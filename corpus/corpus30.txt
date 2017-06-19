@@ -1,0 +1,1010 @@
+Spark Streaming can also generate RDDs with zero partitions if no data was
+received i.e. no data blocks were created in a batch interval. The
+resultant BlockRDD for that batch interval will have zero partitions.
+This RDD still need to be cogrouped with another RDD (state RDD) and
+finally new state RDD needs to be computed (even if there was no input
+data).
+However, as far as I think, since we are doing a shuffle on the BlockRDD
+(for the cogroup) the ShuffledRDD (or whatever its now called) will
+non-zero partitions (even though its parent RDD has zero-poartitions). So
+this is not really a case of zero partitions and it will actually get
+computed in the current code.
+TL;DR: From Spark Streaming point of view, even though there are
+0-partition RDDs possible, I dont see a point of handling zero partitions
+beyond runjob.
+TD
+On Fri, Aug 23, 2013 at 11:07 AM, Reynold Xin  wrote:
+Responses inline. Sorry for the delay. Hope this helps!
+TD
+On Fri, Sep 20, 2013 at 12:41 PM, Gerard Maas  wrote:
+The way our input streams works is that there is only one receiver per
+input stream. So if you have set up only one kafka input stream then all
+the data will go to one node running the receiver. For parallel ingestion
+of data, you need to create multiple kafka input streams and partition the
+kafka topics across them. Then there will be multiple receivers. and
+The line [0] points to is not exactly the reason. What that lines does it
+runs a dummy job to make sure that all the worker nodes have connected to
+master before starting the receivers.
+Unless I missed some part, It looks like we might have a concurrency issue
+current block generator was not exactly designed for parallel insertion and
+so this is something. For the time being a simple solution would be to add
+a "synchronized" in += function.
+I actually have plans to make major changes to the block generation code
+and I will keep in mind of this issue.
+The justification behind the design of the NetworkInputTracker is as
+follows. The ReceiverExecutor thread is meant to start the receiver and
+stay blocked until the receivers are shutdown. This is because the way
+receivers are started is by making an RDD out of the receiver objects and
+starting a Spark job to distribute and execute them. Hence the receivers
+are run as long running tasks in the workers, and in case a receiver dies
+(node dies), Spark scheduler's in built fault-tolerance model will rerun
+the task (i.e, start the receiver) on another node. Hence the Spark job
+executing the receiver continues to be alive and the thread that started
+the Spark job will stay blocked. Also this thread does not need to
+communicate with any other thread. Tasks run through the actor model must
+be short tasks that does not block the actor's thread, hence this activity
+is fundamentally unsuited to be implemented using actors. Hence we used a
+raw thread to start the Spark job that runs the executors. All other actual
+communication between the receiver and tracker is handled by the
+NetworkInputTrackerActor and NetworkReceiverActor (running with the
+receiver).
+Also, note that there is a mix of three concurrency models in the
+NetworkReceiver -
+(i) NetworkReceiverActor communicate with the master about block names,
+(ii) the receiving thread receives data from some source and pushes it to
+the block generator,
+(iii) block generator has its own timer periodically forms blocks and
+another thread that pushes the blocks to Spark's block manager
+(blockPushingThread)
+Again each of these threads have different requirements.
+In case (iii), the "blockPushingThread" in the block generator needs to do
+tasks (pushing blocks) that may take a bit of time to be done. That makes
+it slightly unsuitable for being implemented as actors, for the reasons
+stated earlier. Also, the timer and block pushing thread are different as
+the timer running in it own thread should be execute strictly periodically
+and not be delayed by variable delays in the block pushing thread.
+Case (ii) could have been implemented as an actor as it just inserts a
+record on an arraybuffer (i.e.m very small task). However, with rates of
+more than 100K records received per second, I was unsure what the overhead
+of sending each record as a message through the actor library would be
+like. For this reason, we use actors only in the control plane and not the
+data plane.
+ In case (i), since all control plane messaging is done by actors, this was
+implemented as actors.
+I probably went into more detail that you wanted to know. :) Apologies if
+that is case.
+That said, there may definitely be a better way of implementing this
+without reducing performance significantly. I am totally open for
+discussion in this matter.
+On Wed, Sep 25, 2013 at 12:30 PM, Gerard Maas  wrote:
+Yes! actor vs threads with locking is a great test to do, since for the
+kafka (and who know what other sources in future), the block generator has
+to support multiple thread ingestion. I think one also needs to compare
+with single thread without locking (the current model). If single thread
+without locking is the fastest and thread with locking not so bad compared
+to actors, then it may be better to leave the ingestion without locks for
+maximum throughput for single-thread sources (e.g. Socket, and most others)
+and add a lock for multi-thread sources like Kafka.
+Hello Dachuan,
+RDDs generated by StateDStream are checkpointed because the tree of RDD
+dependencies (i.e. the RDD lineage) can grow indefinitely as each state RDD
+depends on the state RDD from the previous batch of data. Checkpointing
+save an RDD to HDFS to cuts of all ties to its parent RDDs (i.e. truncates
+the lineage). If you do not periodically checkpoint of the state RDDs,
+these really large lineages can lead to all sorts of problems. The
+"mustCheckpoint" field ensures that state RDDs are automatically
+checkpointed with some periodicity even if the user does not explicitly
+specify one. Setting mustCheckpoint to false disables this automatic
+checkpointing. I think that is leading to really large lineages, and
+serializing the RDD with its lineage is causing the stack to overflow.
+On that note, what are you trying to achieve by setting mustCheckpoint =
+false? Maybe there is another way of achieving what you are trying to
+achieve.
+TD
+On Tue, Dec 24, 2013 at 9:05 AM, Dachuan Huang
+ Hello, developers,
+There are two main uses of network in Spark (ignoring Spark Streaming)
+through
+1. spark.network stuff for bulk data transfer
+2. Akka  actor library for control plane messaging
+Besides porting the spark.network, you will also have to port Akka to run
+on your stack. You will find most of the control layer class like
+DAGScheduler, BlockManager, etc uses actor to communicate as well as to
+process events in a single-threaded fashion. For example, the
+BlockManagerMaster (driver) and the BlockManager (worker) communicate
+(control messages only) using the BlockManagerMasterActor and
+BlockManagerSlaveActor, respectively.
+A good place to start would be to first read up on Akka from online
+docs and
+look at the code to see how we use it.
+TD
+On Thu, Jan 2, 2014 at 11:03 PM, Kai Backman  wrote:
+There are a bunch of tricks noted in the Tuning
+Guide.
+You may have seen them already but I thought its still worth mentioning for
+the records.
+Besides those, if you are concerned about consistent latency (that is, low
+variability in the job processing times), then using
+concurrent-mark-and-sweep GC is recommended. Instead of big stop-the-world
+GC pauses, there are many smaller pauses. This reduction in variability
+comes at the cost of processing throughput though, so thats a tradeoff.
+TD
+On Thu, Jan 16, 2014 at 11:35 AM, Kay Ousterhout  Hi all,
+Starting off.
+ +1
+On Sun, Jan 19, 2014 at 2:15 PM, Patrick Wendell  wrote:
+Its highly likely that the executor with the threadpool that runs the tasks
+are the only set of threads that writes to disk. The tasks are designed to
+be interrupted when the corresponding job is cancelled. So a reasonably
+simple way could be to actually cancel the currently active jobs, which
+would send the signal to the worker to stop the tasks. Currently, the
+DAGSchedulerdoes
+not seem to actually cancel the jobs, only mark them as failed. So it
+may be a simple addition.
+There may be some complications with the external spilling of shuffle data
+to disk not stopping immediately when the task is marked for killing. Gotta
+try it out.
+TD
+On Thu, Feb 6, 2014 at 10:39 PM, Andrew Ash  wrote:
+That definitely sound more reliable. Worth trying out if there is a
+reliable way of reproducing the deadlock-like scenario.
+TD
+On Thu, Feb 6, 2014 at 11:38 PM, Matei Zaharia  I don't think we necessarily want to do this through the DAGScheduler
+Or we can try adding a shutdown hook in the
+Executorto
+call threadPool.shutdownNow(). May have to catch the
+InterruptedException and handle it gracefully out
+here
+.
+TD
+On Thu, Feb 6, 2014 at 11:49 PM, Andrew Ash  wrote:
+I think if the threads in the threadpool catch and ignore
+InterruptedException then those thread cant be stopped. So there is not
+guarantee, but it will probably most of the time. Unless some user code
+catches Interrupted exception.
+We can probably first try to
+kill
+the
+currently running
+tasks,
+which will make an attempt to "gracefully" shut them down. That probably
+cannot be overriden by user code. Then use the threadpool.shutdownNow.
+Double whammy!
+TD
+On Fri, Feb 7, 2014 at 12:21 AM, Andrew Ash  wrote:
+That's interesting! I am curious to find out as well.
+TD
+On Fri, Feb 14, 2014 at 9:28 AM, Nick Pentreath  Thanks Parviz, this looks great and good to see it getting updated. Look
+For the log trace, it does not seem like it is finding any new file, which
+is why it is not creating any output data. Are you sure your inserting text
+files correctly into the directory that you have created textStream on?
+Does this program work locally with local file system using the same
+mechanism of adding files to a local directory?
+TD
+On Mon, Feb 17, 2014 at 1:09 AM, Suraj Satishkumar Sheth  wrote:
+ Hello everyone,
+Since the release of Spark 0.9, we have received a number of important bug
+fixes and we would like to make a bug-fix release of Spark 0.9.1. We are
+going to cut a release candidate soon and we would love it if people test
+it out. We have backported several bug fixes into the 0.9 and updated JIRA
+accordingly.
+Please let me know if there are fixes that were not backported but you
+would like to see them in 0.9.1.
+Thanks!
+TD
+I agree that the garbage collection
+PRwould make things very
+convenient in a lot of usecases. However, there are
+two broads reasons why it is hard for that PR to get into 0.9.1.
+1. The PR still needs some amount of work and quite a lot of testing. While
+we enable RDD and shuffle cleanup based on Java GC, its behavior in a real
+workloads still needs to be understood (especially since it is tied to
+Spark driver's garbage collection behavior).
+2. This actually changes some of the semantic behavior of Spark and should
+not be included in a bug-fix release. The PR will definitely be present for
+Spark 1.0, which is expected to be release around end of April (not too far
+;) ).
+TD
+On Wed, Mar 19, 2014 at 5:57 PM, Mridul Muralidharan  Would be great if the garbage collection PR is also committed - if not
+@Shivaram, That is a useful patch but I am bit afraid merge it in.
+Randomizing the executor has performance implications, especially for Spark
+Streaming. The non-randomized ordering of allocating machines to tasks was
+subtly helping to speed up certain window-based shuffle operations.  For
+example, corresponding shuffle partitions in multiple shuffles using the
+same partitioner were likely to be co-located, that is, shuffle partition 0
+were likely to be on the same machine for multiple shuffles. While this is
+the not a reliable mechanism to rely on, randomization may lead to
+performance degradation. So I am afraid to merge this one without
+understanding the consequences.
+@Evan, I have already cut a release! You can submit the PR and we can merge
+it branch-0.9. If we have to cut another release, then we can include it.
+On Sun, Mar 23, 2014 at 11:42 PM, Evan Chan  wrote:
+Patrick, that is a good point.
+On Mon, Mar 24, 2014 at 12:14 AM, Patrick Wendell  > Spark's dependency graph in a maintenance
+Please vote on releasing the following candidate as Apache Spark version 0.9
+.1
+A draft of the release notes along with the CHANGES.txt file is attached to
+this e-mail.
+The tag to be voted on is v0.9.1 (commit 81c6a06c):
+https://git-wip-us.apache.org/repos/asf?p=spark
+.git;a=commit;h=81c6a06c796a87aaeb5f129f36e4c3396e27d652
+The release files, including signatures, digests, etc can be found at:
+http://people.apache.org/~tdas/spark-0.9.1-rc1/
+Release artifacts are signed with the following key:
+https://people.apache.org/keys/committer/tdas.asc
+The staging repository for this release can be found at:
+https://repository.apache.org/content/repositories/orgapachespark-1007/
+The documentation corresponding to this release can be found at:
+http://people.apache.org/~tdas/spark-0.9.1-rc1-docs/
+Please vote on releasing this package as Apache Spark 0.9.1!
+The vote is open until Thursday, March 27, at 22:00 UTC and passes if
+a majority of at least 3 +1 PMC votes are cast.
+[ ] +1 Release this package as Apache Spark 0.9.1
+[ ] -1 Do not release this package because ...
+To learn more about Apache Spark, please see
+http://spark.apache.org/ 
+Spark 0.9.1 is a patch release with bug fixes, performance improvements, and improved parity of the Scala and Python RDD API.
+### Spark Core
+* Fixed bug in external spilling
+* Fixed the use of log4j
+* Fixed bugs in Spark web UI
+* Removed metrics from default build due to LGPL issues
+* Added support for more Hadoop OutputFormats
+* Added ability to make distribution with Tachyon
+* Fixed ADD_JAR
+* Fixed bug in saveAsNewAPIHadoopFile when used with HBase
+* Fixed various scheduler bugs
+* Full list of resolved issues [XXX - remove this if this has to be a txt file]
+### Spark Streaming
+* Improvements to docs
+### MLLib
+* Various performance optimizations
+### GraphX
+* Added Graphx to Spark assembly
+### PySpark
+* Added RDD missing operations (zip, foldByKey, takeOrdered)
+* Fixed bugs in RDD operations
+* Improved
+### Spark on YARN
+* Fixed bug in getting HDFS delegation tokens
+* Fixed bugs in yarn-client mode
+### Spark EC2 scripts
+* Added c3 instance support in EC2 scripts
+1051 has been pulled in!
+search 1051 in
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=shortlog;h=refs/heads/branch-0.9
+TD
+On Mon, Mar 24, 2014 at 4:26 PM, Kevin Markey  wrote:
+Hello Kevin,
+A fix for SPARK-782 would definitely simplify building against Spark.
+However, its possible that a fix for this issue in 0.9.1 will break
+the builds (that reference spark) of existing 0.9 users, either due to
+a change in the ASM version, or for being incompatible with their
+current workarounds for this issue. That is not a good idea for a
+maintenance release, especially when 1.0 is not too far away.
+Can you (and others) elaborate more on the current workarounds that
+you have for this issue? Its best to understand all the implications
+of this fix.
+Note that in branch 0.9, it is not fixed, neither in SBT nor in Maven.
+TD
+On Mon, Mar 24, 2014 at 4:38 PM, Kevin Markey  wrote:
+@evan
+solution for SPARK-1138. Nor do we have a sense of whether the solution is
+going to small enough for a maintenance release. So I dont think we should
+block the release of Spark 0.9.1 for this. We can make another Spark 0.9.2
+release once the correct solution has been figured out.
+@kevin
+I understand the problem. I will try to port the solution for master
+inthis PR  into
+branch 0.9. Lets see if it works out.
+On Tue, Mar 25, 2014 at 10:19 AM, Kevin Markey  TD:
+PR 159 seems like a fairly big patch to me. And quite recent, so its impact
+on the scheduling is not clear. It may also depend on other changes that
+may have gotten into the DAGScheduler but not pulled into branch 0.9. I am
+not sure it is a good idea to pull that in. We can pull those changes later
+for 0.9.2 if required.
+TD
+On Tue, Mar 25, 2014 at 8:44 PM, Mridul Muralidharan  Forgot to mention this in the earlier request for PR's.
+This voting thread has been canceled to accommodate an important fix
+regarding Spark's use of the ASM library. Refer to
+https://spark-project.atlassian.net/browse/SPARK-782 for more details.
+TD
+On Tue, Mar 25, 2014 at 10:36 PM, Matei Zaharia  Actually I found one minor issue, which is that the support for Tachyon in
+Please vote on releasing the following candidate as Apache Spark version 0.9.1
+A draft of the release notes along with the CHANGES.txt file is
+attached to this e-mail.
+The tag to be voted on is v0.9.1-rc2 (commit 1197280a):
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=commit;h=1197280acf1322165301259dd825f44e22a323bc
+The release files, including signatures, digests, etc can be found at:
+http://people.apache.org/~tdas/spark-0.9.1-rc2/
+Release artifacts are signed with the following key:
+https://people.apache.org/keys/committer/tdas.asc
+The staging repository for this release can be found at:
+https://repository.apache.org/content/repositories/orgapachespark-1008/
+The documentation corresponding to this release can be found at:
+http://people.apache.org/~tdas/spark-0.9.1-rc2-docs/
+Please vote on releasing this package as Apache Spark 0.9.1!
+The vote is open until Saturday, March 29, at 12:00 UTC and passes if
+a majority of at least 3 +1 PMC votes are cast.
+[ ] +1 Release this package as Apache Spark 0.9.1
+[ ] -1 Do not release this package because ...
+To learn more about Apache Spark, please see
+http://spark.apache.org/
+Spark 0.9.1 is a patch release with bug fixes, performance improvements, and improved parity of the Scala and Python RDD API.
+### Spark Core
+* Fixed bug in external spilling
+* Fixed bug with Spark's dependency on ASM
+* Fixed Spark's use of log4j
+* Fixed bugs in Spark web UI
+* Removed metrics from default build due to LGPL issues
+* Added support for more Hadoop OutputFormats
+* Added ability to make distribution with Tachyon
+* Fixed ADD_JAR
+* Fixed bug in saveAsNewAPIHadoopFile when used with HBase
+* Fixed various scheduler bugs
+* Full list of resolved issues [XXX - remove this if this has to be a txt file]
+### Spark Streaming
+* Improvements to docs
+### MLLib
+* Various performance optimizations
+### GraphX
+* Added Graphx to Spark assembly
+### PySpark
+* Added RDD missing operations (zip, foldByKey, takeOrdered)
+* Fixed bugs in RDD operations
+* Improved
+### Spark on YARN
+* Fixed bug in getting HDFS delegation tokens
+* Fixed bugs in yarn-client mode
+### Spark EC2 scripts
+* Added c3 instance support in EC2 scripts
+Updates:
+1. Fix for the ASM
+problemthat
+Kevin mentioned is already in Spark 0.9.1 RC2
+2. Fix for pyspark's RDD.top()
+that Patrick
+mentioned has been pulled into branch 0.9. This will get into the next RC
+if there is one.
+TD
+On Wed, Mar 26, 2014 at 9:21 AM, Patrick Wendell  wrote:
+This vote has been cancelled to accommodate two important bug fixes. See
+JIRA issues for more details.
+1. Bug with intercepts in MLLib's GLM:
+https://spark-project.atlassian.net/browse/SPARK-1327
+2. Bug in PySpark's RDD.top() ordering:
+https://spark-project.atlassian.net/browse/SPARK-1322
+TD
+On Wed, Mar 26, 2014 at 4:03 AM, Tathagata Das
+ Please vote on releasing the following candidate as Apache Spark version
+Please vote on releasing the following candidate as Apache Spark version 0.9.1
+A draft of the release notes along with the CHANGES.txt file is
+attached to this e-mail.
+The tag to be voted on is v0.9.1-rc3 (commit 4c43182b):
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=commit;h=4c43182b6d1b0b7717423f386c0214fe93073208
+The release files, including signatures, digests, etc. can be found at:
+http://people.apache.org/~tdas/spark-0.9.1-rc3/
+Release artifacts are signed with the following key:
+https://people.apache.org/keys/committer/tdas.asc
+The staging repository for this release can be found at:
+https://repository.apache.org/content/repositories/orgapachespark-1009/
+The documentation corresponding to this release can be found at:
+http://people.apache.org/~tdas/spark-0.9.1-rc3-docs/
+Please vote on releasing this package as Apache Spark 0.9.1!
+The vote is open until Sunday, March 30, at 10:00 UTC and passes if
+a majority of at least 3 +1 PMC votes are cast.
+[ ] +1 Release this package as Apache Spark 0.9.1
+[ ] -1 Do not release this package because ...
+To learn more about Apache Spark, please see
+http://spark.apache.org/
+Spark 0.9.1 is a patch release with bug fixes, performance improvements, and improved parity of the Scala and Python RDD API.
+### Spark Core
+* Fixed bug in PySpark's RDD.top() ordering
+* Fixed bug in external spilling
+* Fixed bug with Spark's dependency on ASM
+* Fixed bug in MLLib's GLM and intercepts
+* Fixed Spark's use of log4j
+* Fixed bugs in Spark web UI
+* Removed metrics from default build due to LGPL issues
+* Added support for more Hadoop OutputFormats
+* Added ability to make distribution with Tachyon
+* Fixed ADD_JAR
+* Fixed bug in saveAsNewAPIHadoopFile when used with HBase
+* Fixed various scheduler bugs
+* Full list of resolved issues [XXX - remove this if this has to be a txt file]
+### Spark Streaming
+* Improvements to docs
+### MLLib
+* Various performance optimizations
+### GraphX
+* Added Graphx to Spark assembly
+### PySpark
+* Added RDD missing operations (zip, foldByKey, takeOrdered)
+* Fixed bugs in RDD operations
+* Improved
+### Spark on YARN
+* Fixed bug in getting HDFS delegation tokens
+* Fixed bugs in yarn-client mode
+### Spark EC2 scripts
+* Added c3 instance support in EC2 scripts
+I have cut another release candidate, RC3, with two important bug
+fixes. See the following JIRAs for more details.
+1. Bug with intercepts in MLLib's GLM:
+https://spark-project.atlassian.net/browse/SPARK-1327
+2. Bug in PySpark's RDD.top() ordering:
+https://spark-project.atlassian.net/browse/SPARK-1322
+Please vote on this candidate on the voting thread.
+Thanks!
+TD
+On Wed, Mar 26, 2014 at 3:09 PM, Tathagata Das
+ wrote:
+Small fixes to the docs can be done after the voting has completed. This
+should not determine the vote on the release candidate binaries. Please
+vote as "+1" if the published artifacts and binaries are good to go.
+TD
+On Mar 29, 2014 5:23 AM, "prabeesh k"  wrote:
+Ah yes that should be and will be updated!
+One more update in docs.
+In the home page of spark streaming
+http://spark.incubator.apache.org/streaming/.
+Under
+Deployment Options
+ It is mentioned that "*Spark Streaming can read data from HDFS
+,Kafka , Twitter
+ and ZeroMQ *".
+But from Spark Streaming-0.9.0 on wards it also supports Mqtt.
+Can you please do the necessary to update the same after the voting has
+completed?
+On Sat, Mar 29, 2014 at 9:28 PM, Tathagata Das
+ Small fixes to the docs can be done after the voting has completed. This
+tracking
+Yes, lets extend the vote for two more days from now. So the vote is open
+till *Wednesday, April 02, at 20:00 UTC*
+On that note, my +1
+TD
+On Mon, Mar 31, 2014 at 9:57 AM, Patrick Wendell  wrote:
+Yes, I will take a look at those tests ASAP.
+TD
+On Mon, Apr 7, 2014 at 11:32 AM, Patrick Wendell  wrote:
+Aaah, this should have been ported to Spark 0.9.1!
+TD
+On Thu, Apr 17, 2014 at 12:08 PM, Sean Owen  wrote:
+Aaah, this should have been ported to Spark 0.9.1!
+TD
+On Thu, Apr 17, 2014 at 12:08 PM, Sean Owen  wrote:
+Please vote on releasing the following candidate as Apache Spark version 1.0.0!
+This has a few bug fixes on top of rc9:
+SPARK-1875: https://github.com/apache/spark/pull/824
+SPARK-1876: https://github.com/apache/spark/pull/819
+SPARK-1878: https://github.com/apache/spark/pull/822
+SPARK-1879: https://github.com/apache/spark/pull/823
+The tag to be voted on is v1.0.0-rc10 (commit d8070234):
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=commit;h=d807023479ce10aec28ef3c1ab646ddefc2e663c
+The release files, including signatures, digests, etc. can be found at:
+http://people.apache.org/~tdas/spark-1.0.0-rc10/
+The release artifacts are signed with the following key:
+https://people.apache.org/keys/committer/tdas.asc
+The staging repository for this release can be found at:
+https://repository.apache.org/content/repositories/orgapachespark-1018/
+The documentation corresponding to this release can be found at:
+http://people.apache.org/~tdas/spark-1.0.0-rc10-docs/
+The full list of changes in this release can be found at:
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=blob;f=CHANGES.txt;h=d21f0ace6326e099360975002797eb7cba9d5273;hb=d807023479ce10aec28ef3c1ab646ddefc2e663c
+Please vote on releasing this package as Apache Spark 1.0.0!
+The vote is open until Friday, May 23, at 20:00 UTC and passes if
+amajority of at least 3 +1 PMC votes are cast.
+[ ] +1 Release this package as Apache Spark 1.0.0
+[ ] -1 Do not release this package because ...
+To learn more about Apache Spark, please see
+http://spark.apache.org/
+====== API Changes ======
+We welcome users to compile Spark applications against 1.0. There are
+a few API changes in this release. Here are links to the associated
+upgrade guides - user facing changes have been kept as small as
+possible.
+Changes to ML vector specification:
+http://people.apache.org/~tdas/spark-1.0.0-rc10-docs/mllib-guide.html#from-09-to-10
+Changes to the Java API:
+http://people.apache.org/~tdas/spark-1.0.0-rc10-docs/java-programming-guide.html#upgrading-from-pre-10-versions-of-spark
+Changes to the streaming API:
+http://people.apache.org/~tdas/spark-1.0.0-rc10-docs/streaming-programming-guide.html#migration-guide-from-091-or-below-to-1x
+Changes to the GraphX API:
+http://people.apache.org/~tdas/spark-1.0.0-rc10-docs/graphx-programming-guide.html#upgrade-guide-from-spark-091
+Other changes:
+coGroup and related functions now return Iterable[T] instead of Seq[T]
+==> Call toSeq on the result to restore the old behavior
+SparkContext.jarOfClass returns Option[String] instead of Seq[String]
+==> Call toSeq on the result to restore old behavior
+Hey all,
+On further testing, I came across a bug that breaks execution of
+pyspark scripts on YARN.
+https://issues.apache.org/jira/browse/SPARK-1900
+This is a blocker and worth cutting a new RC.
+We also found a fix for a known issue that prevents additional jar
+files to be specified through spark-submit on YARN.
+https://issues.apache.org/jira/browse/SPARK-1870
+The has been fixed and will be in the next RC.
+We are canceling this vote for now. We will post RC11 shortly. Thanks
+everyone for testing!
+TD
+On Thu, May 22, 2014 at 1:25 PM, Kevin Markey  wrote:
+Right! Doing that.
+TD
+On Thu, May 22, 2014 at 3:07 PM, Henry Saputra  wrote:
+Hey all,
+We are canceling the vote on RC10 because of a blocker bug in pyspark on Yarn.
+https://issues.apache.org/jira/browse/SPARK-1900
+Thanks everyone for testing! We will post RC11 soon.
+TD
+Please vote on releasing the following candidate as Apache Spark version 1.0.0!
+This has a few important bug fixes on top of rc10:
+SPARK-1900 and SPARK-1918: https://github.com/apache/spark/pull/853
+SPARK-1870: https://github.com/apache/spark/pull/848
+SPARK-1897: https://github.com/apache/spark/pull/849
+The tag to be voted on is v1.0.0-rc11 (commit c69d97cd):
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=commit;h=c69d97cdb42f809cb71113a1db4194c21372242a
+The release files, including signatures, digests, etc. can be found at:
+http://people.apache.org/~tdas/spark-1.0.0-rc11/
+Release artifacts are signed with the following key:
+https://people.apache.org/keys/committer/tdas.asc
+The staging repository for this release can be found at:
+https://repository.apache.org/content/repositories/orgapachespark-1019/
+The documentation corresponding to this release can be found at:
+http://people.apache.org/~tdas/spark-1.0.0-rc11-docs/
+Please vote on releasing this package as Apache Spark 1.0.0!
+The vote is open until Thursday, May 29, at 16:00 UTC and passes if
+a majority of at least 3 +1 PMC votes are cast.
+[ ] +1 Release this package as Apache Spark 1.0.0
+[ ] -1 Do not release this package because ...
+To learn more about Apache Spark, please see
+http://spark.apache.org/
+== API Changes ==
+We welcome users to compile Spark applications against 1.0. There are
+a few API changes in this release. Here are links to the associated
+upgrade guides - user facing changes have been kept as small as
+possible.
+Changes to ML vector specification:
+http://people.apache.org/~tdas/spark-1.0.0-rc11-docs/mllib-guide.html#from-09-to-10
+Changes to the Java API:
+http://people.apache.org/~tdas/spark-1.0.0-rc11-docs/java-programming-guide.html#upgrading-from-pre-10-versions-of-spark
+Changes to the streaming API:
+http://people.apache.org/~tdas/spark-1.0.0-rc11-docs/streaming-programming-guide.html#migration-guide-from-091-or-below-to-1x
+Changes to the GraphX API:
+http://people.apache.org/~tdas/spark-1.0.0-rc11-docs/graphx-programming-guide.html#upgrade-guide-from-spark-091
+Other changes:
+coGroup and related functions now return Iterable[T] instead of Seq[T]
+==> Call toSeq on the result to restore the old behavior
+SparkContext.jarOfClass returns Option[String] instead of Seq[String]
+==> Call toSeq on the result to restore old behavior
+Let me put in my +1 as well!
+This voting is now closed, and it successfully passes with 13 "+1"
+votes and one "0" vote.
+Thanks to everyone who tested the RC and voted. Here are the totals:
++1: (13 votes)
+Matei Zaharia*
+Mark Hamstra*
+Holden Karau
+Nick Pentreath*
+Will Benton
+Henry Saputra
+Sean McNamara*
+Xiangrui Meng*
+Andy Konwinski*
+Krishna Sankar
+Kevin Markey
+Patrick Wendell*
+Tathagata Das*
+0: (1 vote)
+Ankur Dave*
+-1: (0 vote)
+* = binding
+Please hold off announcing Spark 1.0.0 until Apache Software
+Foundation makes the press release tomorrow. Thank you very much for
+your cooperation.
+TD
+On Thu, May 29, 2014 at 9:14 AM, Patrick Wendell  wrote:
+Hello everyone,
+The vote on Spark 1.0.0 RC11 passes with13 "+1" votes, one "0" vote and no
+"-1" vote.
+Thanks to everyone who tested the RC and voted. Here are the totals:
++1: (13 votes)
+Matei Zaharia*
+Mark Hamstra*
+Holden Karau
+Nick Pentreath*
+Will Benton
+Henry Saputra
+Sean McNamara*
+Xiangrui Meng*
+Andy Konwinski*
+Krishna Sankar
+Kevin Markey
+Patrick Wendell*
+Tathagata Das*
+0: (1 vote)
+Ankur Dave*
+-1: (0 vote)
+Please hold off announcing Spark 1.0.0 until Apache Software Foundation
+makes the press release tomorrow. Thank you very much for your cooperation.
+TD
+After every checkpointing interval, the latest state RDD is stored to HDFS
+in its entirety. Along with that, the series of DStream transformations
+that was setup with the streaming context is also stored into HDFS (the
+whole DAG of DStream objects is serialized and saved).
+TD
+On Wed, Jul 16, 2014 at 5:38 PM, Yan Fang  wrote:
+This is because of the RDD's lazy evaluation! Unless you force a
+transformed (mapped/filtered/etc.) RDD to give you back some data (like
+RDD.count) or output the data (like RDD.saveAsTextFile()), Spark will not
+do anything.
+So after the eventData.map(...), if you do take(10) and then print the
+result, you should seem 10 items from each batch be printed.
+Also you can do the same map operation on the Dstream as well. FYI.
+inputDStream.map(...).foreachRDD(...)     is equivalent to
+ inputDStream.foreachRDD(     // call rdd.map(...) )
+Either way you have to call some RDD "action" (count, collect, take,
+saveAsHadoopFile, etc.)  that asks the system to something concrete with
+the data.
+TD
+On Tue, Jul 22, 2014 at 1:55 PM, Sundaram, Muthu X.  wrote:
+This is because of the RDD's lazy evaluation! Unless you force a
+transformed (mapped/filtered/etc.) RDD to give you back some data (like
+RDD.count) or output the data (like RDD.saveAsTextFile()), Spark will not
+do anything.
+So after the eventData.map(...), if you do take(10) and then print the
+result, you should seem 10 items from each batch be printed.
+Also you can do the same map operation on the Dstream as well. FYI.
+inputDStream.map(...).foreachRDD(...)     is equivalent to
+ inputDStream.foreachRDD(     // call rdd.map(...) )
+Either way you have to call some RDD "action" (count, collect, take,
+saveAsHadoopFile, etc.)  that asks the system to something concrete with
+the data.
+TD
+On Tue, Jul 22, 2014 at 1:55 PM, Sundaram, Muthu X.  wrote:
+Please vote on releasing the following candidate as Apache Spark version 1.0.2.
+This release fixes a number of bugs in Spark 1.0.1.
+Some of the notable ones are
+- SPARK-2452: Known issue is Spark 1.0.1 caused by attempted fix for
+SPARK-1199. The fix was reverted for 1.0.2.
+- SPARK-2576: NoClassDefFoundError when executing Spark QL query on
+HDFS CSV file.
+The full list is at http://s.apache.org/9NJ
+The tag to be voted on is v1.0.2-rc1 (commit 8fb6f00e):
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=commit;h=8fb6f00e195fb258f3f70f04756e07c259a2351f
+The release files, including signatures, digests, etc can be found at:
+http://people.apache.org/~tdas/spark-1.0.2-rc1/
+Release artifacts are signed with the following key:
+https://people.apache.org/keys/committer/tdas.asc
+The staging repository for this release can be found at:
+https://repository.apache.org/content/repositories/orgapachespark-1024/
+The documentation corresponding to this release can be found at:
+http://people.apache.org/~tdas/spark-1.0.2-rc1-docs/
+Please vote on releasing this package as Apache Spark 1.0.2!
+The vote is open until Tuesday, July 29, at 23:00 UTC and passes if
+a majority of at least 3 +1 PMC votes are cast.
+[ ] +1 Release this package as Apache Spark 1.0.2
+[ ] -1 Do not release this package because ...
+To learn more about Apache Spark, please see
+http://spark.apache.org/
+Let me add my vote as well.
+Did some basic tests by running simple projects with various Spark
+modules. Tested checksums.
++1
+On Sun, Jul 27, 2014 at 4:52 PM, Matei Zaharia  wrote:
+Does a "mvn clean" or "sbt/sbt clean" help?
+TD
+On Wed, Jul 30, 2014 at 9:25 PM, yao  wrote:
+Figured it out. Fixing this ASAP.
+TD
+On Fri, Aug 22, 2014 at 5:51 PM, Patrick Wendell  wrote:
+The real fix is that the spark sink suite does not really need to use to
+the spark-streaming test jars. Removing that dependency altogether, and
+submitting a PR.
+TD
+On Fri, Aug 22, 2014 at 6:34 PM, Tathagata Das  Figured it out. Fixing this ASAP.
+If httpClient dependency is coming from Hive, you could build Spark without
+Hive. Alternatively, have you tried excluding httpclient from
+spark-streaming dependency in your sbt/maven project?
+TD
+On Thu, Sep 4, 2014 at 6:42 AM, Koert Kuipers  wrote:
++1
+Tested streaming integration with flume on a local test bed.
+On Thu, Sep 4, 2014 at 6:08 PM, Kan Zhang  wrote:
++1 (binding)
+I agree with the proposal that it just formalizes what we have been
+doing till now, and will increase the efficiency and focus of the
+review process.
+To address Davies' concern, I agree coding style is often a hot topic
+of contention. But that is just an indication that our processes are
+not perfect and we have much room to improve (which is what this
+proposal is all about). Regarding the specific case of coding style,
+we should all get together, discuss, and make our coding style guide
+more comprehensive so that such concerns can be dealt with once and
+not be a recurring concern. And that guide will override any one's
+personal preference, be it the maintainer or a new committer.
+TD
+On Fri, Nov 7, 2014 at 3:18 PM, Davies Liu  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Let me chime in on the discussion as well. Spark Streaming is another
+usecase where the scheduler's task-launching throughput and
+task-latency can limit the batch interval and the overall latencies
+achievable by Spark Streaming. Lets say we want to do batches of 20 ms
+(for achieve end-to-end latencies < 50ms) with 100 receivers. If each
+receiver chunks received data into 10 ms blocks (required for making
+batches every 10 ms), then launches tasks to process those blocks, it
+means 100 blocks / second X 100 receivers = 10000 tasks per seconds.
+This causes a scalability vs. latency tradeoff - if your limit is 1000
+tasks per second (simplifying from 1500), you could either configure
+it to use 100 receivers at 100 ms batches (10 blocks/sec), or 1000
+receivers at 1 second batches.
+Note that I did the calculation without considering processing power
+of the worker nodes, task closure size, workload characteristics, etc
+and other bottlenecks in the system. This calculation therefore does
+not reflect the current performance limits of Spark Streaming, which
+are most likely much lower than above due to other overheads. However,
+as we optimize things further, I know that the scheduler is going to
+be one of the biggest hurdles, and only out-of-the-box approaches like
+Sparrow can solve it.
+TD
+On Sat, Nov 8, 2014 at 10:26 AM, Michael Armbrust
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Too bad Nick, I dont have anything immediately ready that tests Spark
+Streaming with those extreme settings. :)
+On Mon, Nov 10, 2014 at 9:56 AM, Nicholas Chammas
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Spark Streaming essentially does this by saving the DAG of DStreams, which
+can deterministically regenerate the DAG of RDDs upon recovery from
+failure. Along with that the progress information (which batches have
+finished, which batches are queued, etc.) is also saved, so that upon
+recovery the system can restart from where it was before failure. This was
+conceptually easy to do because the RDDs are very deterministically
+generated in every batch. Extending this to a very general Spark program
+with arbitrary RDD computations is definitely conceptually possible but not
+that easy to do.
+On Wed, Dec 10, 2014 at 7:34 PM, Jun Feng Liu  wrote:
+1. There is already a third-party low-level kafka receiver -
+http://spark-packages.org/package/5
+2. There is a new experimental Kafka stream that will be available in Spark
+1.3 release. This is based on the low level API, and might suffice your
+purpose. JIRA - https://issues.apache.org/jira/browse/SPARK-4964
+Can you elaborate on why you have to use SimpleConsumer in your environment?
+TD
+On Wed, Feb 4, 2015 at 7:44 PM, Xuelin Cao  wrote:
+Hey all,
+I found a major issue where JobProgressListener (a listener used to keep
+track of jobs for the web UI) never forgets stages in one of its data
+structures. This is a blocker for long running applications.
+https://issues.apache.org/jira/browse/SPARK-5967
+I am testing a fix for this right now.
+TD
+On Mon, Feb 23, 2015 at 7:23 PM, Soumitra Kumar  +1 (non-binding)
+To add to what Patrick said, the only reason that those JIRAs are marked as
+Blockers (at least I can say for myself) is so that they are at the top of
+the JIRA list signifying that these are more *immediate* issues than all
+the Critical issues. To make it less confusing for the community voting, we
+can definitely add a filter that ignores Documentation issues from the JIRA
+list.
+On Fri, Mar 6, 2015 at 1:17 PM, Patrick Wendell  wrote:
+This is a significant effort that Reynold has undertaken, and I am super
+glad to see that it's finally taking a concrete form. Would love to see
+what the community thinks about the idea.
+TD
+On Wed, Apr 1, 2015 at 3:11 AM, Reynold Xin  wrote:
+Just to add to that, DStream.transform allows you do to arbitrary
+RDD-to-RDD function. Inside that you can do iterative RDD operations as
+well.
+On Thu, Apr 2, 2015 at 6:27 AM, Sean Owen  wrote:
+Correcting the ones that are incorrect or incomplete. BUT this is good list
+for things to remember about Spark Streaming.
+On Wed, May 20, 2015 at 3:40 AM, Hemant Bhanawat  Hi,
+received the block, and another where the block was replicated) that has
+the blocks irrespective of block interval, unless non-local scheduling
+kicks in (as you observed next).
+(print, foreachRDD, saveAsXFiles) and the number of RDD actions in those
+output operations.
+dstream1.union(dstream2).foreachRDD { rdd => rdd.count() }    // one Spark
+job per batch
+dstream1.union(dstream2).foreachRDD { rdd => { rdd.count() ; rdd.count() }
+}    // TWO Spark jobs per batch
+dstream1.foreachRDD { rdd => rdd.count } ; dstream2.foreachRDD { rdd =>
+rdd.count }  // TWO Spark jobs per batch
+spark.streaming.receiver.maxRate
+data checkpointing, needed by only some operations, increase batch
+processing time. Read -
+http://spark.apache.org/docs/latest/streaming-programming-guide.html#checkpointing
+Furthemore, with checkpoint you can recover computation, but you may loose
+some data (that was received but not processed before driver failed) for
+some sources. Enabling write ahead logs and reliable source + receiver,
+allow zero data loss. Read - WAL in
+http://spark.apache.org/docs/latest/streaming-programming-guide.html#fault-tolerance-semantics
+cleaning. What are you are probably talking about is cleaning of shuffle
+and other data in the executors. That can be cleaned using
+spark.cleaner.ttl, but it is a brute force hammer and can clean more stuff
+than you intend. Its not recommended to use that. Rather Spark has
+GC-triggered cleaning of all that, when RDD objects are GCed, their shuffle
+data, cached data, etc are also cleaned in the executors. You can trigger
+GC based cleaning by called System.gc() in the driver periodically.
+Looks like somehow the file size reported by the FSInputDStream of
+Tachyon's FileSystem interface, is returning zero.
+On Mon, May 11, 2015 at 4:38 AM, Dibyendu Bhattacharya  wrote:
+Blocks are replicated immediately, before the driver launches any jobs
+using them.
+On Thu, May 21, 2015 at 2:05 AM, Hemant Bhanawat  Honestly, given the length of my email, I didn't expect a reply. :-)
+Did was it a clean compilation?
+TD
+On Fri, May 29, 2015 at 10:48 PM, Ted Yu  wrote:
++1
+On Sun, Jun 7, 2015 at 3:01 PM, Joseph Bradley  +1
+This should give accurate count for each batch, though for getting the rate
+you have to make sure that you streaming app is stable, that is, batches
+are processed as fast as they are received (scheduling delay in the spark
+streaming UI is approx 0).
+TD
+On Tue, Jun 23, 2015 at 2:49 AM, anshu shukla  I am calculating input rate using the following logic.
+@Ted, could you elaborate more on what was the test command that you ran?
+What profiles, using SBT or Maven?
+TD
+On Sun, Jun 28, 2015 at 12:21 PM, Patrick Wendell  Hey Krishna - this is still the current release candidate.
+@Ted, I ran the following two commands.
+mvn -Phadoop-2.4 -Dhadoop.version=2.7.0 -Pyarn -Phive -DskipTests clean
+package
+mvn -Phadoop-2.4 -Dhadoop.version=2.7.0 -Pyarn -Phive
+-DwildcardSuites=org.apache.spark.streaming.StreamingContextSuite test
+Using Java version "1.7.0_51", the tests passed normally.
+On Mon, Jun 29, 2015 at 1:05 PM, Krishna Sankar  wrote:
++1
+On Tue, Jun 30, 2015 at 8:12 PM, Bobby Chowdary  +1 Tested on CentOS 7
+1. When you set ssc.checkpoint(checkpointDir), the spark streaming
+periodically saves the state RDD (which is a snapshot of all the state
+data) to HDFS using RDD checkpointing. In fact, a streaming app with
+updateStateByKey will not start until you set checkpoint directory.
+2. The updateStateByKey performance is sort of independent of the what is
+the source that is being use - receiver based or direct Kafka. The
+absolutely performance obvious depends on a LOT of variables, size of the
+cluster, parallelization, etc. The key things is that you must ensure
+sufficient parallelization at every stage - receiving, shuffles
+(updateStateByKey included), and output.
+Some more discussion in my talk -
+https://www.youtube.com/watch?v=d5UJonrruHk
+On Tue, Jul 14, 2015 at 4:11 PM, swetha  wrote:
+BTW, this is more like a user-list kind of mail, than a dev-list. The
+dev-list is for Spark developers.
+On Tue, Jul 14, 2015 at 4:23 PM, Tathagata Das  wrote:
+I am taking care of this right now.
+On Sun, Jul 19, 2015 at 6:08 PM, Patrick Wendell  wrote:
+The PR to fix this is out.
+https://github.com/apache/spark/pull/7519
+On Sun, Jul 19, 2015 at 6:41 PM, Tathagata Das  wrote:
+I have remove the flag in the PullRequestBuilder that enabled Kinesis
+tests. All the Kinesis tests should be ignored now. In the mean time we can
+fix the tests.
+On Sat, Jul 25, 2015 at 8:44 AM, Shixiong Zhu  wrote:
+You have to partition that data on the Spark Streaming by the primary key,
+and then make sure insert data into Cassandra atomically per key, or per
+set of keys in the partition. You can use the combination of the (batch
+time, and partition Id) of the RDD inside foreachRDD as the unique id for
+the data you are inserting. This will guard against multiple attempts to
+run the task that inserts into Cassandra.
+See
+http://spark.apache.org/docs/latest/streaming-programming-guide.html#semantics-of-output-operations
+TD
+On Sun, Jul 26, 2015 at 11:19 AM, Priya Ch  Hi All,
+A very basic support that is there in DStream is DStream.transform() which
+take arbitrary RDD => RDD function. This function can actually choose to do
+different computation with time. That may be of help to you.
+On Tue, Sep 29, 2015 at 12:06 PM, Archit Thakur  Hi,
+What happens when a whole node running  your " per node streaming engine
+(built-in checkpoint and recovery)" fails? Can its checkpoint and recovery
+mechanism handle whole node failure? Can you recover from the checkpoint on
+a different node?
+Spark and Spark Streaming were designed with the idea that executors are
+disposable, and there should not be any node-specific long term state that
+you rely on unless you can recover that state on a different node.
+On Mon, Oct 5, 2015 at 3:03 PM, Renyi Xiong  wrote:
+Unfortunately, there is not an obvious way to do this. I am guessing that
+you want to partition your stream such that the same keys always go to the
+same executor, right?
+You could do it by writing a custom RDD. See ShuffledRDD
+.
+That is what is used to do a lot of shuffling. See how it is used from
+RDD.partitionByKey() or RDD.reduceByKey(). You could subclass it specify a
+set of preferred locations, and the system will try to respect those
+locations. These locations should be among the currently active executors.
+You could either get the current list of executors from
+SparkContext.getExecutorMemoryStatus(),
+Hope this helps.
+On Tue, Oct 6, 2015 at 8:27 AM, Renyi Xiong  wrote:
+My intention is to make it compatible! Filed this bug -
+https://issues.apache.org/jira/browse/SPARK-11932
+Looking into it right now. Thanks for testing it out and reporting this!
+On Mon, Nov 23, 2015 at 7:22 AM, jan  wrote:
+Both mapWithState and updateStateByKey by default uses the HashPartitioner,
+and hashes the key in the key-value DStream on which the state operation is
+applied. The new data and state is partition in the exact same partitioner,
+so that same keys from the new data (from the input DStream) get shuffled
+and colocated with the already partitioned state RDDs. So the new data is
+brought to the corresponding old state in the same machine and then the
+state mapping /updating function is applied. The state is not shuffled
+every time, only the batches of new data is shuffled in every batch
+On Tue, Jan 5, 2016 at 5:21 PM, Soumitra Johri  wrote:
+DataFrame is a type alias of Dataset[Row], so externally it seems like
+Dataset is the main type and DataFrame is a derivative type.
+However, internally, since everything is processed as Rows, everything uses
+DataFrames, Type classes used in a Dataset is internally converted to rows
+for processing. . Therefore internally DataFrame is like "main" type that
+is used.
+On Thu, Jun 16, 2016 at 11:18 AM, Cody Koeninger  wrote:
+There are different ways to view this. If its confusing to think that
+Source API returning DataFrames, its equivalent to thinking that you are
+returning a Dataset[Row], and DataFrame is just a shorthand.
+And DataFrame/Datasetp[Row] is to Dataset[String] is what java
+Array[Object] is to Array[String]. DataFrame is more general in a way, as
+every Dataset can be boiled down to a DataFrame. So to keep the Source APIs
+general (and also source-compatible with 1.x), they return DataFrame.
+On Thu, Jun 16, 2016 at 12:38 PM, Cody Koeninger  wrote:
+Its not throwing away any information from the point of view of the SQL
+optimizer. The schema preserves all the type information that the catalyst
+uses. The type information T in Dataset[T] is only used at the API level to
+ensure compilation-time type checks of the user program.
+On Thu, Jun 16, 2016 at 2:05 PM, Cody Koeninger  wrote:
+Hey all,
+I have been working on adding operational metrics for monitoring the health
+and performance of Structured Streaming applications. The detailed design
+and the WIP Github PR is here.
+*JIRA *- SPARK-17731 
+*Design Doc* - https://docs.google.com/document/d/
+1NIdcGuR1B3WIe8t7VxLrt58TJB4DtipWEbj5I_mzJys/edit?usp=sharing
+*PR* - https://github.com/apache/spark/pull/15307
+Would be wonderful if you can give me feedback on the selection of metrics
+and the overall design.
+TD
+Hey all,
+We are planning implement watermarking in Structured Streaming that would
+allow us handle late, out-of-order data better. Specially, when we are
+aggregating over windows on event-time, we currently can end up keeping
+unbounded amount data as state. We want to define watermarks on the event
+time in order mark and drop data that are "too late" and accordingly age
+out old aggregates that will not be updated any more.
+To enable the user to specify details like lateness threshold, we are
+considering adding a new method to Dataset. We would like to get more
+feedback on this API. Here is the design doc
+https://docs.google.com/document/d/1z-Pazs5v4rA31azvmYhu4I5xwqaNQl6Z
+LIS03xhkfCQ/
+Please comment on the design and proposed APIs.
+Thank you very much!
+TD
+This may be a good addition. I suggest you read our guidelines on
+contributing code to Spark.
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark#ContributingtoSpark-PreparingtoContributeCodeChanges
+Its long document but it should have everything for you to figure out how
+to contribute your changes. I hope to see your changes in a Github PR soon!
+TD
+On Mon, Nov 7, 2016 at 5:30 PM, Chan Chor Pang  hi everyone
+You should make sure that schema of the streaming Dataset returned by
+`readStream`, and the schema of the DataFrame returned by the sources
+getBatch.
+On Wed, Feb 1, 2017 at 3:25 PM, Sam Elamin  wrote:
+I am assuming that you have written your own BigQuerySource (i dont see
+that code in the link you posted). In that source, you must have
+implemented getBatch which uses offsets to return the Dataframe having the
+data of a batch. Can you double check when this DataFrame returned by
+getBatch, has the expected schema?
+On Wed, Feb 1, 2017 at 3:33 PM, Sam Elamin  wrote:
+What is the query you are apply writeStream on? Essentially can you print
+the whole query.
+Also, you can do StreamingQuery.explain() to see in full details how the
+logical plan changes to physical plan, for a batch of data. that might
+help. try doing that with some other sink to make sure the source works
+correctly, and then try using your sink.
+If you want further debugging, then you will have to dig into the
+StreamingExecution class in Spark, and debug stuff there.
+https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/execution/streaming/StreamExecution.scala#L523
+On Wed, Feb 1, 2017 at 3:49 PM, Sam Elamin  wrote:

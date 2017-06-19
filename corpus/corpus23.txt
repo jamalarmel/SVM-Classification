@@ -1,0 +1,869 @@
+Hi Matei,
+  Not sure if it is already planned, but the write related Connection  race
+condition Patrick reported/fixed might need to go to 0.8 also ...
+Regards
+Mridul
+hadoop2, in this context, is use of spark on a hadoop cluster without
+yarn but with hadoop2 interfaces.
+hadoop2-yarn uses yarn RM to launch a spark job (and obviously uses
+hadoop2 interfaces).
+Regards,
+Mridul
+Hi,
+  Unless I am mistaken, the change to using typesafe ConfigFactory has
+broken some of the system properties we use in spark.
+For example: if we have both
+-Dspark.speculation=true -Dspark.speculation.multiplier=0.95
+set, then the spark.speculation property is dropped.
+The rules of parseProperty actually document this clearly [1]
+I am not sure what the right fix here would be (other than replacing
+use of config that is).
+Any thoughts ?
+I would vote -1 for 0.9 to be released before this is fixed.
+Regards,
+Mridul
+[1] http://typesafehub.github.io/config/latest/api/com/typesafe/config/ConfigFactory.html#parseProperties%28java.util.Properties,%20com.typesafe.config.ConfigParseOptions%29
+I would vote -1 for this release until we resolve config property
+issue [1] : if there is a known resolution for this (which I could not
+find unfortunately, apologies if it exists !), then will change my
+vote.
+Thanks,
+Mridul
+[1] http://apache-spark-developers-list.1001551.n3.nabble.com/Config-properties-broken-in-master-td208.html
+Hi,
+  Speculation was an example, there are others in spark which are
+affected by this ...
+Some of them have been around for a while, so will break existing code/scripts.
+Regards,
+Mridul
+IMO we should shoot for more stable interfaces and not break them just
+to workaround bugs - unless the benefit of breaking compatibility is
+offset by the added functionality.
+Since I was not around for a while, I am not sure how much config file
+feature was requested ...
+Regards,
+Mridul
+Chanced upon spill related config which exhibit same pattern ...
+- Mridul
+Oh great, just saw the PR from Matei ... for some odd reason, the dev
+mails are coming to be horribly delayed.
+Thanks,
+Mridul
+Yeah, it is in my TODO to test latest RC - unfortunately, the test
+setup is slightly busy running other things.
+Regards,
+Mridul
+Before we move to 1.0, we need to address two things :
+a) backward compatibility not just at api level, but also at binary
+level (not forcing recompile).
+b) minimize external dependencies - some of them would go away/not be
+actively maintained.
+Regards,
+Mridul
+The reason I explicitly mentioned about binary compatibility was
+because it was sort of hand waved in the proposal as good to have.
+My understanding is that scala does make it painful to ensure binary
+compatibility - but stability of interfaces is vital to ensure
+dependable platforms.
+Recompilation might be a viable option for developers - not for users.
+Regards,
+Mridul
+shutdown hooks should not take 15 mins are you mentioned !
+On the other hand, how busy was your disk when this was happening ?
+(either due to spark or something else ?)
+It might just be that there was a lot of stuff to remove ?
+Regards,
+Mridul
+Looks like a pathological corner case here - where the the delete
+thread is not getting run while the OS is busy prioritizing the thread
+writing data (probably with heavy gc too).
+Ideally, the delete thread would list files, remove them and then fail
+when it tries to remove the non empty directory (since other thread
+might be creating more in parallel).
+Regards,
+Mridul
++1
+Would be great if the JIRA tag was 'clickable' to go to the actual JIRA :-)
+Regards,
+Mridul
+Ideally, interrupting the thread writing to disk should be sufficient
+- though since we are in middle of shutdown when this is happening, it
+is best case effort anyway.
+Identifying which threads to interrupt will be interesting since most
+of them are driven by threadpool's and we cant list all threads and
+interrupt all of them !
+Regards,
+Mridul
+This is neat, thanks Reynold !
+Regards,
+Mridul
+This looks like the most reasonable approach to resolve this !
+Regards,
+Mridul
++1 !
+- Mridul
+There is nothing wrong with 9k partitions - I actually use much higher :-) [1]
+I have not really seen this interesting issue you mentioned - should
+investigate more, thanks for the note !
+Regards,
+Mridul
+[1] I do use insanely high frame size anyway - and my workers/master
+run with 8g; maybe why I did not see it yet ...
+I had not resolved it in time for 0.9 - but IIRC there was a recent PR
+which fixed bugs in spill [1] : are you able to reproduce this with
+spark master ?
+Regards,
+Mridul
+[1] https://github.com/apache/incubator-spark/pull/533
+Case 3 can be a potential issue.
+Current implementation might be returning a concrete class which we
+might want to change later - making it a type change.
+The intention might be to return an RDD (for example), but the
+inferred type might be a subclass of RDD - and future changes will
+cause signature change.
+Regards,
+Mridul
+You are right.
+A degenerate case would be :
+def createFoo = new FooImpl()
+vs
+def createFoo: Foo = new FooImpl()
+Former will cause api instability. Reynold, maybe this is already
+avoided - and I understood it wrong ?
+Thanks,
+Mridul
+Without bikeshedding this too much ... It is likely incorrect (not wrong) -
+and rules like this potentially cause things to slip through.
+Explicit return type strictly specifies what is being exposed (think in
+face of impl change - createFoo changes in future from Foo to Foo1 or Foo2)
+.. being conservative about how to specify exposed interfaces, imo,
+outweighs potential gains in breveity of code.
+Btw this is a degenerate contrieved example already stretching its use ...
+Regards
+Mridul
+Regards
+Mridul
+My initial mail had it listed, adding more details here since I assume I am
+missing something or not being clear - please note, this is just
+illustrative and my scala knowledge is bad :-) (I am trying to draw
+parallels from mistakes in java world)
+def createFoo = new Foo()
+To
+def createFoo = new Foo1()
+To
+def createFoo = new Foo2()
+(appropriate inheritance applied - parent Foo).
+I am thinking from api evolution and binary compatibility point of view
+Regards,
+Mridul
+I agree, makes sense.
+Please note I was referring only to exposed user api in my comments - not
+other code !
+Regards,
+Mridul
+Wonderful news ! Congrats all :-)
+Regards,
+Mridul
+I am not sure if this is resolved now - but maven was better at
+building the assembly jars compared to sbt.
+To the point where I stopped using sbt due to unpredictable order in
+which it unjars the dependencies to create the assembled jar (we do
+have quite a lot of conflicting classes in our dependency tree :-( ).
+I dont know if this is an artifact of how we specify it in sbt
+project, or something else ...
+If this is still an issue, then using sbt only is a non starter.
+Regards,
+Mridul
+Hi,
+  Over the past few months, I have seen a bunch of pull requests which have
+extended spark api ... most commonly RDD itself.
+Most of them are either relatively niche case of specialization (which
+might not be useful for most cases) or idioms which can be expressed
+(sometimes with minor perf penalty) using existing api.
+While all of them have non zero value (hence the effort to contribute, and
+gladly welcomed !) they are extending the api in nontrivial ways and have a
+maintenance cost ... and we already have a pending effort to clean up our
+interfaces prior to 1.0
+I believe there is a need to keep exposed api succint, expressive and
+functional in spark; while at the same time, encouraging extensions and
+specialization within spark codebase so that other users can benefit from
+the shared contributions.
+One approach could be to start something akin to piggybank in pig to
+contribute user generated specializations, helper utils, etc : bundled as
+part of spark, but not part of core itself.
+Thoughts, comments ?
+Regards,
+Mridul
+Good point, and I was purposefully vague on that since that is something
+which our community should evolve imo : this was just an initial proposal
+:-)
+For example: there are multiple ways to do cartesian - and each has its own
+trade offs.
+Another candidate could be, as I mentioned, new methods which can be
+expressed as sequences of existing methods but would be slightly more
+performent if done in one shot - like the self cartesian pr, various types
+of join (which can become a contrib of its own btw !), experiments using
+key indexes, ordering, etc.
+Addition into sparkbank or contrib (or something bettrr named !) does not
+preclude future migration into core ... just an initial staging area for us
+to e olve the api and get user feedback; without necessarily making spark
+core api unstable.
+Obviously, it is not a dumping ground for broken code/ideas ... and must
+follow same level of scrutiny and rigour before committing.
+Regards
+Mridul
+ On Feb 23, 2014 11:53 AM, "Amandeep Khurana"  wrote:
+Curious, what was the issue ?
+- Mridul
+The problem is, the complete spark dependency graph is fairly large,
+and there are lot of conflicting versions in there.
+In particular, when we bump versions of dependencies - making managing
+this messy at best.
+Now, I have not looked in detail at how maven manages this - it might
+just be accidental that we get a decent out-of-the-box assembled
+shaded jar (since we dont do anything great to configure it).
+With current state of sbt in spark, it definitely is not a good
+solution : if we can enhance it (or it already is ?), while keeping
+the management of the version/dependency graph manageable, I dont have
+any objections to using sbt or maven !
+Too many exclude versions, pinned versions, etc would just make things
+unmanageable in future.
+Regards,
+Mridul
+Would be great if the garbage collection PR is also committed - if not
+the whole thing, atleast the part to unpersist broadcast variables
+explicitly would be great.
+Currently we are running with a custom impl which does something
+similar, and I would like to move to standard distribution for that.
+Thanks,
+Mridul
+If 1.0 is just round the corner, then it is fair enough to push to
+that, thanks for clarifying !
+Regards,
+Mridul
+Forgot to mention this in the earlier request for PR's.
+If there is another RC being cut, please add
+https://github.com/apache/spark/pull/159 to it too (if not done
+already !).
+Thanks,
+Mridul
+Got some 100 odd mails from jenkins (?) with "Can one of the admins
+verify this patch?"
+Part of upgrade or some other issue ?
+Significantly reduced the snr of my inbox !
+Regards,
+Mridul
+Hi,
+  So we are now receiving updates from three sources for each change to the PR.
+While each of them handles a corner case which others might miss,
+would be great if we could minimize the volume of duplicated
+communication.
+Regards,
+Mridul
+If the PR comments are going to be replicated into the jira's and they
+are going to be set to dev@, then we could keep that and remove
+[Github] updates ?
+The last was added since discussions were happening off apache lists -
+which should be handled by the jira updates ?
+I dont mind the mails if they had content - this is just duplication
+of the same message in three mails :-)
+Btw, this is a good problem to have - a vibrant and very actively
+engaged community generated a lot of meaningful traffic !
+I just dont want to get distracted from it by repetitions.
+Regards,
+Mridul
+Hi,
+  We have a requirement to use a (potential) ephemeral storage, which
+is not within the VM, which is strongly tied to a worker node. So
+source of truth for a block would still be within spark; but to
+actually do computation, we would need to copy data to external device
+(where it might lie around for a while : so data locality really
+really helps if we can avoid a subsequent copy if it is already
+present on computations on same block again).
+I was wondering if the recently added storage level for tachyon would
+help in this case (note, tachyon wont help; just the storage level
+might).
+What sort of guarantees does it provide ? How extensible is it ? Or is
+it strongly tied to tachyon with only a generic name ?
+Thanks,
+Mridul
+No, I am thinking along lines of writing to an accelerator card or
+dedicated card with its own memory.
+Regards,
+Mridul
+An iterator does not imply data has to be memory resident.
+Think merge sort output as an iterator (disk backed).
+Tom is actually planning to work on something similar with me on this
+hopefully this or next month.
+Regards,
+Mridul
+As Matei mentioned, the Values is now an Iterable : which can be disk backed.
+Does that not address the concern ?
+@Patrick - we do have cases where the length of the sequence is large
+and size per value is also non trivial : so we do need this :-)
+Note that join is a trivial example where this is required (in our
+current implementation).
+Regards,
+Mridul
+This breaks all existing jobs which are not using spark-submit.
+The consensus was not to break compatibility unless there was an overriding
+reason to do so
+Sorry, I misread - I meant SPARK_JAVA_OPTS - not JAVA_OPTS.
+See here : https://issues.apache.org/jira/browse/SPARK-1588
+Regards,
+Mridul
+On a slightly related note (apologies Soren for hijacking the thread),
+Reynold how much better is kryo from spark's usage point of view
+compared to the default java serialization (in general, not for
+closures) ?
+The numbers on kyro site are interesting, but since you have played
+the most with kryo in context of spark (i think) - how do you rate it
+along lines of :
+1) computational overhead compared to java serialization.
+2) memory overhead.
+3) generated byte[] size.
+Particularly given the bugs Patrick and I had looked into in past
+along flush, etc I was always skeptical about using kyro.
+But given the pretty nasty issues with OOM's via java serialization we
+are seeing, wanted to know your thoughts on use of kyro with spark.
+(Will be slightly involved to ensure everything gets registered, but I
+want to go down the path assuming I hear good things in context of
+spark)
+Thanks,
+Mridul
+Hi Sandy,
+  I assume you are referring to caching added to datanodes via new caching
+api via NN ? (To preemptively mmap blocks).
+I have not looked in detail, but does NN tell us about this in block
+locations?
+If yes, we can simply make those process local instead of node local for
+executors on that node.
+This would simply be a change to hadoop based rdd partitioning (what makes
+it tricky is to expose currently 'alive' executors to partition)
+Thanks
+Mridul
+So was rc5 cancelled ? Did not see a note indicating that or why ... [1]
+- Mridul
+[1] could have easily missed it in the email storm though !
+Effectively this is persist without fault tolerance.
+Failure of any node means complete lack of fault tolerance.
+I would be very skeptical of truncating lineage if it is not reliable.
+ On 17-May-2014 3:49 am, "Xiangrui Meng (JIRA)"  wrote:
+Can you try moving your mapPartitions to another class/object which is
+referenced only after sc.addJar ?
+I would suspect CNFEx is coming while loading the class containing
+mapPartitions before addJars is executed.
+In general though, dynamic loading of classes means you use reflection to
+instantiate it since expectation is you don't know which implementation
+provides the interface ... If you statically know it apriori, you bundle it
+in your classpath.
+Regards
+Mridul
+We don't have 3x replication in spark :-)
+And if we use replicated storagelevel, while decreasing odds of failure, it
+does not eliminate it (since we are not doing a great job with replication
+anyway from fault tolerance point of view).
+Also it does take a nontrivial performance hit with replicated levels.
+Regards,
+Mridul
+ On 17-May-2014 8:16 am, "Xiangrui Meng"  wrote:
+I had echoed similar sentiments a while back when there was a discussion
+around 0.10 vs 1.0 ... I would have preferred 0.10 to stabilize the api
+changes, add missing functionality, go through a hardening release before
+1.0
+But the community preferred a 1.0 :-)
+Regards,
+Mridul
+I suspect this is an issue we have fixed internally here as part of a
+larger change - the issue we fixed was not a config issue but bugs in spark.
+Unfortunately we plan to contribute this as part of 1.1
+Regards,
+Mridul
+We made incompatible api changes whose impact we don't know yet completely
+: both from implementation and usage point of view.
+We had the option of getting real-world feedback from the user community if
+we had gone to 0.10 but the spark developers seemed to be in a hurry to get
+to 1.0 - so I made my opinion known but left it to the wisdom of larger
+group of committers to decide ... I did not think it was critical enough to
+do a binding -1 on.
+Regards
+Mridul
+My bad ... I was replying via mobile, and I did not realize responses
+to JIRA mails were not mirrored to JIRA - unlike PR responses !
+Regards,
+Mridul
+In that case, does it work if you use snappy instead of lzf ?
+Regards,
+Mridul
+There are a few interacting issues here - and unfortunately I dont
+recall all of it (since this was fixed a few months back).
+a) With shuffle consolidation, data sent to remote node incorrectly
+includes data from partially constructed blocks - not just the request
+blocks.
+Actually, with shuffle consolidation (with and without failures) quite
+a few things broke.
+b) There might have been a few other bugs in DiskBlockObjectWriter too.
+c) We also suspected buffers overlapping when using cached kryo
+serializer (though never proved this, just disabled caching across
+board for now : and always create new instance).
+The way we debug'ed it is by introducing an Input/Output stream which
+introduced checksum into the data stream and validating that at each
+side for compression, serialization, etc.
+Apologies for being non specific ... I really dont have the details
+right now, and our internal branch is in flux due to merge effort to
+port our local changes to master.
+Hopefully we will be able to submit PR's as soon as this is done and
+testcases are added to validate.
+Regards,
+Mridul
+Hi,
+  While sending map output tracker result, the same serialized byte
+array is sent multiple times - but the akka implementation copies it
+to a private byte array within ByteString for each send.
+Caching a ByteString instead of Array[Byte] did not help, since akka
+does not support special casing ByteString : serializes the
+ByteString, and copies the result out to an array before creating
+ByteString out of it (in Array[Byte] serializing is thankfully simply
+returning same array - so one copy only).
+Given the need to send immutable data large number of times, is there
+any way to do it in akka without copying internally in akka ?
+To see how expensive it is, for 200 nodes withi large number of
+mappers and reducers, the status becomes something like 30 mb for us -
+and pulling this about 200 to 300 times results in OOM due to the
+large number of copies sent out.
+Thanks,
+Mridul
+Our current hack is to use Broadcast variables when serialized
+statuses are above some (configurable) size : and have the workers
+directly pull them from master.
+This is a workaround : so would be great if there was a
+better/principled solution.
+Please note that the responses are going to different workers
+requesting for the output statuses for shuffle (after map) - so not
+sure if back pressure buffers, etc would help.
+Regards,
+Mridul
+We had considered both approaches (if I understood the suggestions right) :
+a) Pulling only map output states for tasks which run on the reducer
+by modifying the Actor. (Probably along lines of what Aaron described
+?)
+The performance implication of this was bad :
+1) We cant cache serialized result anymore, (caching it makes no sense rather).
+2) The number requests to master will go from num_executors to
+num_reducers - the latter can be orders of magnitude higher than
+former.
+b) Instead of pulling this information, push it to executors as part
+of task submission. (What Patrick mentioned ?)
+(1) a.1 from above is still an issue for this.
+(2) Serialized task size is also a concern : we have already seen
+users hitting akka limits for task size - this will be an additional
+vector which might exacerbate it.
+Our jobs are not hitting this yet though !
+I was hoping there might be something in akka itself to alleviate this
+- but if not, we can solve it within context of spark.
+Currently, we have worked around it by using broadcast variable when
+serialized size is above some threshold - so that our immediate
+concerns are unblocked :-)
+But a better solution should be greatly welcomed !
+Maybe we can unify it with large serialized task as well ...
+Btw, I am not sure what the higher cost of BlockManager referred to is
+Aaron - do you mean the cost of persisting the serialized map outputs
+to disk ?
+Regards,
+Mridul
+Hi Patrick,
+  Please see inline.
+Regards,
+Mridul
+Hi Reynold,
+  Please see inline.
+Regards,
+Mridul
+In our clusters, number of containers we can get is high but memory
+per container is low : which is why avg_nodes_not_hosting data is
+rarely zero for ML tasks :-)
+To update - to unblock our current implementation efforts, we went
+with broadcast - since it is intutively easier and minimal change; and
+compress the array as bytes in TaskResult.
+This is then stored in disk backed maps - to remove memory pressure on
+master and workers (else MapOutputTracker becomes a memory hog).
+But I agree, compressed bitmap to represent 'large' blocks (anything
+larger that maxBytesInFlight actually) and probably existing to track
+non zero should be fine (we should not really track zero output for
+reducer - just waste of space).
+Regards,
+Mridul
+You are ignoring serde costs :-)
+- Mridul
+Hi,
+  I noticed today that gmail has been marking most of the mails from
+spark github/jira I was receiving to spam folder; and I was assuming
+it was lull in activity due to spark summit for past few weeks !
+In case I have commented on specific PR/JIRA issues and not followed
+up, apologies for the same - please do reach out in case it is still
+pending something from my end.
+Regards,
+Mridul
++1 on advanced mode !
+Regards.
+Mridul
+We tried with lower block size for lzf, but it barfed all over the place.
+Snappy was the way to go for our jobs.
+Regards,
+Mridul
+Just came across this mail, thanks for initiating this discussion Kay.
+To add; another issue which recurs is very rapid commit's: before most
+contributors have had a chance to even look at the changes proposed.
+There is not much prior discussion on the jira or pr, and the time
+between submitting the PR and committing it is < 12 hours.
+Particularly relevant when contributors are not on US timezones and/or
+colocated; I have raised this a few times before when the commit had
+other side effects not considered.
+On flip side we have PR's which have been languishing for weeks with
+little or no activity from committers side - making the contribution
+stale; so too long a delay is also definitely not the direction to
+take either !
+Regards,
+Mridul
+Issue with supporting this imo is the fact that scala-test uses the
+same vm for all the tests (surefire plugin supports fork, but
+scala-test ignores it iirc).
+So different tests would initialize different spark context, and can
+potentially step on each others toes.
+Regards,
+Mridul
+Is SPARK-3277 applicable to 1.1 ?
+If yes, until it is fixed, I am -1 on the release (I am on break, so can't
+verify or help fix, sorry).
+Regards
+Mridul
+ On 28-Aug-2014 9:33 pm, "Patrick Wendell"  wrote:
+Thanks for being on top of this Patrick ! And apologies for not being able
+to help more.
+Regards,
+Mridul
+Brilliant stuff ! Congrats all :-)
+This is indeed really heartening news !
+Regards,
+Mridul
+Instead of setting spark.locality.wait, try setting individual
+locality waits specifically.
+Namely, spark.locality.wait.PROCESS_LOCAL to high value (so that
+process local tasks are always scheduled in case the task set has
+process local tasks).
+Set spark.locality.wait.NODE_LOCAL and spark.locality.wait.RACK_LOCAL
+to low value - so that in case task set has no process local tasks,
+both node local and rack local tasks are scheduled asap.
+Kay's comment, IMO, is slightly general in nature - and I suspect
+unless we overhaul how preferred locality is specified, and allow for
+taskset specific hints for schedule, we cant resolve that IMO.
+Regards,
+Mridul
+In the specific example stated, the user had two taskset if I
+understood right ... the first taskset reads off db (dfs in your
+example), and does some filter, etc and caches it.
+Second which works off the cached data (which is, now, process local
+locality level aware) to do map, group, etc.
+The taskset(s) which work off the cached data would be sensitive to
+PROCESS_LOCAL locality level.
+But for the initial taskset (which loaded off hdfs/database, etc) no
+tasks can be process local - since we do not have a way to specify
+that in spark (which, imo, is a limitation).
+Given this, the requirement seemed to be to relax locality level for
+initial load taskset - since not scheduling on rack local or other
+nodes seems to be hurting utilization and latency when no node local
+executors are available.
+But for tasksets which have process local tasks, user wants to ensure
+that node/rack local schedule does not happen (based on the timeouts
+and perf numbers).
+Hence my suggestion on setting the individual locality level timeouts
+- ofcourse, my suggestion was highly specific to the problem as stated
+:-)
+It is, by no means, a generalization - and I do agree we definitely do
+need to address the larger scheduling issue.
+Regards,
+Mridul
+I second that !
+Would also be great if the JIRA was updated accordingly too.
+Regards,
+Mridul
+Congratulations !
+Keep up the good work :-)
+Regards
+Mridul
+That is fairly out of date (we used to run some of our jobs on it ... But
+that is forked off 1.1 actually).
+Regards
+Mridul
+That work is from more than an year back and is not maintained anymore
+since we do not use it inhouse now.
+Also note that there have been quite a lot of changes in spark ...
+Including some which break assumptions made in the patch, so it's value is
+very low - having said that, do feel free to work on the jira and/or use
+the patch if it helps !
+Regards
+Mridul
+While I dont have any strong opinions about how we handle enum's
+either way in spark, I assume the discussion is targetted at (new) api
+being designed in spark.
+Rewiring what we already have exposed will lead to incompatible api
+change (StorageLevel for example, is in 1.0).
+Regards,
+Mridul
+  I have a strong dislike for java enum's due to the fact that they
+are not stable across JVM's - if it undergoes serde, you end up with
+unpredictable results at times [1].
+One of the reasons why we prevent enum's from being key : though it is
+highly possible users might depend on it internally and shoot
+themselves in the foot.
+Would be better to keep away from them in general and use something more stable.
+Regards,
+Mridul
+[1] Having had to debug this issue for 2 weeks - I really really hate it.
+In ideal situation, +1 on removing all vendor specific builds and
+making just hadoop version specific - that is what we should depend on
+anyway.
+Though I hope Sean is correct in assuming that vendor specific builds
+for hadoop 2.4 are just that; and not 2.4- or 2.4+ which cause
+incompatibilities for us or our users !
+Regards,
+Mridul
+I am curious how you are going to support these over mesos and yarn.
+Any configure change like this should be applicable to all of them, not
+just local and standalone modes.
+Regards
+Mridul
+Who is managing 1.3 release ? You might want to coordinate with them before
+porting changes to branch.
+Regards
+Mridul
+Let me try to rephrase my query.
+How can a user specify, for example, what the executor memory should
+be or number of cores should be.
+I dont want a situation where some variables can be specified using
+one set of idioms (from this PR for example) and another set cannot
+be.
+Regards,
+Mridul
+Cross region as in different data centers ?
+- Mridul
+This is a great suggestion - definitely makes sense to have it.
+Regards,
+Mridul
+We could build on minimum jdk we support for testing pr's - which will
+automatically cause build failures in case code uses newer api ?
+Regards,
+Mridul
+Hi Shane,
+  Since we are still maintaining support for jdk6, jenkins should be
+using jdk6 [1] to ensure we do not inadvertently use jdk7 or higher
+api which breaks source level compat.
+-source and -target is insufficient to ensure api usage is conformant
+with the minimum jdk version we are supporting.
+Regards,
+Mridul
+[1] Not jdk7 as you mentioned
+I agree, this is better handled by the filesystem cache - not to
+mention, being able to do zero copy writes.
+Regards,
+Mridul
+Hi,
+  I vaguely remember issues with using float/double as keys in MR (and spark ?).
+But cant seem to find documentation/analysis about the same.
+Does anyone have some resource/link I can refer to ?
+Thanks,
+Mridul
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+https://plus.google.com/+LinusTorvalds/posts/DiG9qANf5PA
+I have noticed a bunch of mails from dev@ and github going to spam -
+including spark maliing list.
+Might be a good idea for dev, committers to check if they are missing
+things in their spam folder if on gmail.
+Regards,
+Mridul
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Just to clarify, the proposal is to have a single commit msg giving the
+jira and pr id?
+That sounds like a good change to have.
+Regards
+Mridul
+Thanks for detailing, definitely sounds better.
++1
+Regards
+Mridul
+Might be a good idea to get the PMC's of both projects to sign off to
+prevent future issues with apache.
+Regards,
+Mridul
+If I am not wrong, since the code was hosted within mesos project
+repo, I assume (atleast part of it) is owned by mesos project and so
+its PMC ?
+- Mridul
+That sounds good. Thanks for clarifying !
+Regards,
+Mridul
+Would be a good idea to generalize this for spark core - and allow for
+its use in serde, compression, etc.
+Regards,
+Mridul
+What I understood from Imran's mail (and what was referenced in his
+mail) the RDD mentioned seems to be violating some basic contracts on
+how partitions are used in spark [1].
+They cannot be arbitrarily numbered,have duplicates, etc.
+Extending RDD to add functionality is typically for niche cases; and
+requires subclasses to adhere to the explicit (and implicit)
+contracts/lifecycles for them.
+Using existing RDD's as template would be a good idea for
+customizations - one way to look at it is, using RDD is more in api
+space but extending them is more in spi space.
+Violations would actually not even be detectable by spark-core in general case.
+Regards,
+Mridul
+[1] Ignoring the array out of bounds, etc - I am assuming the intent
+is to show overlapping partitions, duplicates. index to partition
+mismatch - that sort of thing.
+It is giving OOM at 32GB ? Something looks wrong with that ... that is
+already on the higher side.
+Regards,
+Mridul
+Is there a script running to close "old" PR's ? I was not aware of any
+discussion about this in dev list.
+- Mridul
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I am not sure of others, but I had a PR close from under me where
+ongoing discussion was as late as 2 weeks back.
+Given this, I assumed it was automated close and not manual !
+When the change was opened is not a good metric about viability of the
+change (particularly when it touches code which is rarely modified;
+and so will merge after multiple releases).
+Regards,
+Mridul
+On the contrary, PR's are actually meant to be long lived - and a
+reference of discussion about review and changes.
+Particularly so for spark since JIRA's and review board are not used
+for code review.
+Note - they are not used only in spark, but by other organization's to
+track contributions (like in our case).
+If you look at Reynold's response, he has clarified they were closed
+by him and not via user request - he probably missed out on activity
+on some of the PR's when closing in bulk.
+I would have preferred pinging the PR contributors to close, and
+subsequently doing so if inactive after "some" time (and definitely
+not when folks are off on vacations).
+Regards,
+Mridul
+We use it in executors to get to :
+a) spark conf (for getting to hadoop config in map doing custom
+writing of side-files)
+b) Shuffle manager (to get shuffle reader)
+Not sure if there are alternative ways to get to these.
+Regards,
+Mridul
+We have custom join's that leverage it.
+It is used to get to direct shuffle'ed iterator - without needing
+sort/aggregate/etc.
+IIRC the only way to get to it from ShuffleHandle is via shuffle manager.
+Regards,
+Mridul
+I was not aware of a discussion in Dev list about this - agree with most of
+the observations.
+In addition, I did not see PMC signoff on moving (sub-)modules out.
+Regards
+Mridul
+I am not referring to code edits - but to migrating submodules and
+code currently in Apache Spark to 'outside' of it.
+If I understand correctly, assets from Apache Spark are being moved
+out of it into thirdparty external repositories - not owned by Apache.
+At a minimum, dev@ discussion (like this one) should be initiated.
+As PMC is responsible for the project assets (including code), signoff
+is required for it IMO.
+More experienced Apache members might be opine better in case I got it wrong !
+Regards,
+Mridul
++1
+Agree, dropping support for java 7 is long overdue - and 2.0 would be
+a logical release to do this on.
+Regards,
+Mridul
+Removing compatibility (with jdk, etc) can be done with a major release-
+given that 7 has been EOLed a while back and is now unsupported, we have to
+decide if we drop support for it in 2.0 or 3.0 (2+ years from now).
+Given the functionality & performance benefits of going to jdk8, future
+enhancements relevant in 2.x timeframe ( scala, dependencies) which
+requires it, and simplicity wrt code, test & support it looks like a good
+checkpoint to drop jdk7 support.
+As already mentioned in the thread, existing yarn clusters are unaffected
+if they want to continue running jdk7 and yet use spark2 (install jdk8 on
+all nodes and use it via JAVA_HOME, or worst case distribute jdk8 as
+archive - suboptimal).
+I am unsure about mesos (standalone might be easier upgrade I guess ?).
+Proposal is for 1.6x line to continue to be supported with critical
+fixes; newer
+features will require 2.x and so jdk8
+Regards
+Mridul
+I do agree w.r.t scala 2.10 as well; similar arguments apply (though there
+is a nuanced diff - source compatibility for scala vs binary compatibility
+wrt Java)
+Was there a proposal which did not go through ? Not sure if I missed it.
+Regards
+Mridul
+I do agree w.r.t scala 2.10 as well; similar arguments apply (though there
+is a nuanced diff - source compatibility for scala vs binary compatibility
+wrt Java)
+Was there a proposal which did not go through ? Not sure if I missed it.
+Regards
+Mridul
+In general, I agree - it is preferable to break backward compatibility
+(where unavoidable) only at major versions.
+Unfortunately, this usually is planned better - with earlier versions
+announcing intent of the change - deprecation across multiple
+releases, defaults changed, etc.
+has been mentioned as a large disruption to drop support in 2.0.
+The same applies for jdk 7 too unfortunately - since backward
+compatibility is stronger guarantee in jvm compared to scala, it might
+work better there ?
+Regards,
+Mridul
++1 (binding) on removing maintainer process.
+I agree with your opinion of "automatic " instead of a manual list.
+Regards
+Mridul
+Congratulations Yanbo !
+Regards
+Mridul
+I agree, we should not be publishing both of them.
+Thanks for bringing this up !
+Regards,
+Mridul
+It is good to get clarification, but the way I read it, the issue is
+whether we publish it as official Apache artifacts (in maven, etc).
+Users can of course build it directly (and we can make it easy to do so) -
+as they are explicitly agreeing to additional licenses.
+Regards
+Mridul
+When numPartitions is 0, there is no data in the rdd: so getPartition is
+never invoked.
+-  Mridul
++1
+Regards,
+Mridul
+Can someone add me to edit list for the spark wiki please ?
+Thanks,
+Mridul
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Since TaskContext.getPartitionId is part of the public api, it cant be
+removed as user code can be depending on it (unless we go through a
+deprecation process for it).
+Regards,
+Mridul
+Congratulations and welcome Holden and Burak !
+Regards,
+Mridul

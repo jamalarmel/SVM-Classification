@@ -1,0 +1,384 @@
+Hi Prabeesh,
+Do a export _JAVA_OPTIONS="-Xmx10g" before starting the shark. Also you can
+do a ps aux | grep shark and see how much memory it is being allocated,
+mostly it should be 512mb, in that case increase the limit.
+Thanks
+Best Regards
+On Fri, May 23, 2014 at 10:22 AM, prabeesh k  wrote:
+It shows nullPointerException, your data could be corrupted? Try putting a
+try catch inside the operation that you are doing, Are you running the
+worker process on the master node also? If not, then only 1 node will be
+doing the processing. If yes, then try setting the level of parallelism and
+number of partitions while creating/transforming the RDD.
+Thanks
+Best Regards
+On Fri, Nov 14, 2014 at 5:17 PM, Priya Ch  Hi All,
+I think you need to start your streaming job, then put the files there to
+get them read. textFileStream doesn't read the existing files i believe.
+Also are you sure the path is not the following? (no missing / in the
+beginning?)
+JavaDStream textStream = ssc.textFileStream("/user/
+huser/user/huser/flume");
+Thanks
+Best Regards
+On Wed, Jan 7, 2015 at 9:16 AM, Jeniba Johnson  wrote:
+My mails to the mailing list are getting rejected, have opened a Jira
+issue, can someone take a look at it?
+https://issues.apache.org/jira/browse/INFRA-9032
+Thanks
+Best Regards
+Yep. They have sorted it out it seems.
+On 18 Jan 2015 03:58, "Patrick Wendell"  wrote:
+Its the executor memory (spark.executor.memory) which you can set while
+creating the spark context. By default it uses 0.6% of the executor memory
+for Storage. Now, to show some memory usage, you need to cache (persist)
+the RDD. Regarding the OOM Exception, you can increase the level of
+parallelism (also you can increase the number of partitions depending on
+your data size) and it should be fine.
+Thanks
+Best Regards
+On Mon, Jan 19, 2015 at 11:36 AM, Alessandro Baretta   All,
+Here's the sbt version
+https://docs.sigmoidanalytics.com/index.php/Step_by_Step_instructions_on_how_to_build_Spark_App_with_IntelliJ_IDEA
+Thanks
+Best Regards
+On Thu, Feb 5, 2015 at 8:55 AM, Stephen Boesch  wrote:
+You can open a Jira issue pointing this PR to get it processed faster. :)
+Thanks
+Best Regards
+On Sat, Feb 7, 2015 at 7:07 AM, fommil  wrote:
+Can you paste the complete code?
+Thanks
+Best Regards
+On Sat, Mar 7, 2015 at 2:25 AM, Ulanov, Alexander  Hi,
+This might help
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+Thanks
+Best Regards
+On Mon, Mar 9, 2015 at 9:23 AM, David J. Manglano  Hi Spark devs!
+Did you try ssh tunneling instead of SOCKS?
+Thanks
+Best Regards
+On Wed, Mar 18, 2015 at 5:45 AM, Kelly, Jonathan   I'm trying to figure out how I might be able to use Spark with a SOCKS
+You can use sc.newAPIHadoopFile
+with CSVInputFormat  so that it
+will read the csv file properly.
+Thanks
+Best Regards
+On Sat, Mar 21, 2015 at 12:39 AM, Karlson  wrote:
+Nice try :)
+Thanks
+Best Regards
+On Wed, Apr 1, 2015 at 12:41 PM, Reynold Xin  wrote:
+How are you submitting the application? Use a standard build tool like
+maven or sbt to build your project, it will download all the dependency
+jars, when you submit your application (if you are using spark-submit, then
+use --jars option to add those jars which are causing
+classNotFoundException). If you are running as a standalone application
+without using spark-submit, then while creating the SparkContext, use
+sc.addJar() to add those dependency jars.
+For Kafka streaming, when you use sbt, these will be jars that are required:
+    sc.addJar("/root/.ivy2/cache/org.apache.spark/spark-streaming-kafka_2.10/jars/spark-streaming-kafka_2.10-1.1.0.jar")
+   sc.addJar("/root/.ivy2/cache/com.yammer.metrics/metrics-core/jars/metrics-core-2.2.0.jar")
+   sc.addJar("/root/.ivy2/cache/org.apache.kafka/kafka_2.10/jars/kafka_2.10-0.8.0.jar")
+   sc.addJar("/root/.ivy2/cache/com.101tec/zkclient/jars/zkclient-0.3.jar")
+Thanks
+Best Regards
+On Sun, Apr 5, 2015 at 12:00 PM, Priya Ch  Hi All,
+Freenode already has a bit active channel under #Apache-spark, I think Josh
+idle there sometimes.
+Thanks
+Best Regards
+On Fri, Apr 17, 2015 at 3:33 AM, Nicholas Chammas  wrote:
+I also want to add mine :/
+Everyone wants to add it seems.
+Thanks
+Best Regards
+On Fri, Apr 24, 2015 at 8:58 PM, madhu phatak  wrote:
+There's a similar issue reported over here
+https://issues.apache.org/jira/browse/SPARK-6847
+Thanks
+Best Regards
+On Tue, Apr 28, 2015 at 7:35 AM, wyphao.2007  wrote:
+Hi
+With Spark streaming (all versions), when my processing delay (around 2-4
+seconds) exceeds the batch duration (being 1 second) and on a decent
+scale/throughput (consuming around 100MB/s on 1+2 node standalone 15GB, 4
+cores each) the job will start to throw block not found exceptions when the
+Storage is set to MEMORY_ONLY (ensureFreeSpace
+drops
+blocks blindly). When i use MEMORY_AND_DISK* as StorageLevel, then the
+performance went down drastically and the receivers ends up doing a lot of
+Disk IO.
+So sticking with StorageLevel as MEMORY_ONLY the workaround to get ride of
+the block not found exceptions was to tell the receiver not to generate
+more blocks as there are blocks which are yet to get compute.
+To achieve this, i used Spark 1.3.1 with the low level kafka consumer
+, and inside my Job's
+onBatchCompleted i pushed the scheduling delay to zookeeper like:
+[image: Inline image 1]
+And on the receiver end, if there's scheduling delay, then it will simply
+sleep for that much of time without sending any blocks to the Streaming
+receiver. like:
+[image: Inline image 2]
+I could also add a condition there not to generate blocks if the scheduling
+delay kind of exceeds 2-3 times the batch duration instead of making it
+sleep for whatever scheduling delay is happening.
+With this, the only problem I'm having is, some batches have empty data as
+the receiver went to sleep for those batches. Everything else works nicely
+at scale and the block not found is totally gone.
+Please let me know your thoughts on this, can we generalize this for Kakfa
+receivers with Sparkstreaming? Is it possible to apply this (stopping the
+receiver from generating blocks) for all sort of receivers?
+Thanks
+Best Regards
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+May be you should check where exactly its throwing up permission denied
+(possibly trying to write to some directory). Also you can try manually
+cloning the git repo to a directory and then try opening that in eclipse.
+Thanks
+Best Regards
+On Tue, May 12, 2015 at 3:46 PM, Chandrashekhar Kotekar  wrote:
+You can either pull the high level information from your resource manager,
+or if you want more control/specific information you can write a script and
+pull the resource usage information from the OS. Something like this
+will help.
+Thanks
+Best Regards
+On Sun, May 17, 2015 at 6:18 PM, Peter Prettenhofer  wrote:
+Yes Peter that's correct, you need to identify the processes and with that
+you can pull the actual usage metrics.
+Thanks
+Best Regards
+On Thu, May 21, 2015 at 2:52 PM, Peter Prettenhofer  wrote:
+This is a good start, if you haven't seen this already
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+Thanks
+Best Regards
+On Sat, Jun 13, 2015 at 8:46 AM, srinivasraghavansr71  wrote:
+In the conf/slaves file, are you having the ip addresses? or the hostnames?
+Thanks
+Best Regards
+On Sat, Jun 13, 2015 at 9:51 PM, Sea  wrote:
+Which distributed database are you referring here? Spark can connect with
+almost all those databases out there (You just need to pass the
+Input/Output Format classes or there are a bunch of connectors also
+available).
+Thanks
+Best Regards
+On Fri, Jun 26, 2015 at 12:07 PM, louis.hust  wrote:
+UpdatestateByKey?
+Thanks
+Best Regards
+On Wed, Jul 8, 2015 at 1:05 AM, swetha  wrote:
+This will get you started
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+Thanks
+Best Regards
+On Mon, Jul 13, 2015 at 5:29 PM, srinivasraghavansr71  wrote:
+You can try to resolve some Jira issues, to start with try out some newbie
+JIRA's.
+Thanks
+Best Regards
+On Tue, Jul 14, 2015 at 4:10 PM, srinivasraghavansr71  wrote:
+You need to find the bottleneck here, it could your network (if the data is
+huge) or your producer code isn't pushing at 20k/s, If you are able to
+produce at 20k/s then make sure you are able to receive at that rate (try
+it without spark).
+Thanks
+Best Regards
+On Sat, Jul 25, 2015 at 3:29 PM, anshu shukla  My eventGen is emitting 20,000  events/sec ,and I am using store(s1)  in receive()  method to push data to receiverStream .
+I think you can start from here
+https://issues.apache.org/jira/browse/SPARK/fixforversion/12332078/?selectedTab=com.atlassian.jira.jira-projects-plugin:version-summary-panel
+Thanks
+Best Regards
+On Tue, Aug 4, 2015 at 12:02 PM, Meihua Wu  I think the team is preparing for the 1.5 release. Anything to help with
+Hi Starch,
+It also depends on the applications behavior, some might not be properly
+able to utilize the network. If you are using say Kafka, then one thing
+that you should keep in mind is the Size of the individual message and the
+number of partitions that you are having. The higher the message size and
+higher number of partitions (in kafka) will utilize the network properly.
+With this combination, we have operated few pipelines running at 10Gb/s (~
+1GB/s ).
+Thanks
+Best Regards
+On Tue, Aug 11, 2015 at 12:24 AM, Starch, Michael D (398M)  wrote:
+You can create a new Issue and send a pull request for the same i think.
++ dev list
+Thanks
+Best Regards
+On Tue, Aug 11, 2015 at 8:32 AM, Hyukjin Kwon  wrote:
+Hi
+My Spark job (running in local[*] with spark 1.4.1) reads data from a
+thrift server(Created an RDD, it will compute the partitions in
+getPartitions() call and in computes hasNext will return records from these
+partitions), count(), foreach() is working fine it returns the correct
+number of records. But whenever there is shuffleMap stage (like reduceByKey
+etc.) then all the tasks are executing properly but it enters in an
+infinite loop saying :
+   1. 15/08/11 13:05:54 INFO DAGScheduler: Resubmitting ShuffleMapStage 1 (map
+   at FilterMain.scala:59) because some of its tasks had failed: 0, 3
+Here's the complete stack-trace http://pastebin.com/hyK7cG8S
+What could be the root cause of this problem? I looked up and bumped into
+this closed JIRA  (which
+is very very old)
+Thanks
+Best Regards
+Have a look at spark.shuffle.manager, You can switch between sort and hash
+with this configuration.
+spark.shuffle.managersortImplementation to use for shuffling data. There
+are two implementations available:sort and hash. Sort-based shuffle is more
+memory-efficient and is the default option starting in 1.2.
+Thanks
+Best Regards
+On Thu, Aug 13, 2015 at 2:56 PM, cheez  wrote:
+Yep, and it works fine for operations which does not involve any shuffle
+(like foreach,, count etc) and those which involves shuffle operations ends
+up in an infinite loop. Spark should somehow indicate this instead of going
+in an infinite loop.
+Thanks
+Best Regards
+On Thu, Aug 13, 2015 at 11:37 PM, Imran Rashid  wrote:
+Thanks for the clarifications Mrithul.
+Thanks
+Best Regards
+On Fri, Aug 14, 2015 at 1:04 PM, Mridul Muralidharan  What I understood from Imran's mail (and what was referenced in his
+You can add it to the spark packages i guess http://spark-packages.org/
+Thanks
+Best Regards
+On Fri, Aug 14, 2015 at 1:45 PM, pishen tsai  wrote:
+Why not attach a bigger hard disk to the machines and point your
+SPARK_LOCAL_DIRS to it?
+Thanks
+Best Regards
+On Sat, Aug 29, 2015 at 1:13 AM, fsacerdoti  Hello,
+Or you can increase the driver heap space (export _JAVA_OPTIONS="-Xmx5g")
+Thanks
+Best Regards
+On Wed, Sep 2, 2015 at 11:57 PM, Mike Hynes  wrote:
+I found an old JIRA referring the same.
+https://issues.apache.org/jira/browse/SPARK-5421
+Thanks
+Best Regards
+On Sun, Sep 6, 2015 at 8:53 PM, Madhu  wrote:
+You should consider upgrading your spark from 1.3.0 to a higher version.
+Thanks
+Best Regards
+On Mon, Sep 14, 2015 at 2:28 PM, Priya Ch  Hi All,
+Send an email to dev-unsubscribe@spark.apache.org instead of
+dev@spark.apache.org
+Thanks
+Best Regards
+On Fri, Sep 25, 2015 at 4:00 PM, Nirmal R Kumar 
+You can create a JavaRDD as normal and then call the .rdd() to get the RDD.
+Thanks
+Best Regards
+On Mon, Sep 28, 2015 at 9:01 PM, Rohith P  Hi all,
+For some reason the executors are getting killed,
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated:
+app-20150929120924-0000/24463 is now EXITED (Command exited with code 1)
+Can you paste your spark-submit command? You can also look in the executor
+logs and see whats going on.
+Thanks
+Best Regards
+On Wed, Sep 30, 2015 at 12:53 AM, Ulanov, Alexander  wrote:
+I guess the order is guaranteed unless you set
+the spark.streaming.concurrentJobs to a higher number than 1.
+Thanks
+Best Regards
+On Mon, Oct 19, 2015 at 12:28 PM, Renjie Liu  Hi, all:
+Can you paste the contents of your spark-env.sh file? Also would be good to
+have a look at the /etc/hosts file. Cannot bind to the given ip address can
+be resolved if you put the hostname instead of the ip address. Also make
+sure the configuration (conf directory) across your cluster have the same
+contents.
+Thanks
+Best Regards
+On Mon, Oct 26, 2015 at 10:48 AM, Rohith P  No.. the ./sbin/start-master.sh --ip option did not work... It is still the
+You can read the installation details from here
+http://spark.apache.org/docs/latest/
+You can read about contributing to spark from here
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+Thanks
+Best Regards
+On Thu, Oct 29, 2015 at 3:53 PM, Aaska Shah  wrote:
+Is that all you have in the executor logs? I suspect some of those jobs are
+having a hard time managing  the memory.
+Thanks
+Best Regards
+On Sun, Nov 1, 2015 at 9:38 PM, Romi Kuntsman  wrote:
+Did you find anything regarding the OOM in the executor logs?
+Thanks
+Best Regards
+On Mon, Nov 9, 2015 at 8:44 PM, Romi Kuntsman  wrote:
+Not quiet sure whats happening, but its not an issue with multiplication i
+guess as the following query worked for me:
+trades.select(trades("price")*9.5).show
++-------------+
+|(price * 9.5)|
++-------------+
+|        199.5|
+|        228.0|
+|        190.0|
+|        199.5|
+|        190.0|
+|        256.5|
+|        218.5|
+|        275.5|
+|        218.5|
+......
+......
+Could it be with the precision? ccing dev list, may be you can open up a
+jira for this as it seems to be a bug.
+Thanks
+Best Regards
+On Mon, Nov 30, 2015 at 12:41 AM, Philip Dodds  I hit a weird issue when I tried to multiply to decimals in a select
+If the port 7077 is open for public on your cluster, that's all you need to
+take over the cluster. You can read a bit about it here
+https://www.sigmoid.com/securing-apache-spark-cluster/
+You can also look at this small exploit I wrote
+https://www.exploit-db.com/exploits/36562/
+Thanks
+Best Regards
+On Wed, Dec 16, 2015 at 6:46 AM, Judy Nash  Hi all,
+You can pretty much measure it from the Event timeline listed in the driver
+ui, You can click on jobs/tasks and get the time that it took for each of
+it from there.
+Thanks
+Best Regards
+On Thu, Dec 17, 2015 at 7:27 AM, sara mustafa  Hi,
+Have a look at the TPC-H queries, I found this repository with the quries.
+https://github.com/ssavvides/tpch-spark
+Thanks
+Best Regards
+On Fri, Jan 22, 2016 at 1:35 AM, sara mustafa  Hi,
+This?
+http://apache-spark-developers-list.1001551.n3.nabble.com/Automated-close-of-PR-s-td15862.html
+Thanks
+Best Regards
+On Mon, Feb 22, 2016 at 2:47 PM, Sean Owen  wrote:
+You can achieve this with the normal RDD way. Have one extra stage in the
+pipeline where you will properly standardize all the values (like replacing
+doc with doctor) for all the columns before the join.
+Thanks
+Best Regards
+On Tue, Mar 15, 2016 at 9:16 AM, Suniti Singh  Hi All,
+Isn't it what tempRDD.groupByKey does?
+Thanks
+Best Regards
+On Wed, Mar 30, 2016 at 7:36 AM, Suniti Singh  Hi All,
+Have a look at
+http://spark.apache.org/docs/latest/building-spark.html#building-for-scala-211
+Thanks
+Best Regards
+On Wed, Mar 30, 2016 at 12:09 AM, satyajit vegesna  wrote:
+You can read this documentation to get started with the setup
+https://cwiki.apache.org/confluence/display/SPARK/Useful+Developer+Tools#UsefulDeveloperTools-IntelliJ
+There was a pyspark setup discussion on SO over here
+http://stackoverflow.com/questions/33478218/write-and-run-pyspark-in-intellij-idea
+On Mon, Jun 20, 2016 at 7:23 PM, Amit Rana  wrote:
+-- 
+Cheers!

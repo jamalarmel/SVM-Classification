@@ -1,0 +1,697 @@
+Hi,
+I wonder how I can pass parameters to RDD functions with closures. If I do it in a following way, Spark crashes with NotSerializableException:
+class TextToWordVector(csvData:RDD[Array[String]]) {
+  val n = 1
+  lazy val x = csvData.map{ stringArr => stringArr(n)}.collect()
+}
+Exception:
+Job aborted due to stage failure: Task not serializable: java.io.NotSerializableException: org.apache.spark.mllib.util.TextToWordVector
+org.apache.spark.SparkException: Job aborted due to stage failure: Task not serializable: java.io.NotSerializableException: org.apache.spark.mllib.util.TextToWordVector
+                at org.apache.spark.scheduler.DAGScheduler.org$apache$spark$scheduler$DAGScheduler$$failJobAndIndependentStages(DAGScheduler.scala:1038)
+This message proposes a workaround, but it didn't work for me:
+http://mail-archives.apache.org/mod_mbox/spark-user/201404.mbox/%3CCAA_qdLrxXzwXd5=6SXLOgSmTTorpOADHjnOXn=tMrOLEJM=Frw@mail.gmail.com%3E
+What is the best practice?
+Best regards, Alexander
+Thanks, this works both with Scala and Java Serializable. Which one should I use?
+Related question: I would like only the particular val to be used instead of the whole class, what should I do?
+As far as I understand, the whole class is serialized and transferred between nodes (am I right?)
+Alexander
+-----Original Message-----
+Hi,
+I've implemented a class that does Chi-squared feature selection for RDD[LabeledPoint]. It also computes basic class/feature occurrence statistics and other methods like mutual information or information gain can be easily implemented. I would like to make a pull request. However, MLlib master branch doesn't have any feature selection methods implemented. So, I need to create a proper interface that my class will extend or mix. It should be easy to use from developers and users prospective.
+I was thinking that there should be FeatureEvaluator that for each feature from RDD[LabeledPoint] returns RDD[((featureIndex: Int, label: Double), value: Double)].
+Then there should be FeatureSelector that selects top N features or top N features group by class etc.
+And the simplest one, FeatureFilter that filters the data based on set of feature indices.
+Additionally, there should be the interface for FeatureEvaluators that don't use class labels, i.e. for RDD[Vector].
+I am concerned that such design looks rather "disconnected" because there are 3 disconnected objects.
+As a result of use, I would like to see something like "val filteredData = Filter(data, ChiSquared(data).selectTop(100))".
+Any ideas or suggestions?
+Best regards, Alexander
+FYI This is my first take on feature selection, filtering and chi-squared:
+https://github.com/apache/spark/pull/1484
+-----Original Message-----
+Hi,
+I'm trying to create a maven project that references the latest build of Spark.
+1)downloaded sources and compiled the latest version of Spark.
+2)added new spark-core jar to the a new local maven repo
+3)created Scala maven project with net.alchim31.maven (scala-archetype-simple v 1.5)
+4)added dependency to the new spark-core inside the pom.xml
+5)I create SparkContext in the code of this project: val sc = new SparkContext("local", "test")
+6)When I run it, I get the error:
+Error:scalac: bad symbolic reference. A signature in RDD.class refers to term io
+in package org.apache.hadoop which is not available.
+It may be completely missing from the current classpath, or the version on
+the classpath might be incompatible with the version used when compiling RDD.class.
+This problem doesn't occur if I reference the spark-core from the maven repo. What am I doing wrong?
+Best regards, Alexander
+Hi,
+I've implemented back propagation algorithm using Gradient class and a simple update using Updater class. Then I run the algorithm with mllib's GradientDescent class. I have troubles in scaling out this implementation. I thought that if I partition my data into the number of workers then performance will increase, because each worker will run a step of gradient descent on its partition of data. But this does not happen and each worker seems to process all data (if miniBatchFraction == 1.0 as in mllib's logisic regression implementation). For me, this doesn't make sense, because then only single Worker will provide the same performance. Could someone elaborate on this and correct me if I am wrong. How can I scale out the algorithm with many Workers?
+Best regards, Alexander
+Hi, RJ
+https://github.com/avulanov/spark/blob/neuralnetwork/mllib/src/main/scala/org/apache/spark/mllib/classification/NeuralNetwork.scala
+Unit tests are in the same branch.
+Alexander
+Hi,
+Is breeze library called thread safe from Spark mllib code in case when native libs for blas and lapack are used? Might it be an issue when running Spark locally?
+Best regards, Alexander
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Dear Spark developers,
+I am trying to measure the Spark reduce performance for big vectors. My motivation is related to machine learning gradient. Gradient is a vector that is computed on each worker and then all results need to be summed up and broadcasted back to workers. For example, present machine learning applications involve very long parameter vectors, for deep neural networks it can be up to 2Billions. So, I want to measure the time that is needed for this operation depending on the size of vector and number of workers. I wrote few lines of code that assume that Spark will distribute partitions among all available workers. I have 6-machine cluster (Xeon 3.3GHz 4 cores, 16GB RAM), each runs 2 Workers.
+import org.apache.spark.mllib.rdd.RDDFunctions._
+import breeze.linalg._
+import org.apache.log4j._
+Logger.getRootLogger.setLevel(Level.OFF)
+val n = 60000000
+val p = 12
+val vv = sc.parallelize(0 until p, p).map(i => DenseVector.rand[Double]( n ))
+vv.reduce(_ + _)
+When executing in shell with 60M vector it crashes after some period of time. One of the node contains the following in stdout:
+Java HotSpot(TM) 64-Bit Server VM warning: INFO: os::commit_memory(0x0000000755500000, 2863661056, 0) failed; error='Cannot allocate memory' (errno=12)
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (malloc) failed to allocate 2863661056 bytes for committing reserved memory.
+I run shell with --executor-memory 8G --driver-memory 8G, so handling 60M vector of Double should not be a problem. Are there any big overheads for this? What is the maximum size of vector that reduce can handle? 
+Best regards, Alexander
+P.S. 
+"spark.driver.maxResultSize 0" needs to set in order to run this code. I also needed to change "java.io.tmpdir" and "spark.local.dir" folders because my /tmp folder which is default, was too small and Spark swaps heavily into this folder. Without these settings I get either "no space left on device" or "out of memory" exceptions.
+I also submitted a bug https://issues.apache.org/jira/browse/SPARK-5386
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi DB Tsai,
+Thank you for your suggestion. Actually, I've started my experiments with "treeReduce". Originally, I had "vv.treeReduce(_ + _, 2)" in my script exactly because MLlib optimizers are using it, as you pointed out with LBFGS. However, it leads to the same problems as "reduce", but presumably not so directly. As far as I understand, treeReduce limits the number of communications between workers and master forcing workers to partially compute the reduce operation.
+Are you sure that driver will first collect all results (or all partial results in treeReduce) and ONLY then perform aggregation? If that is the problem, then how to force it to do aggregation after receiving each portion of data from Workers?
+Best regards, Alexander
+-----Original Message-----
+Dear Spark developers,
+I am exploring how to make linear algebra operations faster within Spark. One way of doing this is to use Scala Breeze library that is bundled with Spark. For matrix operations, it employs Netlib-java that has a Java wrapper for BLAS (basic linear algebra subprograms) and LAPACK native binaries if they are available on the worker node. It also has its own optimized Java implementation of BLAS. It is worth mentioning, that native binaries provide better performance only for BLAS level 3, i.e. matrix-matrix operations or general matrix multiplication (GEMM). This is confirmed by GEMM test on Netlib-java page https://github.com/fommil/netlib-java. I also confirmed it with my experiments with training of artificial neural network https://github.com/apache/spark/pull/1290#issuecomment-70313952. However, I would like to boost performance more.
+GPU is supposed to work fast with linear algebra and there is Nvidia CUDA implementation of BLAS, called cublas. I have one Linux server with Nvidia GPU and I was able to do the following. I linked cublas (instead of cpu-based blas) with Netlib-java wrapper and put it into Spark, so Breeze/Netlib is using it. Then I did some performance measurements with regards to artificial neural network batch learning in Spark MLlib that involves matrix-matrix multiplications. It turns out that for matrices of size less than ~1000x780 GPU cublas has the same speed as CPU blas. Cublas becomes slower for bigger matrices. It worth mentioning that it is was not a test for ONLY multiplication since there are other operations involved. One of the reasons for slowdown might be the overhead of copying the matrices from computer memory to graphic card memory and back. 
+So, few questions:
+1) Do these results with CUDA make sense? 
+2) If the problem is with copy overhead, are there any libraries that allow to force intermediate results to stay in graphic card memory thus removing the overhead?
+3) Any other options to speed-up linear algebra in Spark?
+Thank you, Alexander
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi,
+I've implemented class MyClass in MLlib that does some operation on LabeledPoint. MyClass extends serializable, so I can map this operation on data of RDD[LabeledPoints], such as data.map(lp => MyClass.operate(lp)). I write this class in file with ObjectOutputStream.writeObject. Then I stop and restart Spark. I load this class from file with ObjectInputStream.readObject.asInstanceOf[MyClass]. When I try to map the same operation of this class to RDD, Spark throws not serializable exception:
+org.apache.spark.SparkException: Task not serializable
+        at org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:166)
+        at org.apache.spark.util.ClosureCleaner$.clean(ClosureCleaner.scala:158)
+        at org.apache.spark.SparkContext.clean(SparkContext.scala:1453)
+        at org.apache.spark.rdd.RDD.map(RDD.scala:273)
+Could you suggest why it throws this exception while MyClass is serializable by definition?
+Best regards, Alexander
+Below is the code with standard MLlib class. Apparently this issue can happen in the same Spark instance.
+import java.io._
+import org.apache.spark.mllib.classification.NaiveBayes
+import org.apache.spark.mllib.classification.NaiveBayesModel
+import org.apache.spark.mllib.util.MLUtils
+val data = MLUtils.loadLibSVMFile(sc, "hdfs://myserver:9000/data/mnist.scale")
+val nb = NaiveBayes.train(data)
+// RDD map works fine
+val predictionAndLabels = data.map( lp => (nb.classifierModel.predict(lp.features), lp.label))
+// serialize the model to file and immediately load it
+val oos = new ObjectOutputStream(new FileOutputStream("/home/myuser/nb.bin"))
+oos.writeObject(nb)
+oos.close
+val ois = new ObjectInputStream(new FileInputStream("/home/myuser/nb.bin"))
+val nbSerialized = ois.readObject.asInstanceOf[NaiveBayesModel]
+ois.close
+// RDD map fails
+val predictionAndLabels = data.map( lp => (nbSerialized.predict(lp.features), lp.label))
+org.apache.spark.SparkException: Task not serializable
+        at org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:166)
+        at org.apache.spark.util.ClosureCleaner$.clean(ClosureCleaner.scala:158)
+        at org.apache.spark.SparkContext.clean(SparkContext.scala:1453)
+        at org.apache.spark.rdd.RDD.map(RDD.scala:273)
+Just tried, the same happens if I use the internal Spark serializer: 
+val serializer = SparkEnv.get.closureSerializer.newInstance
+-----Original Message-----
+Thanks so much! It works! Is it the standard way for Mllib models to be serialized?
+Btw. The example I pasted below works if one implements a TestSuite with MLlibTestSparkContext.
+-----Original Message-----
+Looking forward to use those features! 
+Can I somehow make the model that I saved with ObjectOutputStream work with RDD map? It took 7 hours to build it :)
+-----Original Message-----
+Hi,
+I am working on artificial neural networks for Spark. It is solved with Gradient Descent, so each step the data is read, sum of gradients is calculated for each data partition (on each worker), aggregated (on the driver) and broadcasted back. I noticed that the gradient computation time is few times less than the total time needed for each step. To narrow down my observation, I run the gradient on a single machine with single partition of data of site 100MB that I persist (data.persist). This should minimize the overhead for aggregation at least, but the gradient computation still takes much less time than the whole step. Just in case, data is loaded by MLUtil. loadLibSVMFile in RDD[LabeledPoint], this is my code:
+    val conf = new SparkConf().setAppName("myApp").setMaster("local[2]")
+    val train = MLUtils.loadLibSVMFile(new SparkContext(conf), "/data/mnist/mnist.scale").repartition(1).persist()
+    val model = ANN2Classifier.train(train, 1000, Array[Int](32), 10, 1e-4) //training data, batch size, hidden layer size, iterations, LBFGS tolerance
+Profiler shows that there are two threads, one is doing Gradient and the other I don't know what. The Gradient takes 10% of this thread. Almost all other time is spent by MemoryStore. Below is the screenshot (first thread):
+https://drive.google.com/file/d/0BzYMzvDiCep5bGp2S2F6eE9TRlk/view?usp=sharing
+Second thread:
+https://drive.google.com/file/d/0BzYMzvDiCep5OHA0WUtQbXd3WmM/view?usp=sharing
+Could Spark developers please elaborate what's going on in MemoryStore? It seems that it does some string operations (parsing libsvm file? Why every step?) and a lot of InputStream reading. It seems that the overall time depends on the size of the data batch (or size of vector) I am processing. However it does not seems linear to me.
+Also, I would like to know how to speedup these operations.
+Best regards, Alexander
+Hi,
+Currently I am using Breeze within Spark MLlib for linear algebra. I would like to reuse previously allocated matrices for storing the result of matrices multiplication, i.e. I need to use "gemm" function C:=q*A*B+p*C, which is missing in Breeze (Breeze automatically allocates a new matrix to store the result of multiplication). Also, I would like to minimize gemm calls that Breeze does. Should I use mllib.linalg.BLAS functions instead? While it has gemm and axpy, it has rather limited number of operations. For example, I need sum of the matrix by row or by columns, or applying a function to all elements in a matrix. Also, MLlib Vector and Matrix interfaces that linalg.BLAS operates seems to be rather undeveloped. Should I use plain netlib-java instead (will it remain in MLlib in future releases)?
+Best regards, Alexander
+Hi,
+Could you suggest what would be the reasonable file format to store feature vector data for machine learning in Spark MLlib? Are there any best practices for Spark?
+My data is dense feature vectors with labels. Some of the requirements are that the format should be easy loaded/serialized, randomly accessible, with a small footprint (binary). I am considering Parquet, hdf5, protocol buffer (protobuf), but I have little to no experience with them, so any suggestions would be really appreciated.
+Best regards, Alexander
+Thanks for suggestion, but libsvm is a format for sparse data storing in text file and I have dense vectors. In my opinion, text format is not appropriate for storing large dense vectors due to overhead related to parsing from string to digits and also storing digits as strings is not efficient.
+Thanks, Evan. What do you think about Protobuf? Twitter has a library to manage protobuf files in hdfs https://github.com/twitter/elephant-bird
+Thanks, Jeremy! I also work with time series data right now, so your suggestions are really relevant. However, we want to handle not the raw data, but already processed and prepared for machine learning.
+Initially, we also wanted to have our own simple binary format, but we could not agree on handling little/big endian. We did not agree if we have to stick to a specific endian or to ship this information in metadata file. And metadata file sounds like another data format engineering (aka inventing the bicycle). Does this make sense to you?
+Hi,
+It seems to me that there is an overhead in "runMiniBatchSGD" function of MLlib's "GradientDescent". In particular, "sample" and "treeAggregate" might take time that is order of magnitude greater than the actual gradient computation. In particular, for mnist dataset of 60K instances, minibatch size = 0.001 (i.e. 60 samples) it take 0.15 s to sample and 0.3 to aggregate in local mode with 1 data partition on Core i5 processor. The actual gradient computation takes 0.002 s. I searched through Spark Jira and found that there was recently an update for more efficient sampling (SPARK-3250) that is already included in Spark codebase. Is there a way to reduce the sampling time and local treeRedeuce by order of magnitude?
+Best regards, Alexander
+Hi Sam, 
+What is the best way to do it? Should I clone netlib-java, edit readme.md and make a PR?
+Best regards, Alexander
+-----Original Message-----
+Sorry for bothering you again, but I think that it is an important issue for applicability of SGD in Spark MLlib. Could Spark developers please comment on it.
+-----Original Message-----
+Thanks, sounds interesting! How do you load files to Spark? Did you consider having multiple files instead of file lines?
+FYI, I've added instructions to Netlib-java wiki, Sam added the link to them from the project's readme.md
+https://github.com/fommil/netlib-java/wiki/NVBLAS
+Best regards, Alexander
+-----Original Message-----
+Jeremy, thanks for explanation!
+What if instead you've used Parquet file format? You can still write a number of small files as you do, but you don't have to implement a writer/reader, because they are available for Parquet in various languages.
+Hi Joseph,
+Thank you for suggestion!
+It seems that instead of sample it is better to shuffle data and then access it sequentially by mini-batches. Could you suggest how to implement it?
+With regards to aggregate (reduce), I am wondering why it works so slow in local mode? Could you elaborate on this? I do understand that in cluster mode the network speed will kick in and then one can blame it.
+Best regards, Alexander
+Hi,
+I am trying to execute unit tests with LocalClusterSparkContext on Windows 7. I am getting a bunch of error in the log saying that: "Cannot find any assembly build directories." Below is the part from the log where it brakes. Could you suggest what's happening? In addition the application has created a folder "app-20150403121631-0000" and is keeping to create empty folders there named with numbers until I stop the application.
+15/04/03 12:16:31.239 sparkWorker2-akka.actor.default-dispatcher-3 INFO Worker: Connecting to master akka.tcp://sparkMaster@Mynetwork.net:51990/user/Master...
+15/04/03 12:16:31.277 sparkDriver-akka.actor.default-dispatcher-2 INFO AppClient$ClientActor: Connecting to master akka.tcp://sparkMaster@Mynetwork.net:51990/user/Master...
+15/04/03 12:16:31.549 sparkMaster-akka.actor.default-dispatcher-7 INFO Master: Registering worker Mynetwork.net:52006 with 1 cores, 512.0 MB RAM
+15/04/03 12:16:31.556 sparkMaster-akka.actor.default-dispatcher-7 INFO Master: Registering worker Mynetwork.net:52020 with 1 cores, 512.0 MB RAM
+15/04/03 12:16:31.561 sparkMaster-akka.actor.default-dispatcher-7 INFO Master: Registering app test-cluster
+15/04/03 12:16:31.568 sparkMaster-akka.actor.default-dispatcher-7 INFO Master: Registered app test-cluster with ID app-20150403121631-0000
+15/04/03 12:16:31.573 sparkWorker1-akka.actor.default-dispatcher-3 INFO Worker: Successfully registered with master spark://Mynetwork.net:51990
+15/04/03 12:16:31.588 sparkMaster-akka.actor.default-dispatcher-7 INFO Master: Launching executor app-20150403121631-0000/0 on worker worker-20150403121631-Mynetwork.net-52020
+15/04/03 12:16:31.589 sparkMaster-akka.actor.default-dispatcher-7 INFO Master: Launching executor app-20150403121631-0000/1 on worker worker-20150403121631-Mynetwork.net-52006
+15/04/03 12:16:31.590 sparkWorker2-akka.actor.default-dispatcher-3 INFO Worker: Successfully registered with master spark://Mynetwork.net:51990
+15/04/03 12:16:31.595 sparkDriver-akka.actor.default-dispatcher-3 INFO SparkDeploySchedulerBackend: Connected to Spark cluster with app ID app-20150403121631-0000
+15/04/03 12:16:31.608 sparkWorker1-akka.actor.default-dispatcher-4 INFO Worker: Asked to launch executor app-20150403121631-0000/1 for test-cluster
+15/04/03 12:16:31.624 sparkWorker2-akka.actor.default-dispatcher-5 INFO Worker: Asked to launch executor app-20150403121631-0000/0 for test-cluster
+15/04/03 12:16:31.639 sparkDriver-akka.actor.default-dispatcher-3 INFO AppClient$ClientActor: Executor added: app-20150403121631-0000/0 on worker-20150403121631-Mynetwork.net-52020 (Mynetwork.net:52020) with 1 cores
+15/04/03 12:16:31.683 sparkDriver-akka.actor.default-dispatcher-3 INFO SparkDeploySchedulerBackend: Granted executor ID app-20150403121631-0000/0 on hostPort Mynetwork.net:52020 with 1 cores, 512.0 MB RAM
+15/04/03 12:16:31.683 sparkDriver-akka.actor.default-dispatcher-3 INFO AppClient$ClientActor: Executor added: app-20150403121631-0000/1 on worker-20150403121631-Mynetwork.net-52006 (Mynetwork.net:52006) with 1 cores
+15/04/03 12:16:31.684 sparkDriver-akka.actor.default-dispatcher-3 INFO SparkDeploySchedulerBackend: Granted executor ID app-20150403121631-0000/1 on hostPort Mynetwork.net:52006 with 1 cores, 512.0 MB RAM
+15/04/03 12:16:31.688 sparkDriver-akka.actor.default-dispatcher-3 INFO AppClient$ClientActor: Executor updated: app-20150403121631-0000/1 is now LOADING
+15/04/03 12:16:31.688 sparkDriver-akka.actor.default-dispatcher-3 INFO AppClient$ClientActor: Executor updated: app-20150403121631-0000/0 is now LOADING
+15/04/03 12:16:31.688 ExecutorRunner for app-20150403121631-0000/1 ERROR ExecutorRunner: Error running executor
+java.lang.IllegalStateException: Cannot find any assembly build directories.
+                at org.apache.spark.launcher.CommandBuilderUtils.checkState(CommandBuilderUtils.java:228)
+                at org.apache.spark.launcher.AbstractCommandBuilder.getScalaVersion(AbstractCommandBuilder.java:283)
+                at org.apache.spark.launcher.AbstractCommandBuilder.buildClassPath(AbstractCommandBuilder.java:150)
+                at org.apache.spark.launcher.AbstractCommandBuilder.buildJavaCommand(AbstractCommandBuilder.java:111)
+                at org.apache.spark.launcher.WorkerCommandBuilder.buildCommand(WorkerCommandBuilder.scala:39)
+                at org.apache.spark.launcher.WorkerCommandBuilder.buildCommand(WorkerCommandBuilder.scala:48)
+                at org.apache.spark.deploy.worker.CommandUtils$.buildCommandSeq(CommandUtils.scala:61)
+                at org.apache.spark.deploy.worker.CommandUtils$.buildProcessBuilder(CommandUtils.scala:49)
+                at org.apache.spark.deploy.worker.ExecutorRunner.org$apache$spark$deploy$worker$ExecutorRunner$$fetchAndRunExecutor(ExecutorRunner.scala:132)
+                at org.apache.spark.deploy.worker.ExecutorRunner$$anon$1.run(ExecutorRunner.scala:68)
+15/04/03 12:16:31.712 sparkDriver-akka.actor.default-dispatcher-3 INFO AppClient$ClientActor: Executor updated: app-20150403121631-0000/0 is now RUNNING
+15/04/03 12:16:31.725 sparkDriver-akka.actor.default-dispatcher-3 INFO AppClient$ClientActor: Executor updated: app-20150403121631-0000/1 is now RUNNING
+15/04/03 12:16:31.726 sparkWorker1-akka.actor.default-dispatcher-4 INFO Worker: Executor app-20150403121631-0000/1 finished with state FAILED message java.lang.IllegalStateException: Cannot find any assembly build directories.
+15/04/03 12:16:31.689 ExecutorRunner for app-20150403121631-0000/0 ERROR ExecutorRunner: Error running executor
+java.lang.IllegalStateException: Cannot find any assembly build directories.
+Best regards, Alexander
+Hi Marcelo,
+Thank you for quick response!
+It seems that I get the issue 6673. If I set set SPARK_SCALA_VERSION=2.10 as suggested in https://issues.apache.org/jira/browse/SPARK-6673, I get instead:
+15/04/03 12:46:24.510 ExecutorRunner for app-20150403124624-0000/0 ERROR ExecutorRunner: Error running executor
+java.lang.IllegalStateException: No assemblies found in 'C:\ulanov\dev\spark\mllib\.\assembly\target\scala-2.10'.
+-----Original Message-----
+Thanks! It worked. I've updated the PR and now start the test with working directory in SPARK_HOME
+Now I get:
+ERROR Shell: Failed to locate the winutils binary in the hadoop binary path
+java.io.IOException: Could not locate executable null\bin\winutils.exe in the Hadoop binaries.
+Any ideas?
+-----Original Message-----
+Thank you so much! It allows me to proceed and Spark started to execute my code. I use sc.textFile and Spark crashes on it: 
+15/04/03 15:15:21.572 sparkDriver-akka.actor.default-dispatcher-4 INFO SparkDeploySchedulerBackend: Registered executor: Actor[akka.tcp://sparkExecutor@Mynetwork.net:57652/user/Executor#1137816732] with ID 1
+15/04/03 15:15:21.601 sparkDriver-akka.actor.default-dispatcher-4 INFO TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0, Mynetwork.net, PROCESS_LOCAL, 1301 bytes)
+15/04/03 15:15:22.285 sparkDriver-akka.actor.default-dispatcher-2 INFO BlockManagerMasterActor: Registering block manager Mynetwork.net:57687 with 265.1 MB RAM, BlockManagerId(1, Mynetwork.net, 57687)
+15/04/03 15:15:22.436 sparkDriver-akka.actor.default-dispatcher-2 INFO TaskSetManager: Starting task 1.0 in stage 0.0 (TID 1, Mynetwork.net, PROCESS_LOCAL, 1301 bytes)
+15/04/03 15:15:22.455 task-result-getter-0 WARN TaskSetManager: Lost task 0.0 in stage 0.0 (TID 0, Mynetwork.net): java.io.EOFException
+	at java.io.ObjectInputStream$BlockDataInputStream.readFully(ObjectInputStream.java:2747)
+	at java.io.ObjectInputStream.readFully(ObjectInputStream.java:1033)
+Could you suggest?
+(it seems that new version of Spark was not tested for Windows. Previous versions worked more or less fine for me)
+-----Original Message-----
+Hi,
+Could anyone elaborate on the regularization in Spark? I've found that L1 and L2 are implemented with Updaters (L1Updater, SquaredL2Updater).
+1)Why the loss reported by L2 is (0.5 * regParam * norm * norm) where norm is Norm(weights, 2.0)? It should be 0.5*regParam*norm (0.5 to disappear after differentiation). It seems that it is mixed up with mean squared error.
+2)Why all weights are regularized? I think we should leave the bias weights (aka free or intercept) untouched if we don't assume that the data is centralized.
+3)Are there any short-term plans to move regularization from updater to a more convenient place?
+Best regards, Alexander
+Hi DB,
+Thank you!
+In general case (not only for regression), I think that Regularizer should be tightly coupled with Gradient otherwise it will have no idea which weights are bias (intercept).
+Best regards, Alexander
+-----Original Message-----
+Hi,
+Is there a way to access hdfs FileSystem through Spark? For example, I need to check the file size before opening it with sc.binaryFile("hdfs://mynetwork.com:9000/myfile"). Can I do it without creating hadoop FileSystem by myself ?
+val fs = FileSystem.get(new URI("hdfs://mynetwork.com:9000"), new Configuration())
+Best regards, Alexander
+Hi Pramod,
+For cluster-like tests you might want to use the same code as in mllib's LocalClusterSparkContext. You can rebuild only the package that you change and then run this main class.
+Best regards, Alexander
+-----Original Message-----
+Hi,
+I created a dataset RDD[MyCaseClass], converted it to DataFrame and saved to Parquet file, following https://spark.apache.org/docs/latest/sql-programming-guide.html#interoperating-with-rdds
+When I load this dataset with sqlContext.parquetFile, I get DataFrame with column names as in initial case class. I want to convert this DataFrame to RDD to perform RDD operations. However, when I convert it I get RDD[Row] and all information about row names gets lost. Could you suggest an easy way to convert DataFrame to RDD[MyCaseClass]?
+Best regards, Alexander
+Thank you for suggestions!
+Testing too. Recently I got few undelivered mails to dev-list.
+Hi,
+Is there a way to increase the amount of partition of RDD without causing shuffle? I've found JIRA issue https://issues.apache.org/jira/browse/SPARK-5997 however there is no implementation yet.
+Just in case, I am reading data from ~300 big binary files, which results in 300 partitions, then I need to sort my RDD, but it crashes with outofmemory exception. If I change the number of partitions to 2000, sort works OK, but repartition itself takes a lot of time due to shuffle.
+Best regards, Alexander
+Hi,
+My Hadoop is configured to have replication ratio = 2. I've added $HADOOP_HOME/config to the PATH as suggested in http://apache-spark-user-list.1001560.n3.nabble.com/hdfs-replication-on-saving-RDD-td289.html. Spark (1.4) does rdd.saveAsTextFile with replication=2. However DataFrame.saveAsParquet is done with replication = 3. How can I force Spark Dataframe to save parquet files with replication factor other than 3 (default one)?
+Best regards, Alexander
+Hi,
+I try to inner join of two tables on two fields(string and double). One table is 2B rows, the second is 500K. They are stored in HDFS in Parquet. Spark v 1.4.
+val big = sqlContext.paquetFile("hdfs://big")
+data.registerTempTable("big")
+val small = sqlContext.paquetFile("hdfs://small")
+data.registerTempTable("small")
+val result = sqlContext.sql("select big.f1, big.f2 from big inner join small on big.s=small.s and big.d=small.d")
+This query fails in the middle due to one of the workers "disk out of space" with shuffle reported 1.8TB which is the maximum size of my spark working dirs (on total 7 worker nodes). This is surprising, because the "big" table takes 2TB disk space (unreplicated) and "small" about 5GB and I would expect that optimizer will shuffle the small table. How to force Spark to shuffle the small table? I tried to write "small inner join big" however it also fails with 1.8TB of shuffle.
+Best regards, Alexander
+Hi,
+I am interested how scalable can be the model parallelism within Spark. Suppose, the model contains N weights of type Double and N is so large that does not fit into the memory of a single node. So, we can store the model in RDD[Double] within several nodes. To train the model, one needs to perform K iterations that update all the weights and check the convergence. Then we also need to exchange some weights between the nodes to synchronize the model or update the global state. I've sketched the code that does iterative updates with RDD (without global update yet). Surprisingly, each iteration takes more time than previous as shown below (time in seconds). Could you suggest what is the reason for that? I've checked GC, it does something within few milliseconds.
+Configuration: Spark 1.4, 1 master and 5 worker nodes, 5 executors, Intel Xeon 2.2, 16GB RAM each
+Iteration 0 time:1.127990986
+Iteration 1 time:1.391120414
+Iteration 2 time:1.6429691381000002
+Iteration 3 time:1.9344402954
+Iteration 4 time:2.2075294246999997
+Iteration 5 time:2.6328659593
+Iteration 6 time:2.7911690492999996
+Iteration 7 time:3.0850374104
+Iteration 8 time:3.4031050061
+Iteration 9 time:3.8826580919
+Code:
+val modelSize = 1000000000
+val numIterations = 10
+val parallelizm = 5
+var oldRDD = sc.parallelize(1 to modelSize, parallelizm).map(x => 0.1)
+var newRDD = sc.parallelize(1 to 1, parallelizm).map(x => 0.1)
+var i = 0
+while (i < numIterations) {
+  val t = System.nanoTime()
+  // updating the weights
+  val newRDD = oldRDD.map(x => x * x)
+  oldRDD.unpersist(true)
+  // "checking" convergence
+  newRDD.mean
+  println("Iteration " + i + " time:" + (System.nanoTime() - t) / 1e9 / numIterations)
+  oldRDD = newRDD
+  i += 1
+}
+Best regards, Alexander
+Dear Spark developers,
+I am trying to perform BlockMatrix multiplication in Spark. My test is as follows: 1)create a matrix of N blocks, so that each row of block matrix contains only 1 block and each block resides in separate partition on separate node, 2)transpose the block matrix and 3)multiply the transposed matrix by the original non-transposed one. This should preserve the data locality, so there should be no need for shuffle. However, I observe huge shuffle with the block matrix size of 50000x10000 and one block 10000x10000, 5 blocks per matrix. Could you suggest what is wrong?
+My setup is Spark 1.4, one master and 5 worker nodes, each is Xeon 2.2 16 GB RAM.
+Below is the test code:
+import org.apache.spark.mllib.linalg.Matrices
+import org.apache.spark.mllib.linalg.distributed.BlockMatrix
+val parallelism = 5
+val blockSize = 10000
+val rows = parallelism * blockSize
+val columns = blockSize
+val size = rows * columns
+assert(rows % blockSize == 0)
+assert(columns % blockSize == 0)
+val rowBlocks = rows / blockSize
+val columnBlocks = columns / blockSize
+val rdd = sc.parallelize( {
+                for(i <- 0 until rowBlocks; j <- 0 until columnBlocks) yield (i, j)
+                }, parallelism).map( coord => (coord, Matrices.rand(blockSize, blockSize, util.Random.self)))
+val bm = new BlockMatrix(rdd, blockSize, blockSize).cache()
+bm.validate()
+val mb = bm.transpose.cache()
+mb.validate()
+val t = System.nanoTime()
+val ata = mb.multiply(bm)
+ata.validate()
+println(rows + "x" + columns + ", block:" + blockSize + "\t" + (System.nanoTime() - t) / 1e9)
+Best regards, Alexander
+Hi Rakesh,
+Thanks for suggestion. Each block of original matrix is in separate partition. Each block of transposed matrix is also in a separate partition. The partition numbers are the same for the blocks that undergo multiplication. Each partition is on a separate worker. Basically, I want to force each worker to multiply only 2 blocks. This should be the optimal configuration for multiplication, as far as I understand. Having several blocks in each partition as you suggested is not optimal, is it?
+Best regards, Alexander
+Block matrix stores the data as key->Matrix pairs and multiply does a reduceByKey operations, aggregating matrices per key. Since you said each block is residing in a separate partition, reduceByKey might be effectively shuffling all of the data. A better way to go about this is to allow multiple blocks within each partition so that reduceByKey does a local reduce before aggregating across nodes.
+Rakesh
+On Mon, Jul 13, 2015 at 9:24 PM Ulanov, Alexander  wrote:
+Dear Spark developers,
+I am trying to perform BlockMatrix multiplication in Spark. My test is as follows: 1)create a matrix of N blocks, so that each row of block matrix contains only 1 block and each block resides in separate partition on separate node, 2)transpose the block matrix and 3)multiply the transposed matrix by the original non-transposed one. This should preserve the data locality, so there should be no need for shuffle. However, I observe huge shuffle with the block matrix size of 50000x10000 and one block 10000x10000, 5 blocks per matrix. Could you suggest what is wrong?
+My setup is Spark 1.4, one master and 5 worker nodes, each is Xeon 2.2 16 GB RAM.
+Below is the test code:
+import org.apache.spark.mllib.linalg.Matrices
+import org.apache.spark.mllib.linalg.distributed.BlockMatrix
+val parallelism = 5
+val blockSize = 10000
+val rows = parallelism * blockSize
+val columns = blockSize
+val size = rows * columns
+assert(rows % blockSize == 0)
+assert(columns % blockSize == 0)
+val rowBlocks = rows / blockSize
+val columnBlocks = columns / blockSize
+val rdd = sc.parallelize( {
+                for(i <- 0 until rowBlocks; j <- 0 until columnBlocks) yield (i, j)
+                }, parallelism).map( coord => (coord, Matrices.rand(blockSize, blockSize, util.Random.self)))
+val bm = new BlockMatrix(rdd, blockSize, blockSize).cache()
+bm.validate()
+val mb = bm.transpose.cache()
+mb.validate()
+val t = System.nanoTime()
+val ata = mb.multiply(bm)
+ata.validate()
+println(rows + "x" + columns + ", block:" + blockSize + "\t" + (System.nanoTime() - t) / 1e9)
+Best regards, Alexander
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Dear Spark developers,
+Below is the GraphX Pregel code snippet from https://spark.apache.org/docs/latest/graphx-programming-guide.html#pregel-api:
+(it does not contain caching step):
+while (activeMessages > 0 && i < maxIterations) {
+     // Receive the messages: -----------------------------------------------------------------------
+      // (1st join) Run the vertex program on all vertices that receive messages
+      val newVerts = g.vertices.innerJoin(messages)(vprog).cache()
+      // (2nd join) Merge the new vertex values back into the graph
+      g = g.outerJoinVertices(newVerts) { (vid, old, newOpt) => newOpt.getOrElse(old) }.cache()
+      // Send Messages: ------------------------------------------------------------------------------
+      // Vertices that didn't receive a message above don't appear in newVerts and therefore don't
+      // get to send messages.  More precisely the map phase of mapReduceTriplets is only invoked
+      // on edges in the activeDir of vertices in newVerts
+      messages = g.mapReduceTriplets(sendMsg, mergeMsg, Some((newVerts, activeDir))).cache()
+      activeMessages = messages.count()
+      i += 1
+    }
+It seems that the mentioned two joins can be rewritten as one outer join as follows:
+g = g.outerJoinVertices(messages) { (vid, old, mess) => mess match {
+  case Some(mess) => vprog(vid, old, mess)
+  case None => old }
+}
+This code passes PregelSuite (after removing newVerts). Could you elaborate why two joins are used instead of one and why do you need intermediate variable `newVerts`? Are there some performance considerations?
+Best regards, Alexander
+Dear Spark developers,
+Are there any best practices or guidelines for machine learning unit tests in Spark? After taking a brief look at the unit tests in ML and MLlib, I have found that each algorithm is tested in a different way. There are few kinds of tests:
+1)Partial check of internal algorithm correctness. This can be anything.
+2)Generate test data with distribution specific to the algorithm, do machine learning and check the outcomes. This is also very specific.
+3)Compare the parameters (weights) of machine learning model with parameters from existing implementations, such as R or SciPy. This looks more like a useful test, so that you are sure you will get the same result from the algorithm as other people get using other software.
+After googling a bit, I've found the following guidelines rather relevant:
+http://blog.mpacula.com/2011/02/17/unit-testing-statistical-software/
+I am wondering, should we come up with specific guidelines for machine learning, such as that the user is guaranteed to get the expected result? This also might be considered as additional benefit for Spark - to be standardized ML.
+Best regards, Alexander
+Dear Spark developers,
+I am trying to benchmark the new Dataframe aggregation implemented under the project Tungsten and released with Spark 1.4 (I am using the latest Spark from the repo, i.e. 1.5):
+https://github.com/apache/spark/pull/5725
+It tells that the aggregation should be faster due to using the unsafe to allocate memory and in-place update. It was also presented on Spark Summit this Summer:
+http://www.slideshare.net/SparkSummit/deep-dive-into-project-tungsten-josh-rosen
+The following enables the new aggregation in spark-config:
+spark.sql.unsafe.enabled=true
+spark.unsafe.offHeap=true
+I wrote a simple code that does aggregation of values by keys. However, the time needed to execute the code does not depend if the new aggregation is on or off. Could you suggest how can I observe the improvement that the aggregation provides? Could you write a code snippet that takes advantage of the new aggregation?
+case class Counter(key: Int, value: Double)
+val size = 100000000
+val partitions = 5
+val repetitions = 5
+val data = sc.parallelize(1 to size, partitions).map(x => Counter(util.Random.nextInt(size / repetitions), util.Random.nextDouble))
+val df = sqlContext.createDataFrame(data)
+df.persist()
+df.count()
+val t = System.nanoTime()
+val res = df.groupBy("key").agg(sum("value"))
+res.count()
+println((System.nanoTime() - t) / 1e9)
+Best regards, Alexander
+Dear Spark developers,
+Could you suggest what is the intended use of UnsafeRow (except for Tungsten groupBy and sort) and give an example how to use it?
+1)Is it intended to be instantiated as the copy of the Row in order to perform in-place modifications of it?
+2)Can I create a new UnsafeRow given the types of columns I want it to have (so it will allocate a memory and point to it)?
+Best regards, Alexander
+Dear Spark developers,
+I would like to create a dataframe with one column. However, the createDataFrame method accepts at least a Product:
+val data = Seq(1.0, 2.0)
+val rdd = sc.parallelize(data, 2)
+val df = sqlContext.createDataFrame(rdd)
+[fail]:25: error: overloaded method value createDataFrame with alternatives:
+ [A <: Product](data: Seq[A])(implicit evidence$2: reflect.runtime.universe.TypeTag[A])org.apache.spark.sql.DataFrame 
+  [A <: Product](rdd: org.apache.spark.rdd.RDD[A])(implicit evidence$1: reflect.runtime.universe.TypeTag[A])org.apache.spark.sql.DataFrame
+cannot be applied to (org.apache.spark.rdd.RDD[Double])
+       val df = sqlContext.createDataFrame(rdd)
+So, if I zip rdd with index, then it is OK:
+val df = sqlContext.createDataFrame(rdd.zipWithIndex)
+[success]df: org.apache.spark.sql.DataFrame = [_1: double, _2: bigint]
+Also, if I use the case class, it also seems to work:
+case class Hack(x: Double)
+val caseRDD = rdd.map( x => Hack(x))
+val df = sqlContext.createDataFrame(caseRDD)
+[success]df: org.apache.spark.sql.DataFrame = [x: double]
+What is the recommended way of creating a dataframe with one column?
+Best regards, Alexander
+Dear Spark developers,
+I am currently implementing the Estimator in ML that has a parameter that can take several different values that are mutually exclusive. The most appropriate type seems to be Scala Enum (http://www.scala-lang.org/api/current/index.html#scala.Enumeration). However, the current ML API has the following parameter types:
+BooleanParam, DoubleArrayParam, DoubleParam, FloatParam, IntArrayParam, IntParam, LongParam, StringArrayParam
+Should I introduce a new parameter type in ML API that is based on Scala Enum?
+Best regards, Alexander
+Hi Feynman,
+Thank you for suggestion. How can I ensure that there will be no problems for Java users? (I only use Scala API)
+Best regards, Alexander
+Hi Joseph,
+Strings sounds reasonable. However, there is no StringParam (only StringArrayParam). Should I create a new param type? Also, how can the user get all possible values of String parameter?
+Best regards, Alexander
+Dear Spark developers,
+Is it possible (and how to do it if possible) to pick one element per physical node from an RDD? Let's say the first element of any partition on that node. The result would be an RDD[element], the count of elements is equal to the N of nodes that has partitions of the initial RDD.
+Best regards, Alexander
+Dear Spark developers,
+I have created a simple Spark application for spark submit. It calls a machine learning library from Spark MLlib that is executed in a number of iterations that correspond to the same number of task in Spark. It seems that Spark creates an executor for each task and then removes it. The following messages indicate this in my log:
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24463 is now RUNNING
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24463 is now EXITED (Command exited with code 1)
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Executor app-20150929120924-0000/24463 removed: Command exited with code 1
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Asked to remove non-existent executor 24463
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor added: app-20150929120924-0000/24464 on worker-20150929120330-16.111.35.101-46374 (16.111.35.101:46374) with 12 cores
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Granted executor ID app-20150929120924-0000/24464 on hostPort 16.111.35.101:46374 with 12 cores, 30.0 GB RAM
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24464 is now LOADING
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24464 is now RUNNING
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24464 is now EXITED (Command exited with code 1)
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Executor app-20150929120924-0000/24464 removed: Command exited with code 1
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Asked to remove non-existent executor 24464
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor added: app-20150929120924-0000/24465 on worker-20150929120330-16.111.35.101-46374 (16.111.35.101:46374) with 12 cores
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Granted executor ID app-20150929120924-0000/24465 on hostPort 16.111.35.101:46374 with 12 cores, 30.0 GB RAM
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24465 is now LOADING
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24465 is now EXITED (Command exited with code 1)
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Executor app-20150929120924-0000/24465 removed: Command exited with code 1
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Asked to remove non-existent executor 24465
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor added: app-20150929120924-0000/24466 on worker-20150929120330-16.111.35.101-46374 (16.111.35.101:46374) with 12 cores
+15/09/29 12:21:02 INFO SparkDeploySchedulerBackend: Granted executor ID app-20150929120924-0000/24466 on hostPort 16.111.35.101:46374 with 12 cores, 30.0 GB RAM
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24466 is now LOADING
+15/09/29 12:21:02 INFO AppClient$ClientEndpoint: Executor updated: app-20150929120924-0000/24466 is now RUNNING
+It end up creating and removing thousands of executors. Is this a normal behavior?
+If I run the same code within spark-shell, this does not happen. Could you suggest what might be wrong in my setting?
+Best regards, Alexander
+Dear Spark developers,
+I would like to understand GraphX caching behavior with regards to PageRank in Spark, in particular, the following implementation of PageRank:
+https://github.com/apache/spark/blob/master/graphx/src/main/scala/org/apache/spark/graphx/lib/PageRank.scala
+On each iteration the new graph is created and cached, and the old graph is un-cached:
+1) Create new graph and cache it:
+rankGraph = rankGraph.joinVertices(rankUpdates) {
+        (id, oldRank, msgSum) => rPrb(src, id) + (1.0 - resetProb) * msgSum
+      }.cache()
+2) Unpersist the old one:
+      prevRankGraph.vertices.unpersist(false)
+      prevRankGraph.edges.unpersist(false)
+According to the code, at the end of each iteration only one graph should be in memory, i.e. one EdgeRDD and one VertexRDD. During the iteration, exactly between the mentioned lines of code, there will be two graphs: old and new. It is two pairs of Edge and Vertex RDDs. However, when I run the example provided in Spark examples folder, I observe the different behavior.
+Run the example (I checked that it runs the mentioned code):
+$SPARK_HOME/bin/spark-submit --class "org.apache.spark.examples.graphx.SynthBenchmark"  --master spark://mynode.net:7077 $SPARK_HOME/examples/target/spark-examples.jar
+According to "Storage" and RDD DAG in Spark UI, 3 VertexRDDs and 3 EdgeRDDs are cached, even when all iterations are finished, given that the mentioned code suggests caching at most 2 (and only in particular stage of the iteration):
+https://drive.google.com/file/d/0BzYMzvDiCep5WFpnQjFzNy0zYlU/view?usp=sharing
+Edges (the green ones are cached):
+https://drive.google.com/file/d/0BzYMzvDiCep5S2JtYnhVTlV1Sms/view?usp=sharing
+Vertices (the green ones are cached):
+https://drive.google.com/file/d/0BzYMzvDiCep5S1k4N2NFb05RZDA/view?usp=sharing
+Could you explain, why 3 VertexRDDs and 3 EdgeRDDs are cached?
+Is it OK that there is a double caching in code, given that joinVertices implicitly caches vertices and then the graph is cached in the PageRank code?
+Best regards, Alexander
+Dear Spark developers,
+I am trying to understand how Spark UI displays operation with the cached RDD.
+For example, the following code caches an rdd:
+The Jobs tab shows me that the RDD is evaluated:
+: 1 count at :24              2015/10/09 16:15:43        0.4 s       1/1
+: 0 zipWithIndex at  :21             2015/10/09 16:15:38        0.6 s       1/1
+An I can observe this rdd in the Storage tab of Spark UI:
+: ZippedWithIndexRDD  Memory Deserialized 1x Replicated
+Then I want to make an operation over the cached RDD. I run the following code:
+The Jobs tab shows me a new Job:
+: 2 count at :26
+Inside this Job there are two stages:
+: 3 count at :26 +details 2015/10/09 16:16:18   0.2 s       5/5
+: 2 zipWithIndex at :21
+It shows that zipWithIndex is executed again. It does not seem to be reasonable, because the rdd is cached, and zipWithIndex is already executed previously.
+Could you explain why if I perform an operation followed by an action on a cached RDD, then the last operation in the lineage of the cached RDD is shown to be executed in the Spark UI?
+Best regards, Alexander
+Hi Disha,
+The problem might be as follows. The data that you have might physically reside only on two nodes and Spark launches data-local tasks. As a result, only two workers are used. You might want to force Spark to distribute the data across all nodes, however it does not seem to be worthwhile for this rather small dataset.
+Best regards, Alexander
+Thank you, Nitin. This does explain the problem. It seems that UI should make this more clear to the user, otherwise it is simply misleading if you read it as it.
+Dear Spark developers,
+I have noticed that Gradient Descent is Spark MLlib takes long time if the model is large. It is implemented with TreeAggregate. I've extracted the code from GradientDescent.scala to perform the benchmark. It allocates the Array of a given size and the aggregates it:
+val dataSize = 12000000
+val n = 5
+val maxIterations = 3
+val rdd = sc.parallelize(0 until n, n).cache()
+rdd.count()
+var avgTime = 0.0
+for (i <- 1 to maxIterations) {
+  val start = System.nanoTime()
+  val result = rdd.treeAggregate((new Array[Double](dataSize), 0.0, 0L))(
+        seqOp = (c, v) => {
+          // c: (grad, loss, count)
+          val l = 0.0
+          (c._1, c._2 + l, c._3 + 1)
+        },
+        combOp = (c1, c2) => {
+          // c: (grad, loss, count)
+          (c1._1, c1._2 + c2._2, c1._3 + c2._3)
+        })
+  avgTime += (System.nanoTime() - start) / 1e9
+  assert(result._1.length == dataSize)
+}
+println("Avg time: " + avgTime / maxIterations)
+If I run on my cluster of 1 master and 5 workers, I get the following results (given the array size = 12M):
+n = 1: Avg time: 4.555709667333333
+n = 2 Avg time: 7.059724584666667
+n = 3 Avg time: 9.937117377666667
+n = 4 Avg time: 12.687526233
+n = 5 Avg time: 12.939526129666667
+Could you explain why the time becomes so big? The data transfer of 12M array of double should take ~ 1 second in 1Gbit network. There might be other overheads, however not that big as I observe.
+Best regards, Alexander
+Hi Disha,
+This is a good question. We plan to elaborate on it in our talk on the upcoming Spark Summit. Less workers means less compute power, more workers means more communication overhead. So, there exist an optimal number of workers for solving optimization problem with batch gradient given the size of the data and the model. Also, you have to make sure that all workers own local data, that is a separate thing to the number of partitions.
+Best regards, Alexander
+Hi Disha,
+Multilayer perceptron classifier in Spark implements data parallelism.
+Best regards, Alexander
+Hi Disha,
+Which use case do you have in mind that would require model parallelism? It should have large number of weights, so it could not fit into the memory of a single machine. For example, multilayer perceptron topologies, that are used for speech recognition, have up to 100M of weights. Present hardware is capable of accommodating this in the main memory. That might be a problem for GPUs, but this is a different topic.
+The straightforward way of model parallelism for fully connected neural networks is to distribute horizontal (or vertical) blocks of weight matrices across several nodes. That means that the input data has to be reproduced on all these nodes. The forward and the backward passes will require re-assembling the outputs and the errors on each of the nodes after each layer, because each of the node can produce only partial results since it holds a part of weights. According to my estimations, this is inefficient due to large intermediate traffic between the nodes and should be used only if the model does not fit in memory of a single machine. Another way of model parallelism would be to represent the network as the graph and use GraphX to write forward and back propagation. However, this option does not seem very practical to me.
+Best regards, Alexander
+Hi Kazuaki,
+Sounds very interesting! Could you elaborate on your benchmark with regards to logistic regression (LR)? Did you compare your implementation with the current implementation of LR in Spark?
+Best regards, Alexander
+Hi Disha,
+Data is stacked into matrices to perform matrix-matrix multiplication (instead of matrix-vector) that is handled by native BLAS and one can get a speed-up. You can refer here for benchmarks https://github.com/fommil/netlib-java
+With regards to your second question, data parallelism is handled by Spark RDD, i.e. each worker processes a subset of data partitions, and master serves the role of parameter server.
+Best regards, Alexander
+Hi Kazuaki,
+Indeed, moving data to/from GPU is costly and this benchmark summarizes the costs for moving different data sizes with regards to matrices multiplication. These costs are paid for the convenience of using the standard BLAS API that Nvidia NVBLAS provides. The thing is that there are no code changes required (in Spark), one just needs to reference BLAS implementation with the system variable. Naturally, hardware-specific implementation will always be faster than default. The benchmark results show that fact by comparing jCuda (by means of BIDMat) and NVBLAS. However, it also shows that it worth using NVBLAS for large matrices because it can take advantage of several GPUs and it will be faster despite the copying overhead. That is also a known thing advertised by Nvidia.
+By the way, I don't think that the column/row friendly format is an issue, because one can use transposed matrices to fit the required format. I believe that is just a software preference.
+My suggestion with regards to your prototype would be to make comparisons with Spark's implementation of logistic regression (that does not take advantage of GPU) and also with BIDMach's (that takes advantage of GPUs). It will give the users a better understanding of your's implementation performance. Currently you compare it with Spark's example logistic regression implementation that is supposed to be a reference for learning Spark rather than benchmarking its performance.
+Best regards, Alexander
+Hi Pan,
+There is a pull request that is supposed to fix the issue:
+https://github.com/apache/spark/pull/9854
+There is a workaround for saving/loading a model (however I am not sure if it will work for the pipeline):
+sc.parallelize(Seq(model), 1).saveAsObjectFile("path")
+val sameModel = sc.objectFile[YourCLASS]("path").first()
+Best regards, Alexander
+Dear Spark developers,
+I have 100 binary files in local file system that I want to load into Spark RDD. I need the data from each file to be in a separate partition. However, I cannot make it happen:
+scala> sc.binaryFiles("/data/subset").partitions.size
+res5: Int = 66
+The "minPartitions" parameter does not seems to help:
+scala> sc.binaryFiles("/data/subset", minPartitions = 100).partitions.size
+res8: Int = 66
+At the same time, Spark produces the required number of partitions with sc.textFiles (though I cannot use it because my files are binary):
+scala> sc.textFile("/data/subset").partitions.size
+res9: Int = 100
+Could you suggest how to force Spark to load binary files each in a separate partition?
+Best regards, Alexander
+Dear Spark developers,
+Recently, I was trying to switch my code from RDDs to DataFrames in order to compare the performance. The code computes RDD in a loop. I use RDD.persist followed by RDD.count to force Spark compute the RDD and cache it, so that it does not need to re-compute it on each iteration. However, it does not seem to work for DataFrame:
+import scala.util.Random
+val rdd = sc.parallelize(1 to 10, 2).map(x => (Random(5), Random(5))
+val edges = sqlContext.createDataFrame(rdd).toDF("from", "to")
+val vertices = edges.select("from").unionAll(edges.select("to")).distinct().cache()
+vertices.count
+[Stage 34:=================>                                     (65 + 4) / 200]
+[Stage 34:========================>                              (90 + 5) / 200]
+[Stage 34:==============================>                       (114 + 4) / 200]
+[Stage 34:====================================>                 (137 + 4) / 200]
+[Stage 34:==========================================>           (157 + 4) / 200]
+[Stage 34:=================================================>    (182 + 4) / 200]
+res25: Long = 5
+If I run count again, it recomputes it again instead of using the cached result:
+scala> vertices.count
+[Stage 37:=============>                                         (49 + 4) / 200]
+[Stage 37:==================>                                    (66 + 4) / 200]
+[Stage 37:========================>                              (90 + 4) / 200]
+[Stage 37:=============================>                        (110 + 4) / 200]
+[Stage 37:===================================>                  (133 + 4) / 200]
+[Stage 37:==========================================>           (157 + 4) / 200]
+[Stage 37:================================================>     (178 + 5) / 200]
+res26: Long = 5
+Could you suggest how to schrink the DataFrame lineage ?
+Best regards, Alexander
+Hi Joseph,
+Thank you for the link! Two follow up questions
+1)Suppose I have the original DataFrame in Tungsen, i.e. catalyst types and cached in off-heap store. It might be quite useful for iterative workloads due to lower GC overhead. Then I convert it to RDD and then backto DF. Will the resulting DF remain off-heap or it will be on heap as regular RDD?
+2)How is the mentioned problem handled in GraphFrames? Suppose, I want to use aggregateMessages in the iterative loop, for implementing PageRank.
+Best regards, Alexander
+-1
+Spark Unit tests fail on Windows. Still not resolved, though marked as resolved.
+https://issues.apache.org/jira/browse/SPARK-15893
+Spark Unit tests fail on Windows in Spark 2.0. It can be considered as blocker since there are people that develop for Spark on Windows. The referenced issue is indeed Minor and has nothing to do with unit tests.
+Here is the fix https://github.com/apache/spark/pull/13868
+-1, due to unresolved https://issues.apache.org/jira/browse/SPARK-15899
+Dear Spark developers,
+Could you suggest how to perform pattern matching on the type of the graph edge in the following scenario. I need to perform some math by means of aggregateMessages on the graph edges if edges are Double. Here is the code:
+def my[VD: ClassTag, ED: ClassTag] (graph: Graph[VD, ED]): Double {
+graph match {
+   g: Graph[_, Double] => g.aggregateMessages[Double](t => t.sendToSrc(t.attr), _ + _).values.max
+   _ => 0.0
+}
+}
+However, it does not work, because aggregateMessages creates context t of type [VD, ED, Double]. I expect it to create context of [VD, Double, Double] because of the type pattern matching. Could you suggest what is the issue?
+Best regards, Alexander
+Dear Spark developers,
+I am working with Spark streaming 1.6.1. The task is to get RDDs for some external analytics from each timewindow. This external function accepts RDD so I cannot use DStream. I learned that DStream.window.compute(time) returns Option[RDD]. I am trying to use it in the following code derived from the example in programming guide:
+val conf = new SparkConf().setMaster("local[2]").setAppName("NetworkWordCount")
+val ssc = new StreamingContext(conf, Seconds(1))
+val lines = ssc.socketTextStream("localhost", 9999)
+val rdd = lines.window(Seconds(5), Seconds(3)).compute(Time(System.currentTimeMillis())) // this does not seem to be a proper way to set time
+ssc.start()
+ssc.awaitTermination()
+At the line with rdd I get the following exception: Exception in thread "main" org.apache.spark.SparkException: org.apache.spark.streaming.dstream.SocketInputDStream@2264e43c has not been initialized.
+The other option to get RDD from DStream is to use "slice" function. However, it is not clear how to use it and I get the same exception with the following use:
+val rdd = lines.slice(Time(System.currentTimeMillis() - 100), Time(System.currentTimeMillis())) // does not seem correct
+Could you suggest what is the proper use of "compute" or "slice" functions from DStream or another way to get RDD from DStream?
+Best regards, Alexander
+P.S. I have found the following example that does streaming within the loop, however it looks hacky:
+https://github.com/chlam4/spark-exercises/blob/master/using-dstream-slice.scala
+Dear Spark users and developers,
+I have released version 1.0.0 of scalable-deeplearning package. This package is based on the implementation of artificial neural networks in Spark ML. It is intended for new Spark deep learning features that were not yet merged to Spark ML or that are too specific to be merged. The package provides ML pipeline API, distributed training, optimized numerical processing with tensor library, and extensible API for developers. Current features are the multilayer perceptron classifier and stacked autoencoder.
+As a Spark package: https://spark-packages.org/package/avulanov/scalable-deeplearning
+The source code: https://github.com/avulanov/scalable-deeplearning
+Contributions are very welcome! Please, let me know if you have any comment or questions.
+Best regards, Alexander
+Dear Spark developers and users,
+HPE has open sourced the implementation of the belief propagation (BP) algorithm for Apache Spark, a popular message passing algorithm for performing inference in probabilistic graphical models. It provides exact inference for graphical models without loops. While inference for graphical models with loops is approximate, in practice it is shown to work well. The implementation is generic and operates on factor graph representation of graphical models. It handles factors of any order, and variable domains of any size. It is implemented with Apache Spark GraphX, and thus can scale to large scale models. Further, it supports computations in log scale for numerical stability. Large scale applications of BP include fraud detection in banking transactions and malicious site detection in computer networks.
+Source code: https://github.com/HewlettPackard/sandpiper
+Best regards, Alexander
+Hi Bertrand,
+We only do inference. We do not do structure or parameter estimation (or learning) - that for the MRF would be estimation of the factors, and the structure of the graphical model. The parameters can be estimated using maximum likelihood if data is available for all the nodes, or by EM if there are hidden nodes. We of course don't implement MLE, or EM.
+Assuming the model parameters are already available, we can do inference for both Bayesian and Markov models.
+So to answer the question below, we don't do "learning", we do "inference" using BP.
+We were using both LibDAI and our own implementation of BP for GraphLab and as a reference.
+Best regards, Manish Marwah & Alexander
+________________________________

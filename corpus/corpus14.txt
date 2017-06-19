@@ -1,0 +1,1687 @@
+If you're looking at consolidating build systems, I'd ask to consider ease 
+of cross-publishing for different Scala versions.  My instinct is that sbt 
+will be less troublesome in that regard (although as I understand it, the 
+changes to the repl may present a problem).
+We're needing to use 2.10 for a project, so I'd be happy to put in some 
+work on the issue.
+Hi all, just wanted to give a heads up that we're seeing a reproducible
+deadlock with spark 1.0.1 with 2.3.0-mr1-cdh5.0.2
+If jira is a better place for this, apologies in advance - figured talking
+about it on the mailing list was friendlier than randomly (re)opening jira
+tickets.
+I know Gary had mentioned some issues with 1.0.1 on the mailing list, once
+we got a thread dump I wanted to follow up.
+The thread dump shows the deadlock occurs in the synchronized block of code
+that was changed in HadoopRDD.scala, for the Spark-1097 issue
+Relevant portions of the thread dump are summarized below, we can provide
+the whole dump if it's useful.
+Found one Java-level deadlock:
+=============================
+"Executor task launch worker-1":
+  waiting to lock monitor 0x00007f250400c520 (object 0x00000000fae7dc30, a
+org.apache.hadoop.co
+nf.Configuration),
+  which is held by "Executor task launch worker-0"
+"Executor task launch worker-0":
+  waiting to lock monitor 0x00007f2520495620 (object 0x00000000faeb4fc8, a
+java.lang.Class),
+  which is held by "Executor task launch worker-1"
+"Executor task launch worker-1":
+        at
+org.apache.hadoop.conf.Configuration.reloadConfiguration(Configuration.java:791)
+        - waiting to lock  (a
+org.apache.hadoop.conf.Configuration)
+        at
+org.apache.hadoop.conf.Configuration.addDefaultResource(Configuration.java:690)
+        - locked  (a java.lang.Class for
+org.apache.hadoop.conf.Configurati
+on)
+        at
+org.apache.hadoop.hdfs.HdfsConfiguration.(HdfsConfiguration.java:34)
+        at
+org.apache.hadoop.hdfs.DistributedFileSystem.(DistributedFileSystem.java:110
+)
+        at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native
+Method)
+        at
+sun.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.
+java:57)
+        at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native
+Method)
+        at
+sun.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.
+java:57)
+        at
+sun.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAcces
+sorImpl.java:45)
+        at java.lang.reflect.Constructor.newInstance(Constructor.java:525)
+        at java.lang.Class.newInstance0(Class.java:374)
+        at java.lang.Class.newInstance(Class.java:327)
+        at java.util.ServiceLoader$LazyIterator.next(ServiceLoader.java:373)
+        at java.util.ServiceLoader$1.next(ServiceLoader.java:445)
+        at
+org.apache.hadoop.fs.FileSystem.loadFileSystems(FileSystem.java:2364)
+        - locked  (a java.lang.Class for
+org.apache.hadoop.fs.FileSystem)
+        at
+org.apache.hadoop.fs.FileSystem.getFileSystemClass(FileSystem.java:2375)
+        at
+org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:2392)
+        at org.apache.hadoop.fs.FileSystem.access$200(FileSystem.java:89)
+        at
+org.apache.hadoop.fs.FileSystem$Cache.getInternal(FileSystem.java:2431)
+        at org.apache.hadoop.fs.FileSystem$Cache.get(FileSystem.java:2413)
+        at org.apache.hadoop.fs.FileSystem.get(FileSystem.java:368)
+        at org.apache.hadoop.fs.FileSystem.get(FileSystem.java:167)
+        at
+org.apache.hadoop.mapred.JobConf.getWorkingDirectory(JobConf.java:587)
+        at
+org.apache.hadoop.mapred.FileInputFormat.setInputPaths(FileInputFormat.java:315)
+        at
+org.apache.hadoop.mapred.FileInputFormat.setInputPaths(FileInputFormat.java:288)
+        at
+org.apache.spark.SparkContext$$anonfun$22.apply(SparkContext.scala:546)
+        at
+org.apache.spark.SparkContext$$anonfun$22.apply(SparkContext.scala:546)
+        at
+org.apache.spark.rdd.HadoopRDD$$anonfun$getJobConf$1.apply(HadoopRDD.scala:145)
+...elided...
+"Executor task launch worker-0" daemon prio=10 tid=0x0000000001e71800
+nid=0x2d97 waiting for monitor entry [0x00007f24d2bf1000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at
+org.apache.hadoop.fs.FileSystem.loadFileSystems(FileSystem.java:2362)
+        - waiting to lock  (a java.lang.Class for
+org.apache.hadoop.fs.FileSystem)
+        at
+org.apache.hadoop.fs.FileSystem.getFileSystemClass(FileSystem.java:2375)
+        at
+org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:2392)
+        at org.apache.hadoop.fs.FileSystem.access$200(FileSystem.java:89)
+        at
+org.apache.hadoop.fs.FileSystem$Cache.getInternal(FileSystem.java:2431)
+        at org.apache.hadoop.fs.FileSystem$Cache.get(FileSystem.java:2413)
+        at org.apache.hadoop.fs.FileSystem.get(FileSystem.java:368)
+        at org.apache.hadoop.fs.FileSystem.get(FileSystem.java:167)
+        at
+org.apache.hadoop.mapred.JobConf.getWorkingDirectory(JobConf.java:587)
+        at
+org.apache.hadoop.mapred.FileInputFormat.setInputPaths(FileInputFormat.java:315)
+        at
+org.apache.hadoop.mapred.FileInputFormat.setInputPaths(FileInputFormat.java:288)
+        at
+org.apache.spark.SparkContext$$anonfun$22.apply(SparkContext.scala:546)
+        at
+org.apache.spark.SparkContext$$anonfun$22.apply(SparkContext.scala:546)
+        at
+org.apache.spark.rdd.HadoopRDD$$anonfun$getJobConf$1.apply(HadoopRDD.scala:145)
+Here's the entire jstack output.
+I'm going to be on a plane wed 23, return flight monday 28, so will miss
+daily call those days.  I'll be pushing forward on projects as I can, but
+skype availability may be limited, so email if you need something from me.
+No, sorry for the mixup, it was a "helpful" autocomplete similarity between
+an internal work list and the spark dev list
+:(
+Switched my spark mailing list subscription back to my personal email so
+you guys won't be subjected to further unwanted email.
+We tested that patch from aarondav's branch, and are no longer seeing that
+deadlock.  Seems to have solved the problem, at least for us.
+We were previously using SPARK_JAVA_OPTS to set java system properties via
+-D.
+This was used for properties that varied on a per-deployment-environment
+basis, but needed to be available in the spark shell and workers.
+On upgrading to 1.0, we saw that SPARK_JAVA_OPTS had been deprecated, and
+replaced by spark-defaults.conf and command line arguments to spark-submit
+or spark-shell.
+However, setting spark.driver.extraJavaOptions and
+spark.executor.extraJavaOptions in spark-defaults.conf is not a replacement
+for SPARK_JAVA_OPTS:
+$ cat conf/spark-defaults.conf
+spark.driver.extraJavaOptions=-Dfoo.bar.baz=23
+$ ./bin/spark-shell
+scala> System.getProperty("foo.bar.baz")
+res0: String = null
+$ ./bin/spark-shell --driver-java-options "-Dfoo.bar.baz=23"
+scala> System.getProperty("foo.bar.baz")
+res0: String = 23
+Looking through the shell scripts for spark-submit and spark-class, I can
+see why this is; parsing spark-defaults.conf from bash could be brittle.
+But from an ergonomic point of view, it's a step back to go from a
+set-it-and-forget-it configuration in spark-env.sh, to requiring command
+line arguments.
+I can solve this with an ad-hoc script to wrap spark-shell with the
+appropriate arguments, but I wanted to bring the issue up to see if anyone
+else had run into it,
+or had any direction for a general solution (beyond parsing java properties
+files from bash).
+Either whitespace or equals sign are valid properties file formats.
+Here's an example:
+$ cat conf/spark-defaults.conf
+spark.driver.extraJavaOptions -Dfoo.bar.baz=23
+$ ./bin/spark-shell -v
+Using properties file: /opt/spark/conf/spark-defaults.conf
+Adding default property: spark.driver.extraJavaOptions=-Dfoo.bar.baz=23
+scala>  System.getProperty("foo.bar.baz")
+res0: String = null
+If you add double quotes, the resulting string value will have double
+quotes.
+$ cat conf/spark-defaults.conf
+spark.driver.extraJavaOptions "-Dfoo.bar.baz=23"
+$ ./bin/spark-shell -v
+Using properties file: /opt/spark/conf/spark-defaults.conf
+Adding default property: spark.driver.extraJavaOptions="-Dfoo.bar.baz=23"
+scala>  System.getProperty("foo.bar.baz")
+res0: String = null
+Neither one of those affects the issue; the underlying problem in my case
+seems to be that bin/spark-class uses the SPARK_SUBMIT_OPTS and
+SPARK_JAVA_OPTS environment variables, but nothing parses
+spark-defaults.conf before the java process is started.
+Here's an example of the process running when only spark-defaults.conf is
+being used:
+$ ps -ef | grep spark
+514       5182  2058  0 21:05 pts/2    00:00:00 bash ./bin/spark-shell -v
+514       5189  5182  4 21:05 pts/2    00:00:22 /usr/local/java/bin/java
+-cp
+::/opt/spark/conf:/opt/spark/lib/spark-assembly-1.0.1-hadoop2.3.0-mr1-cdh5.0.2.jar:/etc/hadoop/conf-mx
+-XX:MaxPermSize=128m -Djava.library.path= -Xms512m -Xmx512m
+org.apache.spark.deploy.SparkSubmit spark-shell -v --class
+org.apache.spark.repl.Main
+Here's an example of it when the command line --driver-java-options is used
+(and thus things work):
+$ ps -ef | grep spark
+514       5392  2058  0 21:15 pts/2    00:00:00 bash ./bin/spark-shell -v
+--driver-java-options -Dfoo.bar.baz=23
+514       5399  5392 80 21:15 pts/2    00:00:06 /usr/local/java/bin/java
+-cp
+::/opt/spark/conf:/opt/spark/lib/spark-assembly-1.0.1-hadoop2.3.0-mr1-cdh5.0.2.jar:/etc/hadoop/conf-mx
+-XX:MaxPermSize=128m -Dfoo.bar.baz=23 -Djava.library.path= -Xms512m
+-Xmx512m org.apache.spark.deploy.SparkSubmit spark-shell -v
+--driver-java-options -Dfoo.bar.baz=23 --class org.apache.spark.repl.Main
+In addition, spark.executor.extraJavaOptions does not seem to behave as I
+would expect; java arguments don't seem to be propagated to executors.
+$ cat conf/spark-defaults.conf
+spark.master
+mesos://zk://etl-01.mxstg:2181,etl-02.mxstg:2181,etl-03.mxstg:2181/masters
+spark.executor.extraJavaOptions -Dfoo.bar.baz=23
+spark.driver.extraJavaOptions -Dfoo.bar.baz=23
+$ ./bin/spark-shell
+scala> sc.getConf.get("spark.executor.extraJavaOptions")
+res0: String = -Dfoo.bar.baz=23
+scala> sc.parallelize(1 to 100).map{ i => (
+     |  java.net.InetAddress.getLocalHost.getHostName,
+     |  System.getProperty("foo.bar.baz")
+     | )}.collect
+res1: Array[(String, String)] = Array((dn-01.mxstg,null),
+(dn-01.mxstg,null), (dn-01.mxstg,null), (dn-01.mxstg,null),
+(dn-01.mxstg,null), (dn-01.mxstg,null), (dn-01.mxstg,null),
+(dn-01.mxstg,null), (dn-01.mxstg,null), (dn-01.mxstg,null),
+(dn-01.mxstg,null), (dn-01.mxstg,null), (dn-02.mxstg,null),
+(dn-02.mxstg,null), ...
+Note that this is a mesos deployment, although I wouldn't expect that to
+affect the availability of spark.driver.extraJavaOptions in a local spark
+shell.
+1. I've tried with and without escaping equals sign, it doesn't affect the
+results.
+2. Yeah, exporting SPARK_SUBMIT_OPTS from spark-env.sh works for getting
+system properties set in the local shell (although not for executors).
+3. We're using the default fine-grained mesos mode, not setting
+spark.mesos.coarse, so it doesn't seem immediately related to that ticket.
+Should I file a bug report?
+Just wanted to check in on this, see if I should file a bug report
+regarding the mesos argument propagation.
+I'm seeing situations where starting e.g. a 4th spark job on Mesos results
+in none of the jobs making progress.  This happens even with
+--executor-memory set to values that should not come close to exceeding the
+availability per node, and even if the 4th job is doing something
+completely trivial (e.g. parallelize 1 to 10000 and sum).  Killing one of
+the jobs typically allows the others to start proceeding.
+While jobs are hung, I see the following in mesos master logs:
+I0820 19:28:02.651296 24666 master.cpp:2282] Sending 7 offers to framework
+20140820-170154-1315739402-5050-24660-0020
+I0820 19:28:02.654502 24668 master.cpp:1578] Processing reply for offers: [
+20140820-170154-1315739402-5050-24660-96624 ] on slave
+20140724-150750-1315739402-5050-25405-6 (dn-04) for framework
+20140820-170154-1315739402-5050-24660-0020
+I0820 19:28:02.654722 24668 hierarchical_allocator_process.hpp:590]
+Framework 20140820-170154-1315739402-5050-24660-0020 filtered slave
+20140724-150750-1315739402-5050-25405-6 for 1secs
+Am I correctly interpreting that to mean that spark is being offered
+resources, but is rejecting them?  Is there a way (short of patching spark
+to add more logging) to figure out why resources are being rejected?
+This is on the default fine-grained mode.
+At least some of the jobs are typically doing work that would make it
+difficult to share, e.g. accessing hdfs.  I'll see if I can get a smaller
+reproducible case.
+I definitely saw a case where
+a. the only job running was a 256m shell
+b. I started a 2g job
+c. a little while later the same user as in a started another 256m shell
+My job immediately stopped making progress.  Once user a killed his shells,
+it started again.
+This is on nodes with ~15G of memory, on which we have successfully run 8G
+jobs.
+I've been looking at performance differences between spark sql queries
+against single parquet tables, vs a unionAll of two tables.  It's a
+significant difference, like 5 to 10x
+Is there a reason in general not to push projections and predicates down
+into the individual ParquetTableScans in a union?
+Here's an example of what I'm talking about:
+scala> p.printSchema
+root
+ |-- name: string (nullable = true)
+ |-- age: integer (nullable = false)
+ |-- phones: array (nullable = true)
+ |    |-- element: string (containsNull = true)
+scala> p2.printSchema
+root
+ |-- name: string (nullable = true)
+ |-- age: integer (nullable = false)
+ |-- phones: array (nullable = true)
+ |    |-- element: string (containsNull = true)
+scala> val b = p.unionAll(p2)
+// single table, pushdown
+scala> p.where('age < 40).select('name)
+res36: org.apache.spark.sql.SchemaRDD =
+SchemaRDD[97] at RDD at SchemaRDD.scala:103
+== Query Plan ==
+== Physical Plan ==
+Project [name#3]
+ ParquetTableScan [name#3,age#4], (ParquetRelation /var/tmp/people,
+Some(Configuration: core-default.xml, core-site.xml, mapred-default.xml,
+mapred-site.xml), org.apache.spark.sql.SQLContext@6d7e79f6, []), [(age#4 <
+40)]
+// union of 2 tables, no pushdown
+scala> b.where('age < 40).select('name)
+res37: org.apache.spark.sql.SchemaRDD =
+SchemaRDD[99] at RDD at SchemaRDD.scala:103
+== Query Plan ==
+== Physical Plan ==
+Project [name#3]
+ Filter (age#4 < 40)
+  Union [ParquetTableScan [name#3,age#4,phones#5], (ParquetRelation
+/var/tmp/people, Some(Configuration: core-default.xml, core-site.xml,
+mapred-default.xml, mapred-site.xml),
+org.apache.spark.sql.SQLContext@6d7e79f6, []), []
+,ParquetTableScan [name#0,age#1,phones#2], (ParquetRelation
+/var/tmp/people2, Some(Configuration: core-default.xml, core-site.xml,
+mapred-default.xml, mapred-site.xml),
+org.apache.spark.sql.SQLContext@6d7e79f6, []), []
+]
+   ParquetTableScan [name#3,age#4,phones#5], (ParquetRelation
+/var/tmp/people, Some(Configuration: core-default.xml, core-site.xml,
+mapred-default.xml, mapred-site.xml), org.apache.spark.sql...
+Opened
+https://issues.apache.org/jira/browse/SPARK-3462
+I'll take a look at ColumnPruning and see what I can do
+Maybe I'm missing something, I thought parquet was generally a write-once
+format and the sqlContext interface to it seems that way as well.
+d1.saveAsParquetFile("/foo/d1")
+// another day, another table, with same schema
+d2.saveAsParquetFile("/foo/d2")
+Will give a directory structure like
+/foo/d1/_metadata
+/foo/d1/part-r-1.parquet
+/foo/d1/part-r-2.parquet
+/foo/d1/_SUCCESS
+/foo/d2/_metadata
+/foo/d2/part-r-1.parquet
+/foo/d2/part-r-2.parquet
+/foo/d2/_SUCCESS
+// ParquetFileReader will fail, because /foo/d1 is a directory, not a
+parquet partition
+sqlContext.parquetFile("/foo")
+// works, but has the noted lack of pushdown
+sqlContext.parquetFile("/foo/d1").unionAll(sqlContext.parquetFile("/foo/d2"))
+Is there another alternative?
+Ok, so looking at the optimizer code for the first time and trying the
+simplest rule that could possibly work,
+object UnionPushdown extends Rule[LogicalPlan] {
+  def apply(plan: LogicalPlan): LogicalPlan = plan transform {
+    // Push down filter into
+union
+    case f @ Filter(condition, u @ Union(left, right)) =>
+      u.copy(left = f.copy(child = left), right = f.copy(child =
+right))
+    // Push down projection into
+union
+    case p @ Project(projectList, u @ Union(left, right)) =>
+      u.copy(left = p.copy(child = left), right = p.copy(child =
+right))
+}
+}
+If I try manually applying that rule to a logical plan in the repl, it
+produces the query shape I'd expect, and executing that plan results in
+parquet pushdowns as I'd expect.
+But adding those cases to ColumnPruning results in a runtime exception
+(below)
+I can keep digging, but it seems like I'm missing some obvious initial
+context around naming of attributes.  If you can provide any pointers to
+speed me on my way I'd appreciate it.
+java.lang.AssertionError: assertion failed: ArrayBuffer() + ArrayBuffer()
+!= WrappedArray(name#6, age#7), List(name#9, age#10, phones#11)
+        at scala.Predef$.assert(Predef.scala:179)
+        at
+org.apache.spark.sql.parquet.ParquetTableScan.(ParquetTableOperations.scala:75)
+        at
+org.apache.spark.sql.execution.SparkStrategies$ParquetOperations$$anonfun$9.apply(SparkStrategies.scala:234)
+        at
+org.apache.spark.sql.execution.SparkStrategies$ParquetOperations$$anonfun$9.apply(SparkStrategies.scala:234)
+        at
+org.apache.spark.sql.SQLContext$SparkPlanner.pruneFilterProject(SQLContext.scala:367)
+        at
+org.apache.spark.sql.execution.SparkStrategies$ParquetOperations$.apply(SparkStrategies.scala:230)
+        at
+org.apache.spark.sql.catalyst.planning.QueryPlanner$$anonfun$1.apply(QueryPlanner.scala:58)
+        at
+org.apache.spark.sql.catalyst.planning.QueryPlanner$$anonfun$1.apply(QueryPlanner.scala:58)
+        at scala.collection.Iterator$$anon$13.hasNext(Iterator.scala:371)
+        at
+org.apache.spark.sql.catalyst.planning.QueryPlanner.apply(QueryPlanner.scala:59)
+        at
+org.apache.spark.sql.catalyst.planning.QueryPlanner.planLater(QueryPlanner.scala:54)
+        at
+org.apache.spark.sql.execution.SparkStrategies$BasicOperators$$anonfun$12.apply(SparkStrategies.scala:282)
+        at
+org.apache.spark.sql.execution.SparkStrategies$BasicOperators$$anonfun$12.apply(SparkStrategies.scala:282)
+        at
+scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:244)
+        at
+scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:244)
+        at scala.collection.immutable.List.foreach(List.scala:318)
+        at
+scala.collection.TraversableLike$class.map(TraversableLike.scala:244)
+        at scala.collection.AbstractTraversable.map(Traversable.scala:105)
+        at
+org.apache.spark.sql.execution.SparkStrategies$BasicOperators$.apply(SparkStrategies.scala:282)
+        at
+org.apache.spark.sql.catalyst.planning.QueryPlanner$$anonfun$1.apply(QueryPlanner.scala:58)
+        at
+org.apache.spark.sql.catalyst.planning.QueryPlanner$$anonfun$1.apply(QueryPlanner.scala:58)
+        at scala.collection.Iterator$$anon$13.hasNext(Iterator.scala:371)
+        at
+org.apache.spark.sql.catalyst.planning.QueryPlanner.apply(QueryPlanner.scala:59)
+        at
+org.apache.spark.sql.SQLContext$QueryExecution.sparkPlan$lzycompute(SQLContext.scala:402)
+        at
+org.apache.spark.sql.SQLContext$QueryExecution.sparkPlan(SQLContext.scala:400)
+        at
+org.apache.spark.sql.SQLContext$QueryExecution.executedPlan$lzycompute(SQLContext.scala:406)
+        at
+org.apache.spark.sql.SQLContext$QueryExecution.executedPlan(SQLContext.scala:406)
+        at
+org.apache.spark.sql.SQLContext$QueryExecution.toString(SQLContext.scala:431)
+So the obvious thing I was missing is that the analyzer has already
+resolved attributes by the time the optimizer runs, so the references in
+the filter / projection need to be fixed up to match the children.
+Created a PR, let me know if there's a better way to do it.  I'll see about
+testing performance against some actual data sets.
+Tested the patch against a cluster with some real data.  Initial results
+seem like going from one table to a union of 2 tables is now closer to a
+doubling of query time as expected, instead of 5 to 10x.
+Let me know if you see any issues with that PR.
+Cool, thanks for your help on this.  Any chance of adding it to the 1.1.1
+point release, assuming there ends up being one?
+I noticed that the release notes for 1.1.0 said that spark doesn't support
+Hive buckets "yet".  I didn't notice any jira issues related to adding
+support.
+Broadly speaking, what would be involved in supporting buckets, especially
+the bucketmapjoin and sortedmerge optimizations?
+After the recent spark project changes to guava shading, I'm seeing issues
+with the datastax spark cassandra connector (which depends on guava 15.0)
+and the datastax cql driver (which depends on guava 16.0.1)
+Building an assembly for a job (with spark marked as provided) that
+includes either guava 15.0 or 16.0.1, results in errors like the following:
+scala> session.close
+scala> s[14/09/20 04:56:35 ERROR Futures$CombinedFuture: input future
+failed.
+java.lang.IllegalAccessError: tried to access class
+org.spark-project.guava.common.base.Absent from class
+com.google.common.base.Optional
+        at com.google.common.base.Optional.absent(Optional.java:79)
+        at com.google.common.base.Optional.fromNullable(Optional.java:94)
+        at
+com.google.common.util.concurrent.Futures$CombinedFuture.setOneValue(Futures.java:1608)
+        at
+com.google.common.util.concurrent.Futures$CombinedFuture.access$400(Futures.java:1470)
+        at
+com.google.common.util.concurrent.Futures$CombinedFuture$2.run(Futures.java:1548)
+        at
+com.google.common.util.concurrent.MoreExecutors$SameThreadExecutorService.execute(MoreExecutors.java:297)
+        at
+com.google.common.util.concurrent.ExecutionList.executeListener(ExecutionList.java:156)
+        at
+com.google.common.util.concurrent.ExecutionList.add(ExecutionList.java:101)
+        at
+com.google.common.util.concurrent.AbstractFuture.addListener(AbstractFuture.java:170)
+        at
+com.google.common.util.concurrent.Futures$CombinedFuture.init(Futures.java:1545)
+        at
+com.google.common.util.concurrent.Futures$CombinedFuture.(Futures.java:1491)
+        at
+com.google.common.util.concurrent.Futures.listFuture(Futures.java:1640)
+        at
+com.google.common.util.concurrent.Futures.allAsList(Futures.java:983)
+        at
+com.datastax.driver.core.CloseFuture$Forwarding.(CloseFuture.java:73)
+        at
+com.datastax.driver.core.HostConnectionPool.closeAsync(HostConnectionPool.java:398)
+        at
+com.datastax.driver.core.SessionManager.closeAsync(SessionManager.java:157)
+        at
+com.datastax.driver.core.SessionManager.close(SessionManager.java:172)
+        at
+com.datastax.spark.connector.cql.CassandraConnector$.com$datastax$spark$connector$cql$CassandraConnector$$destroySession(CassandraConnector.scala:180)
+        at
+com.datastax.spark.connector.cql.CassandraConnector$$anonfun$5.apply(CassandraConnector.scala:151)
+        at
+com.datastax.spark.connector.cql.CassandraConnector$$anonfun$5.apply(CassandraConnector.scala:151)
+        at com.datastax.spark.connector.cql.RefCountedCache.com
+$datastax$spark$connector$cql$RefCountedCache$$releaseImmediately(RefCountedCache.scala:86)
+        at
+com.datastax.spark.connector.cql.RefCountedCache$ReleaseTask.run(RefCountedCache.scala:26)
+        at
+com.datastax.spark.connector.cql.RefCountedCache$$anonfun$com$datastax$spark$connector$cql$RefCountedCache$$processPendingReleases$2.apply(RefCountedCache.scala:150)
+        at
+com.datastax.spark.connector.cql.RefCountedCache$$anonfun$com$datastax$spark$connector$cql$RefCountedCache$$processPendingReleases$2.apply(RefCountedCache.scala:147)
+        at
+scala.collection.TraversableLike$WithFilter$$anonfun$foreach$1.apply(TraversableLike.scala:772)
+        at scala.collection.Iterator$class.foreach(Iterator.scala:727)
+        at
+scala.collection.concurrent.TrieMapIterator.foreach(TrieMap.scala:922)
+        at
+scala.collection.IterableLike$class.foreach(IterableLike.scala:72)
+        at scala.collection.concurrent.TrieMap.foreach(TrieMap.scala:632)
+        at
+scala.collection.TraversableLike$WithFilter.foreach(TraversableLike.scala:771)
+        at com.datastax.spark.connector.cql.RefCountedCache.com
+$datastax$spark$connector$cql$RefCountedCache$$processPendingReleases(RefCountedCache.scala:147)
+        at
+com.datastax.spark.connector.cql.RefCountedCache$$anon$1.run(RefCountedCache.scala:157)
+        at
+java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:471)
+        at
+java.util.concurrent.FutureTask$Sync.innerRunAndReset(FutureTask.java:351)
+        at java.util.concurrent.FutureTask.runAndReset(FutureTask.java:178)
+        at
+java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.access$301(ScheduledThreadPoolExecutor.java:178)
+        at
+java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:293)
+        at
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+        at
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+        at java.lang.Thread.run(Thread.java:722)
+Just as a heads up, we deployed 471e6a3a of master (in order to get some
+sql fixes), and were seeing jobs fail until we set
+spark.shuffle.manager=HASH
+I'd be reluctant to change the default to sort for the 1.1.1 release
+Unfortunately we were somewhat rushed to get things working again and did
+not keep the exact stacktraces, but one of the issues we saw was similar to
+that reported in
+https://issues.apache.org/jira/browse/SPARK-3032
+We also saw FAILED_TO_UNCOMPRESS errors from snappy when reading the
+shuffle file.
+We're using Mesos, is there a reasonable expectation that
+spark.files.userClassPathFirst will actually work?
+We've worked around it for the meantime by excluding guava from transitive
+dependencies in the job assembly and specifying the same version of guava
+14 that spark is using.  Obviously things break whenever a guava 15 / 16
+feature is used at runtime, so a long term solution is needed.
+After commit 8856c3d8 switched from gzip to snappy as default parquet
+compression codec, I'm seeing the following when trying to read parquet
+files saved using the new default (same schema and roughly same size as
+files that were previously working):
+java.lang.OutOfMemoryError: Direct buffer memory
+        java.nio.Bits.reserveMemory(Bits.java:658)
+        java.nio.DirectByteBuffer.(DirectByteBuffer.java:123)
+        java.nio.ByteBuffer.allocateDirect(ByteBuffer.java:306)
+parquet.hadoop.codec.SnappyDecompressor.setInput(SnappyDecompressor.java:99)
+parquet.hadoop.codec.NonBlockedDecompressorStream.read(NonBlockedDecompressorStream.java:43)
+        java.io.DataInputStream.readFully(DataInputStream.java:195)
+        java.io.DataInputStream.readFully(DataInputStream.java:169)
+parquet.bytes.BytesInput$StreamBytesInput.toByteArray(BytesInput.java:201)
+parquet.column.impl.ColumnReaderImpl.readPage(ColumnReaderImpl.java:521)
+parquet.column.impl.ColumnReaderImpl.checkRead(ColumnReaderImpl.java:493)
+parquet.column.impl.ColumnReaderImpl.consume(ColumnReaderImpl.java:546)
+parquet.column.impl.ColumnReaderImpl.(RecordReaderImplementation.java:265)
+        parquet.io.MessageColumnIO.getRecordReader(MessageColumnIO.java:60)
+        parquet.io.MessageColumnIO.getRecordReader(MessageColumnIO.java:74)
+parquet.hadoop.InternalParquetRecordReader.checkRead(InternalParquetRecordReader.java:110)
+parquet.hadoop.InternalParquetRecordReader.nextKeyValue(InternalParquetRecordReader.java:172)
+parquet.hadoop.ParquetRecordReader.nextKeyValue(ParquetRecordReader.java:130)
+org.apache.spark.rdd.NewHadoopRDD$$anon$1.hasNext(NewHadoopRDD.scala:139)
+org.apache.spark.InterruptibleIterator.hasNext(InterruptibleIterator.scala:39)
+        scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:327)
+        scala.collection.Iterator$$anon$14.hasNext(Iterator.scala:388)
+        scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:327)
+        scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:327)
+        scala.collection.Iterator$class.isEmpty(Iterator.scala:256)
+        scala.collection.AbstractIterator.isEmpty(Iterator.scala:1157)
+org.apache.spark.sql.execution.ExistingRdd$$anonfun$productToRowRdd$1.apply(basicOperators.scala:220)
+org.apache.spark.sql.execution.ExistingRdd$$anonfun$productToRowRdd$1.apply(basicOperators.scala:219)
+        org.apache.spark.rdd.RDD$$anonfun$13.apply(RDD.scala:596)
+        org.apache.spark.rdd.RDD$$anonfun$13.apply(RDD.scala:596)
+org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:35)
+        org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:262)
+        org.apache.spark.rdd.RDD.iterator(RDD.scala:229)
+        org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:62)
+        org.apache.spark.scheduler.Task.run(Task.scala:54)
+org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:181)
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+        java.lang.Thread.run(Thread.java:722)
+So as a related question, is there any reason the settings in SQLConf
+aren't read from the spark context's conf?  I understand why the sql conf
+is mutable, but it's not particularly user friendly to have most spark
+configuration set via e.g. defaults.conf or --properties-file, but for
+spark sql to ignore those.
+Cool, that's pretty much what I was thinking as far as configuration goes.
+Running on Mesos.  Worker nodes are amazon xlarge, so 4 core / 15g.  I've
+tried executor memory sizes as high as 6G
+Default hdfs block size 64m, about 25G of total data written by a job with
+128 partitions.  The exception comes when trying to read the data (all
+columns).
+Schema looks like this:
+case class A(
+  a: Long,
+  b: Long,
+  c: Byte,
+  d: Option[Long],
+  e: Option[Long],
+  f: Option[Long],
+  g: Option[Long],
+  h: Option[Int],
+  i: Long,
+  j: Option[Int],
+  k: Seq[Int],
+  l: Seq[Int],
+  m: Seq[Int]
+)
+We're just going back to gzip for now, but might be nice to help someone
+else avoid running into this.
+Wondering if anyone has thoughts on a path forward for parquet schema
+migrations, especially for people (like us) that are using raw parquet
+files rather than Hive.
+So far we've gotten away with reading old files, converting, and writing to
+new directories, but that obviously becomes problematic above a certain
+data size.
+Sorry, by "raw parquet" I just meant there is no external metadata store,
+only the schema written as part of the parquet format.
+We've done several different kinds of changes, including column rename and
+widening the data type of an existing column.  I don't think it's feasible
+to support those.
+The kind of change we've made that it probably makes most sense to support
+is adding a nullable column. I think that also implies supporting
+"removing" a nullable column, as long as you don't end up with columns of
+the same name but different type.
+I'm not sure semantically that it makes sense to do schema merging as part
+of union all, and definitely doesn't make sense to do it by default.  I
+wouldn't want two accidentally compatible schema to get merged without
+warning.  It's also a little odd since unlike a normal sql database union
+all can happen before there are any projections or filters... e.g. what
+order do columns come back in if someone does select *.
+Seems like there should be either a separate api call, or an optional
+argument to union all.
+As far as resources go, I can probably put some personal time into this if
+we come up with a plan that makes sense.
+3 quick questions, then some background:
+1.  Is there a reason not to document the fact that spark.hadoop.* is
+copied from spark config into hadoop config?
+2.  Is there a reason StreamingContext.getOrCreate defaults to a blank
+hadoop configuration rather than
+org.apache.spark.deploy.SparkHadoopUtil.get.conf,
+which would pull values from spark config?
+3.  If I submit a PR to address those issues, is it likely to be lost in
+the 1.2 scramble :)
+Background:
+I have a streaming job that is not recoverable from checkpoint, because the
+s3 credentials were originally set using
+sparkContext.hadoopConfiguration.set.
+Checkpointing saves the spark config, but not the transient spark context,
+so does not save the s3 credentials unless they were originally present in
+the spark config.
+Providing a hadoop config to getOrCreate only uses that hadoop config for
+CheckpointReader's initial load of the checkpoint file.  It does not copy
+the hadoop config into the newly created spark context, and so the
+immediately following attempt to restore DStreamCheckpointData fails for
+lack of credentials.
+I think the cleanest way to handle this would be to encourage people to set
+hadoop configuration in the spark config, and for
+StreamingContext.getOrCreate to use SparkHadoopUtil rather than a blank
+config.
+Relevant stack trace:
+14/11/04 15:37:30 INFO CheckpointReader: Checkpoint files found: s3n://XXX
+14/11/04 15:37:30 INFO CheckpointReader: Attempting to load checkpoint from
+file s3n://XXX
+14/11/04 15:37:30 INFO NativeS3FileSystem: Opening 's3n://XXX
+14/11/04 15:37:31 INFO Checkpoint: Checkpoint for time 1415114220000 ms
+validated
+14/11/04 15:37:31 INFO CheckpointReader: Checkpoint successfully loaded
+from file s3n://XXX
+14/11/04 15:37:31 INFO CheckpointReader: Checkpoint was generated at time
+1415114220000 ms
+14/11/04 15:37:33 INFO DStreamGraph: Restoring checkpoint data
+14/11/04 15:37:33 INFO ForEachDStream: Restoring checkpoint data
+14/11/04 15:37:33 INFO StateDStream: Restoring checkpoint data
+14/11/04 15:37:33 INFO DStreamCheckpointData: Restoring checkpointed RDD
+for time 1415097420000 ms from file 's3n://XXX
+Exception in thread "main" java.lang.IllegalArgumentException: AWS Access
+Key ID and Secret Access Key must be specified as
+the username or password (respectively) of a s3n URL, or by setting the
+fs.s3n.awsAccessKeyId or fs.s3n.awsSecretAccessKey properties
+(respectively).
+at org.apache.hadoop.fs.s3.S3Credentials.initialize(S3Credentials.java:70)
+at
+org.apache.hadoop.fs.s3native.Jets3tNativeFileSystemStore.initialize(Jets3tNativeFileSystemStore.java:73)
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at
+sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+at
+sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+at java.lang.reflect.Method.invoke(Method.java:606)
+at
+org.apache.hadoop.io.retry.RetryInvocationHandler.invokeMethod(RetryInvocationHandler.java:190)
+at
+org.apache.hadoop.io.retry.RetryInvocationHandler.invoke(RetryInvocationHandler.java:103)
+at org.apache.hadoop.fs.s3native.$Proxy8.initialize(Unknown Source)
+at
+org.apache.hadoop.fs.s3native.NativeS3FileSystem.initialize(NativeS3FileSystem.java:272)
+at org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:2397)
+at org.apache.hadoop.fs.FileSystem.access$200(FileSystem.java:89)
+at org.apache.hadoop.fs.FileSystem$Cache.getInternal(FileSystem.java:2431)
+at org.apache.hadoop.fs.FileSystem$Cache.get(FileSystem.java:2413)
+at org.apache.hadoop.fs.FileSystem.get(FileSystem.java:368)
+at org.apache.hadoop.fs.Path.getFileSystem(Path.java:296)
+at org.apache.spark.rdd.CheckpointRDD.(CheckpointRDD.scala:42)
+at org.apache.spark.SparkContext.checkpointFile(SparkContext.scala:824)
+at
+org.apache.spark.streaming.dstream.DStreamCheckpointData$$anonfun$restore$1.apply(DStreamCheckpointData.scala:112)
+at
+org.apache.spark.streaming.dstream.DStreamCheckpointData$$anonfun$restore$1.apply(DStreamCheckpointData.scala:109)
+at
+scala.collection.mutable.HashMap$$anonfun$foreach$1.apply(HashMap.scala:98)
+at
+scala.collection.mutable.HashMap$$anonfun$foreach$1.apply(HashMap.scala:98)
+at
+scala.collection.mutable.HashTable$class.foreachEntry(HashTable.scala:226)
+at scala.collection.mutable.HashMap.foreachEntry(HashMap.scala:39)
+at scala.collection.mutable.HashMap.foreach(HashMap.scala:98)
+at
+org.apache.spark.streaming.dstream.DStreamCheckpointData.restore(DStreamCheckpointData.scala:109)
+at
+org.apache.spark.streaming.dstream.DStream.restoreCheckpointData(DStream.scala:397)
+at
+org.apache.spark.streaming.dstream.DStream$$anonfun$restoreCheckpointData$2.apply(DStream.scala:398)
+at
+org.apache.spark.streaming.dstream.DStream$$anonfun$restoreCheckpointData$2.apply(DStream.scala:398)
+at scala.collection.immutable.List.foreach(List.scala:318)
+at
+org.apache.spark.streaming.dstream.DStream.restoreCheckpointData(DStream.scala:398)
+at
+org.apache.spark.streaming.DStreamGraph$$anonfun$restoreCheckpointData$2.apply(DStreamGraph.scala:149)
+at
+org.apache.spark.streaming.DStreamGraph$$anonfun$restoreCheckpointData$2.apply(DStreamGraph.scala:149)
+at
+scala.collection.mutable.ResizableArray$class.foreach(ResizableArray.scala:59)
+at scala.collection.mutable.ArrayBuffer.foreach(ArrayBuffer.scala:47)
+at
+org.apache.spark.streaming.DStreamGraph.restoreCheckpointData(DStreamGraph.scala:149)
+at
+org.apache.spark.streaming.StreamingContext.(StreamingContext.scala:131)
+at
+org.apache.spark.streaming.StreamingContext$$anonfun$getOrCreate$1.apply(StreamingContext.scala:552)
+at
+org.apache.spark.streaming.StreamingContext$$anonfun$getOrCreate$1.apply(StreamingContext.scala:552)
+at scala.Option.map(Option.scala:145)
+at
+org.apache.spark.streaming.StreamingContext$.getOrCreate(StreamingContext.scala:552)
+Opened
+https://issues.apache.org/jira/browse/SPARK-4229
+Sent a PR
+https://github.com/apache/spark/pull/3102
+I'm wondering why
+https://issues.apache.org/jira/browse/SPARK-3638
+only updated the version of http client for the kinesis-asl profile and
+left the base dependencies unchanged.
+Spark built without that profile still has the same
+java.lang.NoSuchMethodError:
+org.apache.http.impl.conn.DefaultClientConnectionOperator.(Lorg/apache/http/conn/scheme/SchemeRegistry;Lorg/apache/http/conn/DnsResolver;)V
+when using aws components in general, not just kinesis (e.g.
+AmazonCloudWatchAsyncClient)
+Re-Reading the "Dependency Hell in Spark applications" thread from
+september didn't shed any light on the subject.  As noted in that thread,
+userClassPathFirst doesn't help.
+Is there a reason not to depend on an updated version of httpclient for all
+spark builds, as opposed to just kinesis-asl?
+For an alternative take on a similar idea, see
+https://github.com/koeninger/spark-1/tree/kafkaRdd/external/kafka/src/main/scala/org/apache/spark/rdd/kafka
+An advantage of the approach I'm taking is that the lower and upper offsets
+of the RDD are known in advance, so it's deterministic.
+I haven't had a need to write to kafka from spark yet, so that's an obvious
+advantage of your library.
+I think the existing kafka dstream is inadequate for a number of use cases,
+and would really like to see some combination of these approaches make it
+into the spark codebase.
+Now that 1.2 is finalized...  who are the go-to people to get some
+long-standing Kafka related issues resolved?
+The existing api is not sufficiently safe nor flexible for our production
+use.  I don't think we're alone in this viewpoint, because I've seen
+several different patches and libraries to fix the same things we've been
+running into.
+Regarding flexibility
+https://issues.apache.org/jira/browse/SPARK-3146
+has been outstanding since August, and IMHO an equivalent of this is
+absolutely necessary.  We wrote a similar patch ourselves, then found that
+PR and have been running it in production.  We wouldn't be able to get our
+jobs done without it.  It also allows users to solve a whole class of
+problems for themselves (e.g. SPARK-2388, arbitrary delay of messages, etc).
+Regarding safety, I understand the motivation behind WriteAheadLog as a
+general solution for streaming unreliable sources, but Kafka already is a
+reliable source.  I think there's a need for an api that treats it as
+such.  Even aside from the performance issues of duplicating the
+write-ahead log in kafka into another write-ahead log in hdfs, I need
+exactly-once semantics in the face of failure (I've had failures that
+prevented reloading a spark streaming checkpoint, for instance).
+I've got an implementation i've been using
+https://github.com/koeninger/spark-1/tree/kafkaRdd/external/kafka
+/src/main/scala/org/apache/spark/rdd/kafka
+Tresata has something similar at https://github.com/tresata/spark-kafka,
+and I know there were earlier attempts based on Storm code.
+Trying to distribute these kinds of fixes as libraries rather than patches
+to Spark is problematic, because large portions of the implementation are
+private[spark].
+ I'd like to help, but i need to know whose attention to get.
+Is there a reason not to go ahead and move the _cache and _lock files
+created by Utils.fetchFiles into the work directory, so they can be cleaned
+up more easily?  I saw comments to that effect in the discussion of the PR
+for 2713, but it doesn't look like it got done.
+And no, I didn't just have a machine fill up the /tmp directory, why do you
+ask?  :)
+The spark context reference is transient.
+It looks like taskContext.attemptId doesn't mean what one thinks it might
+mean, based on
+http://apache-spark-developers-list.1001551.n3.nabble.com/Get-attempt-number-in-a-closure-td8853.html
+and the unresolved
+https://issues.apache.org/jira/browse/SPARK-4014
+Is there any alternative way to tell if compute is being called from a
+retry?  Barring that, does anyone have any tips on how it might be possible
+to get the attempt count propagated to executors?
+It would be extremely useful for the kafka rdd preferred location awareness.
+So when building 1.3.0-rc1 I see the following warning:
+[WARNING] spark-streaming-kafka_2.10-1.3.0.jar, unused-1.0.0.jar define 1
+overlappping classes:
+[WARNING]   - org.apache.spark.unused.UnusedStubClass
+and when trying to build an assembly of a project that was previously using
+1.3 snapshots without difficulty, I see the following errors:
+[error] (*:assembly) deduplicate: different file contents found in the
+following:
+[error]
+/Users/cody/.m2/repository/org/apache/spark/spark-streaming-kafka_2.10/1.3.0/spark-streaming-kafka_2.10-1.3.0.jar:org/apache/spark/unused/UnusedStubClass.class
+[error]
+/Users/cody/.m2/repository/org/spark-project/spark/unused/1.0.0/unused-1.0.0.jar:org/apache/spark/unused/UnusedStubClass.class
+This persists even after a clean / rebuild of both 1.3.0-rc1 and the
+project using it.
+I can just exclude that jar in the assembly definition, but is anyone else
+seeing similar issues?  If so, might be worth resolving rather than make
+users mess with assembly exclusions.
+I see that this class was introduced a while ago, related to SPARK-3812 but
+the jira issue doesn't have much detail.
+I'm building with
+mvn -Phadoop-2.4 -DskipTests install
+Yeah, commenting out the unused dependency in the root pom.xml resolves
+it.  I'm a little surprised that it cropped up now as well, I had built
+against multiple different snapshots of 1.3 over the past couple weeks with
+no problems.
+Is it worth me putting in a PR to remove that class and the dependency
+altogether?
+Yeah, I wouldn't be shocked if Kafka's metadata apis didn't return results
+for topics that don't have any messages.  (sorry about the triple negative,
+but I think you get my meaning).
+Try putting a message in the topic and seeing what happens.
+I went ahead and created
+https://issues.apache.org/jira/browse/SPARK-6434
+to track this
+My 2 cents - I'd rather see design docs in github pull requests (using
+plain text / markdown).  That doesn't require changing access or adding
+people, and github PRs already allow for conversation / email notifications.
+Conversation is already split between jira and github PRs.  Having a third
+stream of conversation in Google Docs just leads to things being ignored.
+Why can't pull requests be used for design docs in Git if people who aren't
+committers want to contribute changes (as opposed to just comments)?
+What's your schema for the offset table, and what's the definition of
+writeOffset ?
+What key are you reducing on?  Maybe I'm misreading the code, but it looks
+like the per-partition offset is part of the key.  If that's true then you
+could just do your reduction on each partition, rather than after the fact
+on the whole stream.
+This is what I'm suggesting, in pseudocode
+rdd.mapPartitionsWithIndex { case (i, iter) =>
+   offset = offsets(i)
+   result = yourReductionFunction(iter)
+   transaction {
+      save(result)
+      save(offset)
+   }
+}.foreach { (_: Nothing) => () }
+where yourReductionFunction is just normal scala code.
+The code you posted looks like you're only saving offsets once per
+partition, but you're doing it after reduceByKey.  Reduction steps in spark
+imply a shuffle.  After a shuffle you no longer have a guaranteed 1:1
+correspondence between spark partiion and kafka partition.  If you want to
+verify that's what the problem is, log the value of currentOffset whenever
+it changes.
+In fact, you're using the 2 arg form of reduce by key to shrink it down to
+1 partition
+ reduceByKey(sumFunc, 1)
+But you started with 4 kafka partitions?  So they're definitely no longer
+1:1
+Glad that worked out for you.  I updated the post on my github to hopefully
+clarify the issue.
+Since that's an internal class used only for unit testing, what would the
+benefit be?
+Regarding performance, keep in mind we'd probably have to turn all those
+async calls into blocking calls for the unit tests
+If the transformation you're trying to do really is per-partition, it
+shouldn't matter whether you're using scala methods or spark methods.  The
+parallel speedup you're getting is all from doing the work on multiple
+machines, and shuffle or caching or other benefits of spark aren't a factor.
+If using scala methods bothers you, do all of your transformation using
+spark methods, collect the results back to the driver, and save them with
+the offsets there:
+stream.foreachRDD { rdd =>
+  val offsets = rdd.asInstanceOf[HasOffsets].offsetRanges
+  val results = rdd.some.chain.of.spark.calls.collect
+  save(offsets, results)
+}
+My work-in-progress slides for my talk at the upcoming spark conference are
+here
+http://koeninger.github.io/kafka-exactly-once/
+if that clarifies that point a little bit (slides 20 vs 21)
+The direct stream doesn't use long-running receivers, so the concerns that
+blog post is trying to address don't really apply.
+Under normal operation a given partition of an rdd is only going to be
+handled by a single executor at a time (as long as you don't turn on
+speculative execution... or I suppose it might be possible in some kind of
+network partition situation).  Transactionality should save you even if
+something weird happens though.
+I think as long as you have adequate monitoring and Kafka retention, the
+simplest solution is safest - let it crash.
+ On May 14, 2015 4:00 PM, "badgerpants"  wrote:
+Sorry, realized I probably didn't fully answer your question about my blog
+post, as opposed to Michael Nolls.
+The direct stream is really blunt, a given RDD partition is just a kafka
+topic/partition and an upper / lower bound for the range of offsets.  When
+an executor computes the partition, it connects to kafka and pulls only
+those messages, then closes the connection.  There's no long running
+receiver at all, no caching of connections (I found caching sockets didn't
+matter much).
+You get much better cluster utilization that way, because if a partition is
+relatively small compared to the others in the RDD, the executor gets done
+with it and gets scheduled another one to work one.  With long running
+receivers spark acts like the receiver takes up a core even if it isn't
+doing much.  Look at the CPU graph on slide 13 of the link i posted.
+The scala api has 2 ways of calling createDirectStream.  One of them allows
+you to pass a message handler that gets full access to the kafka
+MessageAndMetadata, including offset.
+I don't know why the python api was developed with only one way to call
+createDirectStream, but the first thing I'd look at would be adding that
+functionality back in.  If someone wants help creating a patch for that,
+just let me know.
+Dealing with offsets on a per-message basis may not be as efficient as
+dealing with them on a batch basis using the HasOffsetRanges interface...
+but if efficiency was a primary concern, you probably wouldn't be using
+Python anyway.
+I wrote some code for this a while back, pretty sure it didn't need access
+to anything private in the decision tree / random forest model.  If people
+want it added to the api I can put together a PR.
+I think it's important to have separately parseable operators / operands
+though.  E.g
+"lhs":0,"op":"<=","rhs":-35.0
+No, in general you can't make new RDDs in code running on the executors.
+It looks like your properties file is a constant, why not process it at the
+beginning of the job and broadcast the result?
+There are already private methods in the code for interacting with Kafka's
+offset management api.
+There's a jira for making those methods public, but TD has been reluctant
+to merge it
+https://issues.apache.org/jira/browse/SPARK-10963
+I think adding any ZK specific behavior to spark is a bad idea, since ZK
+may no longer be the preferred storage location for Kafka offsets within
+the next year.
+Honestly my feeling on any new API is to wait for a point release before
+taking it seriously :)
+Auth and encryption seem like the only compelling reason to move, but
+forcing people on kafka 8.x to upgrade their brokers is questionable.
+Brute force way to do it might be to just have a separate
+streaming-kafka-new-consumer subproject, or something along those lines.
+Have you seen
+SPARK-12177
+Should probably get everyone on the same page at
+https://issues.apache.org/jira/browse/SPARK-12177
+I saw this slide:
+http://image.slidesharecdn.com/east2016v2matei-160217154412/95/2016-spark-summit-east-keynote-matei-zaharia-5-638.jpg?cb=1455724433
+Didn't see the talk - was this just referring to the existing work on the
+spark-streaming-kafka subproject, or is someone actually working on making
+Kafka Connect ( http://docs.confluent.io/2.0.0/connect/ ) play nice with
+Spark?
+Jay, thanks for the response.
+Regarding the new consumer API for 0.9, I've been reading through the code
+for it and thinking about how it fits in to the existing Spark integration.
+So far I've seen some interesting challenges, and if you (or anyone else on
+the dev list) have time to provide some hints, I'd appreciate it.
+To recap how the existing Spark integration works (this is all using the
+Kafka simple consumer api):
+- Single driver node.  For each spark microbatch, it queries Kafka for the
+offset high watermark for all topicpartitions of interest.  Creates one
+spark partition for each topicpartition.  The partition doesn't have
+messages, it just has a lower offset equal to the last consumed position,
+upper offset equal to the high water mark. Sends those partitions to the
+workers.
+- Multiple worker nodes.  For each spark partition, it opens a simple
+consumer, consumes from kafka the lower to the upper offset for a single
+topicpartition, closes the consumer.
+This is really blunt, but it actually works better than the integration
+based on the older higher level consumer.  Churn of simple consumers on the
+worker nodes in practice wasn't much of a problem (because the granularity
+of microbatches is rarely under 1 second), so we don't even bother to cache
+connections between batches.
+The new consumer api presents some interesting challenges
+- On the driver node, it would be desirable to be the single member of a
+consumer group with dynamic topic subscription (so that users can take
+advantage of topic patterns, etc).  Heartbeat happens only on a poll.  But
+clearly the driver doesn't actually want to poll any messages, because that
+load should be distributed to workers. I've seen KIP-41, which might help
+if polling a single message is sufficiently lightweight.  In the meantime
+the only things I can think of are trying to subclass to make a .heartbeat
+method, or possibly setting max fetch bytes to a very low value.
+- On the worker nodes, we aren't going to be able to get away with creating
+and closing an instance of the new consumer every microbatch, since
+prefetching, security, metadata requests all make that heavier weight than
+a simple consumer.  The new consumer doesn't have a way to poll for only a
+given number of messages (again KIP-41 would help here).  But the new
+consumer also doesn't provide a way to poll for only a given
+topicpartition, and the .pause method flushes fetch buffers so it's not an
+option either.  I don't see a way to avoid caching one consumer per
+topicpartition, which is probably less desirable than e.g. one consumer per
+broker.
+Any suggestions welcome, even if it's "why don't you go work on
+implementing KIP-41", or "You're doing it wrong" :)
+Thanks,
+Cody
+I need getPreferredLocations to choose a consistent executor for a
+given partition in a stream.  In order to do that, I need to know what
+the current executors are.
+I'm currently grabbing them from the block manager master .getPeers(),
+which works, but I don't know if that's the most reasonable way to do
+it.
+Relevant code:
+https://github.com/koeninger/spark-1/blob/aaef0fc6e7e3aae18e4e03271bc0707d09d243e4/external/kafka-beta/src/main/scala/org/apache/spark/streaming/kafka/KafkaRDD.scala#L107
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Thanks.  That looks pretty similar to what I'm doing, with the
+difference being getPeers vs getMemoryStatus.  Seems like they're both
+backed by the same blockManagerInfo, but getPeers is filtering in a
+way that looks close to what I need.  Is there a reason to prefer
+getMemoryStatus?
+Wanted to survey what people are using the direct stream
+messageHandler for, besides just extracting key / value / offset.
+Would your use case still work if that argument was removed, and the
+stream just contained ConsumerRecord objects
+(http://kafka.apache.org/090/javadoc/org/apache/kafka/clients/consumer/ConsumerRecord.html)
+which you could then use normal map transformations to access?
+The only other valid use of messageHandler that I can think of is
+catching serialization problems on a per-message basis.  But with the
+new Kafka consumer library, that doesn't seem feasible anyway, and
+could be handled with a custom (de)serializer.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+No, looks like you'd have to catch them in the serializer and have the
+serializer return option or something. The new consumer builds a buffer
+full of records, not one at a time.
+Spark streaming by default will not start processing a batch until the
+current batch is finished.  So if your processing time is larger than
+your batch time, delays will build up.
+I'm really not sure what you're asking.
+Yeah, to be clear, I'm talking about having only one constructor for a
+direct stream, that will give you a stream of ConsumerRecord.
+Different needs for topic subscription, starting offsets, etc could be
+handled by calling appropriate methods after construction but before
+starting the stream.
+The central problem with doing anything like this is that you break
+one of the basic guarantees of kafka, which is in-order processing on
+a per-topicpartition basis.
+As far as PRs go, because of the new consumer interface for kafka 0.9
+and 0.10, there's a lot of potential change already underway.
+See
+https://issues.apache.org/jira/browse/SPARK-12177
+No, I don't agree that someone explicitly calling repartition or
+shuffle is the same as a constructor that implicitly breaks
+guarantees.
+Realistically speaking, the changes you have made are also totally
+incompatible with the way kafka's new consumer works. Pulling
+different out-of-order chunks of the same topicpartition from
+different consumer nodes is going to make prefetch optimizations
+useless.
+i.  An ASF project can clearly decide that some of its code is no
+longer worth maintaining and delete it.  This isn't really any
+different. It's still apache licensed so ultimately whoever wants the
+code can get it.
+ii.  I think part of the rationale is to not tie release management to
+Spark, so it can proceed on a schedule that makes sense.  I'm fine
+with helping out with release management for the Kafka subproject, for
+instance.  I agree that practical governance questions need to be
+worked out.
+iii.  How is this any different from how python users get access to
+any other third party Spark package?
+Why would a PMC vote be necessary on every code deletion?
+There was a Jira and pull request discussion about the submodules that
+have been removed so far.
+https://issues.apache.org/jira/browse/SPARK-13843
+There's another ongoing one about Kafka specifically
+https://issues.apache.org/jira/browse/SPARK-13877
+Anyone can fork apache licensed code.  Committers can approve pull
+requests that delete code from asf repos.  Because those two things
+happen near each other in time, it's somehow a process violation?
+I think the discussion would be better served by concentrating on how
+we're going to solve the problem and move forward.
+There's a difference between "without discussion" and "without as much
+discussion as I would have liked to have a chance to notice it".
+There are plenty of PRs that got merged before I noticed them that I
+would rather have not gotten merged.
+As far as group / artifact name compatibility, at least in the case of
+Kafka we need different artifact names anyway, and people are going to
+have to make changes to their build files for spark 2.0 anyway.   As
+far as keeping the actual classes in org.apache.spark to not break
+code despite the group name being different, I don't know whether that
+would be enforced by maven central, just looked at as poor taste, or
+ASF suing for trademark violation :)
+For people who would rather the problem be solved with official asf
+subprojects, which committers are volunteering to help do that work?
+Reynold already said he doesn't want to mess with that overhead.
+I'm fine with continuing to help work on the Kafka integration
+wherever it ends up, I'd just like the color of the bikeshed to get
+decided so we can build a decent bike...
+I'm in favor of everything in /extras and /external being removed, but
+I'm more in favor of making a decision and moving on.
+I really think the only thing that should have to change is the maven
+group and identifier, not the java namespace.
+There are compatibility problems with the java namespace changing
+(e.g. access to private[spark]), and I don't think that someone who
+takes the time to change their build file to download a maven artifact
+without "apache" in the identifier is at significant risk of consumer
+confusion.
+I've tried to get a straight answer from ASF trademarks on this point,
+but the answers I've been getting are mixed, and personally disturbing
+to me in terms of over-reaching.
+Are you talking about group/identifier name, or contained classes?
+Because there are plenty of org.apache.* classes distributed via maven
+with non-apache group / identifiers.
+I agree with Mark in that I don't see how supporting scala 2.10 for
+spark 2.0 implies supporting it for all of spark 2.x
+Regarding Koert's comment on akka, I thought all akka dependencies
+have been removed from spark after SPARK-7997 and the recent removal
+of external/akka
+Given that not all of the connectors were removed, I think this
+creates a weird / confusing three tier system
+1. connectors in the official project's spark/extras or spark/external
+2. connectors in "Spark Extras"
+3. connectors in some random organization's github
+100% agree with Sean & Reynold's comments on this.
+Adding this as a TLP would just cause more confusion as to "official"
+endorsement.
+For what it's worth, I have definitely had PRs that sat inactive for
+more than 30 days due to committers not having time to look at them,
+but did eventually end up successfully being merged.
+I guess if this just ends up being a committer ping and reopening the
+PR, it's fine, but I don't know if it really addresses the underlying
+issue.
+If you want to refer back to Kafka based on offset ranges, why not use
+createDirectStream?
+Any word on Kafka 0.10 support / SPARK-12177
+I understand the hesitation, but is having nothing better than having
+a standalone subproject marked as experimental?
+Is there a principled reason why sql.streaming.* and
+sql.execution.streaming.* are making extensive use of DataFrame
+instead of Datasource?
+Or is that just a holdover from code written before the move / type alias?
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Sorry, meant DataFrame vs Dataset
+Is this really an internal / external distinction?
+For a concrete example, Source.getBatch seems to be a public
+interface, but returns DataFrame.
+I'm clear on what a type alias is.  My question is more that moving
+from e.g. Dataset[T] to Dataset[Row] involves throwing away
+information.  Reading through code that uses the Dataframe alias, it's
+a little hard for me to know when that's intentional or not.
+If we're considering backporting changes for the 0.8 kafka
+integration, I am sure there are people who would like to get
+https://issues.apache.org/jira/browse/SPARK-10963
+into 1.6.x as well
+I don't have a vote, but I'd just like to reiterate that I think kafka
+0.10 support should be added to a 2.0 release candidate; if not now,
+then well before release.
+- it's a completely standalone jar, so shouldn't break anyone who's
+using the existing 0.8 support
+- it's like the 5th highest voted open ticket, and has been open for months
+- Luciano has said multiple times that he wants to merge that PR into
+Bahir if it isn't in a RC for spark 2.0, which I think would confuse
+users and cause maintenance problems
+As far as I know the only thing blocking it at this point is lack of
+committer review / approval.
+It's technically adding a new feature after spark code-freeze, but it
+doesn't change existing code, and the kafka project didn't release
+0.10 until the end of may.
+Luciano knows there are publicly available examples of how to use the
+0.10 connector, including TLS support, because he asked me about it
+and I gave him a link
+https://github.com/koeninger/kafka-exactly-once/blob/kafka-0.9/src/main/scala/example/TlsStream.scala
+If any committer at any time had said "I'd accept this PR, if only it
+included X", I'd be happy to provide X.  Documentation updates and
+python support for the 0.8 direct stream connector were done after the
+original PR.
+Can someone familiar with amplab's jenkins setup clarify whether all tests
+running at a given time are competing for network ports, or whether there's
+some sort of containerization being done?
+Based on the use of Utils.startServiceOnPort in the tests, I'd assume the
+former.
+Thanks for the response.  I'm talking about test code that starts up
+embedded network services for integration testing.
+KafkaTestUtils in particular always attempts to start a kafka broker
+on the standard port, 9092.  Util.startServiceInPort is intended to
+pick a higher port if the starting one has a bind collision... but in
+my local testing multiple KafkaTestUtils instances running at the same
+time on the same machine don't actually behave correctly.
+I already updated the kafka 0.10 consumer tests to use a random port,
+and can do the same for the 0.8 consumer tests, but wanted to make
+sure I understood what was happening in the Jenkins environment.
+Makes sense.  I'll submit a fix for kafka 0.8 and do a scan through of
+other tests to see if I can find similar issues.
+I don't think that's a scala compiler bug.
+println is a valid expression that returns unit.
+Unit is not a single-argument function, and does not match any of the
+overloads of foreachPartition
+You may be used to a conversion taking place when println is passed to
+method expecting a function, but that's not a safe thing to do
+silently for multiple overloads.
+tldr;
+just use
+ds.foreachPartition(x => println(x))
+you don't need any type annotations
+I know some usages of the 0.10 kafka connector will be broken until
+https://github.com/apache/spark/pull/14026  is merged, but the 0.10
+connector is a new feature, so not blocking.
+Sean I'm assuming the DirectKafkaStreamSuite failure you saw was for
+0.8?  I'll take another look at it.
+For 2.0, the kafka dstream support is in two separate subprojects
+depending on which version of Kafka you are using
+spark-streaming-kafka-0-10
+or
+spark-streaming-kafka-0-8
+corresponding to brokers that are version 0.10+ or 0.8+
+This seems really low risk to me.  In order to be impacted, it'd have
+to be someone who was using the kafka integration in spark 2.0, which
+isn't even officially released yet.
+Most stream systems you're still going to incur the cost of reading
+each message... I suppose you could rotate among reading just the
+latest messages from a single partition of a Kafka topic if they were
+evenly balanced.
+But once you've read the messages, nothing's stopping you from
+filtering most of them out before doing further processing.  The
+dstream .transform method will let you do any filtering / sampling you
+could have done on an rdd.
+Can you keep a queue per executor in memory?
+Put the queue in a static variable that is first referenced on the
+workers (inside an rdd closure).  That way it will be created on each
+of the workers, not the driver.
+Easiest way to do that is with a lazy val in a companion object.
+Are you using KafkaUtils.createDirectStream?
+The Kafka 0.10 support in spark 2.0 allows for pattern based topic
+subscription
+The Kafka commit api isn't transactional, you aren't going to get
+exactly once behavior out of it even if you were committing offsets on
+a per-partition basis.  This doesn't really have anything to do with
+Spark; the old code you posted was already inherently broken.
+Make your outputs idempotent and use commitAsync.
+Or store offsets transactionally in your own data store.
+I don't see a reason to remove the non-assembly artifact, why would
+you?  You're not distributing copies of Amazon licensed code, and the
+Amazon license goes out of its way not to over-reach regarding
+derivative works.
+This seems pretty clearly to fall in the spirit of
+http://www.apache.org/legal/resolved.html#optional
+I certainly think the majority of Spark users will still want to use
+Spark without adding Kinesis
+To be clear, "safe" has very little to do with this.
+It's pretty clear that there's very little risk of the spark module
+for kinesis being considered a derivative work, much less all of
+spark.
+The use limitation in 3.3 that caused the amazon license to be put on
+the apache X list also doesn't have anything to do with a legal safety
+risk here.  Really, what are you going to use a kinesis connector for,
+except for connecting to kinesis?
+Regarding documentation debt, is there a reason not to deploy
+documentation updates more frequently than releases?  I recall this
+used to be the case.
+I love Spark.  3 or 4 years ago it was the first distributed computing
+environment that felt usable, and the community was welcoming.
+But I just got back from the Reactive Summit, and this is what I observed:
+- Industry leaders on stage making fun of Spark's streaming model
+- Open source project leaders saying they looked at Spark's governance
+as a model to avoid
+- Users saying they chose Flink because it was technically superior
+and they couldn't get any answers on the Spark mailing lists
+Whether you agree with the substance of any of this, when this stuff
+gets repeated enough people will believe it.
+Right now Spark is suffering from its own success, and I think
+something needs to change.
+- We need a clear process for planning significant changes to the codebase.
+I'm not saying you need to adopt Kafka Improvement Proposals exactly,
+but you need a documented process with a clear outcome (e.g. a vote).
+Passing around google docs after an implementation has largely been
+decided on doesn't cut it.
+- All technical communication needs to be public.
+Things getting decided in private chat, or when 1/3 of the committers
+work for the same company and can just talk to each other...
+Yes, it's convenient, but it's ultimately detrimental to the health of
+the project.
+The way structured streaming has played out has shown that there are
+significant technical blind spots (myself included).
+One way to address that is to get the people who have domain knowledge
+involved, and listen to them.
+- We need more committers, and more committer diversity.
+Per committer there are, what, more than 20 contributors and 10 new
+jira tickets a month?  It's too much.
+There are people (I am _not_ referring to myself) who have been around
+for years, contributed thousands of lines of code, helped educate the
+public around Spark... and yet are never going to be voted in.
+- We need a clear process for managing volunteer work.
+Too many tickets sit around unowned, unclosed, uncertain.
+If someone proposed something and it isn't up to snuff, tell them and
+close it.  It may be blunt, but it's clearer than "silent no".
+If someone wants to work on something, let them own the ticket and set
+a deadline. If they don't meet it, close it or reassign it.
+This is not me putting on an Apache Bureaucracy hat.  This is me
+saying, as a fellow hacker and loyal dissenter, something is wrong
+with the culture and process.
+Please, let's change it.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Sean, that was very eloquently put, and I 100% agree.  If I ever meet
+you in person, I'll buy you multiple rounds of beverages of your
+choice ;)
+This is probably reiterating some of what you said in a less clear
+manner, but I'll throw more of my 2 cents in.
+- Design.
+Yes, design by committee doesn't work.  The best designs are when a
+person who understands the problem builds something that works for
+them, shares with others, and most importantly iterates when it
+doesn't work for others.  This iteration only works if you're willing
+to change interfaces, but committer and user goals are not aligned
+here.  Users want something that is clearly documented and helps them
+get their job done.  Committers (not all) want to minimize interface
+change, even at the expense of users being able to do their jobs.  In
+this situation, it is critical that you understand early what users
+need to be able to do.  This is what the improvement proposal process
+should focus on: Goals, non-goals, possible solutions, rejected
+solutions.  Not class-level design.  Most importantly, it needs a
+clear, unambiguous outcome that is visible to the public.
+- Trolling
+It's not just trolling.  Event time and kafka are technically
+important and should not be ignored.  I've been banging this drum for
+years.  These concerns haven't been fully heard and understood by
+committers.  This one example of why diversity of enfranchised users
+is important and governance concerns shouldn't be ignored.
+- Jira
+Concretely, automate closing stale jiras after X amount of time.  It's
+really surprising to me how much reluctance a community of programmers
+have shown towards automating their own processes around stuff like
+this (not to mention automatic code formatting of modified files).  I
+understand the arguments against. but the current alternative doesn't
+work.
+Concretely, clearly reject and close jiras.  I have a backlog of 50+
+kafka jiras, many of which are irrelevant at this point, but I do not
+feel that I have the political power to close them.
+Concretely, make it clear who is working on something.  This can be as
+simple as just "I'm working on this", assign it to me, if I don't
+follow up in X amount of time, close it or reassign.  That doesn't
+mean there can't be competing work, but it does mean those people
+should talk to each other.  Conversely, if committers currently don't
+have time to work on something that is important, make that clear in
+the ticket.
++1 to adding an SIP label and linking it from the website.  I think it needs
+- template that focuses it towards soliciting user goals / non goals
+- clear resolution as to which strategy was chosen to pursue.  I'd
+recommend a vote.
+Matei asked me to clarify what I meant by changing interfaces, I think
+it's directly relevant to the SIP idea so I'll clarify here, and split
+a thread for the other discussion per Nicholas' request.
+I meant changing public user interfaces.  I think the first design is
+unlikely to be right, because it's done at a time when you have the
+least information.  As a user, I find it considerably more frustrating
+to be unable to use a tool to get my job done, than I do having to
+make minor changes to my code in order to take advantage of features.
+I've seen committers be seriously reluctant to allow changes to
+@experimental code that are needed in order for it to really work
+right.  You need to be able to iterate, and if people on both sides of
+the fence aren't going to respect that some newer apis are subject to
+change, then why even mark them as such?
+Ideally a finished SIP should give me a checklist of things that an
+implementation must do, and things that it doesn't need to do.
+Contributors/committers should be seriously discouraged from putting
+out a version 0.1 that doesn't have at least a prototype
+implementation of all those things, especially if they're then going
+to argue against interface changes necessary to get the the rest of
+the things done in the 0.2 version.
+0.10 consumers won't work on an earlier broker.
+Earlier consumers will (should?) work on a 0.10 broker.
+The main things earlier consumers lack from a user perspective is
+support for SSL, and pre-fetching messages.  The implementation is
+totally and completely different however, in ways that leak to the end
+user.
+Without a hell of a lot more work, Assign would be the only strategy usable.
+Matei asked:
+It's a matter of mismanagement and miscommunication.
+The structured streaming kafka jira sat with multiple unanswered
+requests for someone who was a committer to communicate whether they
+were working on it and what the plan was.  I could have done that
+implementation and had it in users' hands months ago.  I didn't
+pre-emptively do it because I didn't want to then have to argue with
+committers about why my code did or did not meet their uncommunicated
+expectations.
+I don't want to re-hash that particular circumstance, I just want to
+make sure it never happens again.
+Hopefully the SIP thread results in clearer expectations, but there
+are still some ideas on the table regarding management of volunteer
+contributions:
+- Closing stale jiras.  I hear the bots are impersonal argument, but
+the alternative of "someone cleans it up" is not sufficient right now
+(with apologies to Sean and all the other janitors).
+- Clear rejection of jiras.  This isn't mean, it's respectful.
+- Clear "I'm working on this", with clear removal and reassignment if
+they go radio silent.  This could be keyed to automated check for
+staleness.
+- Clear expectation that if someone is working on a jira, you can work
+on your own alternative, but you need to communicate.
+I'm sure I've missed some.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+So concrete problems / potential solutions:
+- Technical discussion needs to be public, or you don't hear use cases
+and alternative viewpoints.
+Yet email communication is low-bandwidth and hard to read people's
+emotions, so committers who are colocated talk and decide things.
+A possible alternative Reynold and I discussed is to have public video
+streaming meetings on occasion.
+- Each major area of the code needs at least one person who cares
+about it that is empowered with a vote, otherwise decisions get made
+that don't make technical sense.
+I don't know if anyone with a vote is shepherding GraphX (or maybe
+it's just dead), the Mesos relationship has always been weird, no one
+with a vote really groks Kafka.
+marmbrus and zsxwing are getting there quickly on the Kafka side, and
+I appreciate it, but it's been bad for a while.
+Because I don't have any political power, my response to seeing things
+that I know are technically dangerous has been to yell really loud
+until someone listens, which sucks for everyone involved.
+I already apologized to Michael privately; Ryan, I'm sorry, it's not about you.
+This seems pretty straightforward to fix, if politically awkward:
+those people exist, just give them a vote.
+Failing that, listen the first or second time they say something not
+the third or fourth, and if it doesn't make sense, ask.
+- More committers
+Just looking at the ratio of committers to open tickets, or committers
+to contributors, I don't think you have enough human power.
+I realize this is a touchy issue.  I don't have dog in this fight,
+because I'm not on either coast nor in a big company that views
+committership as a political thing.  I just think you need more people
+to do the work, and more diversity of viewpoint.
+It's unfortunate that the Apache governance process involves giving
+someone all the keys or none of the keys, but until someone really
+starts screwing up, I think it's better to err on the side of
+accepting hard-working people.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+The main thing is picking up new partitions.  You can't do that
+without reimplementing portions of the consumer rebalance.  The
+low-level consumer is really low level, and the old high-level
+consumer is basically broken (it might have been fixed by the time
+they abandoned it, I dunno)
+Yeah, in case it wasn't clear, I was talking about SIPs for major
+user-facing or cross-cutting changes, not minor feature adds.
+That makes sense, thanks.
+One thing I've never been clear on is who should be allowed to resolve
+Jiras.  Can I go clean up the backlog of Kafka Jiras that weren't created
+by me?
+If there's an informal policy here, can we update the wiki to reflect it?
+Maybe it's there already, but I didn't see it last time I looked.
+So to be clear, can I go clean up the Kafka cruft?
+Cool, I'll start going through stuff as I have time.  Already closed
+one, if anyone sees a problem let me know.
+Still think it would be nice to have some way to make it obvious to
+the people who have the will and knowledge to do it that it's ok for
+them to do it :)
+It's not about technical design disagreement as to matters of taste,
+it's about familiarity with the domain.  To make an analogy, it's as
+if a committer in MLlib was firmly intent on, I dunno, treating a
+collection of categorical variables as if it were an ordered range of
+continuous variables.  It's just wrong.  That kind of thing, to a
+greater or lesser degree, has been going on related to the Kafka
+modules, for years.
+That's awesome Sean, very clear.
+One minor thing, noncommiters can't change assigned field as far as I know.
+Here's my specific proposal (meta-proposal?)
+Spark Improvement Proposals (SIP)
+Background:
+The current problem is that design and implementation of large features are
+often done in private, before soliciting user feedback.
+When feedback is solicited, it is often as to detailed design specifics,
+not focused on goals.
+When implementation does take place after design, there is often
+disagreement as to what goals are or are not in scope.
+This results in commits that don't fully meet user needs.
+Goals:
+- Ensure user, contributor, and committer goals are clearly identified and
+agreed upon, before implementation takes place.
+- Ensure that a technically feasible strategy is chosen that is likely to
+meet the goals.
+Rejected Goals:
+- SIPs are not for detailed design.  Design by committee doesn't work.
+- SIPs are not for every change.  We dont need that much process.
+Strategy:
+My suggestion is outlined as a Spark Improvement Proposal process
+documented at
+https://github.com/koeninger/spark-1/blob/SIP-0/docs/spark-improvement-proposals.md
+Specifics of Jira manipulation are an implementation detail we can figure
+out.
+I'm suggesting voting; the need here is for a _clear_ outcome.
+Rejected Strategies:
+Having someone who understands the problem implement it first works, but
+only if significant iteration after user feedback is allowed.
+Historically this has been problematic due to pressure to limit public api
+changes.
+So to focus the discussion on the specific strategy I'm suggesting,
+documented at
+https://github.com/koeninger/spark-1/blob/SIP-0/docs/spark-improvement-proposals.md
+"Goals: What must this allow people to do, that they can't currently?"
+Is it unclear that this is focusing specifically on people-visible behavior?
+Rejected goals -  are important because otherwise people keep trying
+to argue about scope.  Of course you can change things later with a
+different SIP and different vote, the point is to focus.
+Use cases - are something that people are going to bring up in
+discussion.  If they aren't clearly documented as a goal ("This must
+allow me to connect using SSL"), they should be added.
+Internal architecture - if the people who need specific behavior are
+implementers of other parts of the system, that's fine.
+Rejected strategies - If you have none of these, you have no evidence
+that the proponent didn't just go with the first thing they had in
+mind (or have already implemented), which is a big problem currently.
+Approval isn't binding as to specifics of implementation, so these
+aren't handcuffs.  The goals are the contract, the strategy is
+evidence that contract can actually be met.
+Design docs - I'm not touching design docs.  The markdown file I
+linked specifically says of the strategy section "This is not a full
+design document."  Is this unclear?  Design docs can be worked on
+obviously, but that's not what I'm concerned with here.
+Regarding name, if the SIP overlap is a concern, we can pick a different name.
+My tongue in cheek suggestion would be
+Spark Lightweight Improvement process (SPARKLI)
+Users instead of people, sure.  Commiters and contributors are (or at least
+should be) a subset of users.
+Non goals, sure. I don't care what the name is, but we need to clearly say
+e.g. 'no we are not maintaining compatibility with XYZ right now'.
+API, what I care most about is whether it allows me to accomplish the
+goals. Arguing about how ugly or pretty it is can be saved for design/
+implementation imho.
+Strategy, this is necessary because otherwise goals can be out of line with
+reality.  Don't propose goals you don't have at least some idea of how to
+implement.
+Rejected strategies, given that commiters are the only ones I'm saying
+should formally submit SPARKLIs or SIPs, if they put junk in a required
+section then slap them down for it and tell them to fix it.
+Yeah, I've looked at KIPs and Scala SIPs.
+I'm reluctant to use the Kafka structured streaming as an example
+because of the pre-existing conflict around it.  If Michael or another
+committer wanted to put it forth as an example, I'd participate in
+good faith though.
+Only committers should formally submit SIPs because in an apache
+project only commiters have explicit political power.  If a user can't
+find a commiter willing to sponsor an SIP idea, they have no way to
+get the idea passed in any case.  If I can't find a committer to
+sponsor this meta-SIP idea, I'm out of luck.
+I do not believe unrealistic goals can be found solely by inspection.
+We've managed to ignore unrealistic goals even after implementation!
+Focusing on APIs can allow people to think they've solved something,
+when there's really no way of implementing that API while meeting the
+goals.  Rapid iteration is clearly the best way to address this, but
+we've already talked about why that hasn't really worked.  If adding a
+non-binding API section to the template is important to you, I'm not
+against it, but I don't think it's sufficient.
+On your PRD vs design doc spectrum, I'm saying this is closer to a
+PRD.  Clear agreement on goals is the most important thing and that's
+why it's the thing I want binding agreement on.  But I cannot agree to
+goals unless I have enough minimal technical info to judge whether the
+goals are likely to actually be accomplished.
+I've always been confused as to why it would ever be a good idea to
+put any streaming query system on the critical path for synchronous  <
+100msec requests.  It seems to make a lot more sense to have a
+streaming system do asynch updates of a store that has better latency
+and quality of service characteristics for multiple users.  Then your
+only latency concerns are event to update, not request to response.
+SPARK-17841  three line bugfix that has a week old PR
+SPARK-17812  being able to specify starting offsets is a must have for
+a Kafka mvp in my opinion, already has a PR
+SPARK-17813  I can put in a PR for this tonight if it'll be considered
++1 to putting docs in one clear place.
+Is anyone seriously thinking about alternatives to microbatches?
+I don't think it's just about what to target - if you could target 1ms
+batches, without harming 1 second or 1 minute batches.... why wouldn't you?
+I think it's about having a clear strategy and dedicating resources to it.
+If  scheduling batches at an order of magnitude or two lower latency is the
+strategy, and that's actually feasible, that's great. But I haven't seen
+that clear direction, and this is by no means a recent issue.
+Access to the partition ID is necessary for basically every single one
+of my jobs, and there isn't a foreachPartiionWithIndex equivalent.
+You can kind of work around it with empty foreach after the map, but
+it's really awkward to explain to people.
+Yep, I had submitted a PR that included it way back in the original
+direct stream for kafka, but it got nixed in favor of
+TaskContext.partitionId ;)  The concern then was about too many
+xWithBlah apis on rdd.
+If we do want to deprecate taskcontext.partitionId and add
+foreachPartitionWithIndex, I think that makes sense, I can start a
+ticket.
+I think only supporting 1 version of scala at any given time is not
+sufficient, 2 probably is ok.
+I.e. don't drop 2.10 before 2.12 is out + supported
+Makes sense to me.
+I do wonder if e.g.
+[SPARK-12345][STRUCTUREDSTREAMING][KAFKA]
+is going to leave any room in the Github PR form for actual title content?
+I answered the duplicate post on the user mailing list, I'd say keep
+the discussion there.
+SPARK-17510
+https://github.com/apache/spark/pull/15132
+It's for allowing tweaking of rate limiting on a per-partition basis
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Have you asked the assignee on the Kafka jira whether they'd be
+willing to accept help on it?
+Ok... in general it seems to me like effort would be better spent
+trying to help upstream, as opposed to us making a 5th slightly
+different interface to kafka (currently have 0.8 receiver, 0.8
+dstream, 0.10 dstream, 0.10 structured stream)
+It'd probably be worth no longer marking the 0.8 interface as
+experimental.  I don't think it's likely to be subject to active
+development at this point.
+You can use the 0.8 artifact to consume from a 0.9 broker
+Where are you reading documentation indicating that the direct stream
+only runs on the driver?  It runs consumers on the worker nodes.
+Generating / defining an RDDis not the same thing as running the
+compute() method of an rdd .  The direct stream definitely runs kafka
+consumers on the executors.
+If you want more info, the blog post and video linked from
+https://github.com/koeninger/kafka-exactly-once refers to the 0.8
+implementation, but the general design is similar for the 0.10
+version.
+I think the likelihood of an official release supporting 0.9 is fairly
+slim at this point, it's a year out of date and wouldn't be a drop-in
+dependency change.
+If you want finer-grained max rate setting, SPARK-17510 got merged a
+while ago.  There's also SPARK-18580 which might help address the
+issue of starting backpressure rate for the first batch.
+Agree that frequent topic deletion is not a very Kafka-esque thing to do
+Totally agree with most of what Sean said, just wanted to give an
+alternate take on the "maintainers" thing
+Reynold, thanks, LGTM.
+Sean, great concerns.  I agree that behavior is largely cultural and
+writing down a process won't necessarily solve any problems one way or
+the other.  But one outwardly visible change I'm hoping for out of
+this a way for people who have a stake in Spark, but can't follow
+jiras closely, to go to the Spark website, see the list of proposed
+major changes, contribute discussion on issues that are relevant to
+their needs, and see a clear direction once a vote has passed.  We
+don't have that now.
+Ryan, realistically speaking any PMC member can and will stop any
+changes they don't like anyway, so might as well be up front about the
+reality of the situation.
+It's been a week since any further discussion.
+Do PMC members think the current draft is OK to vote on?
+Another week, another ping.  Anyone on the PMC willing to call a vote on
+this?
+I started this idea as a fork with a merge-able change to docs.
+Reynold moved it to his google doc, and has suggested during this
+email thread that a vote should occur.
+If a vote needs to occur, I can't see anything on
+http://apache.org/foundation/voting.html suggesting that I can call
+for a vote, which is why I'm asking PMC members to do it since they're
+the ones who would vote anyway.
+Now Sean is saying this is a code/doc change that can just be reviewed
+and merged as usual...which is what I tried to do to begin with.
+The fact that you haven't agreed on a process to agree on your process
+is, I think, an indication that the process really does need
+improvement ;)
+I think it ought to be its own page, linked from the more / community
+menu dropdowns.
+We also need the jira tag, and for the page to clearly link to filters
+that show proposed / completed SPIPs
+So to be clear, if I translate that google doc to markup and submit a
+PR, you will merge it?
+If we're just using "spip" label, that's probably fine, but we still
+need shared filters for open and closed SPIPs so the page can link to
+them.
+I do not believe I have jira permissions to share filters, I just
+attempted to edit one of mine and do not see an add shares field.
+Can someone with filter share permissions can make a filter for open
+SPIP and one for closed SPIP and share it?
+e.g.
+project = SPARK AND status in (Open, Reopened, "In Progress") AND
+labels=SPIP ORDER BY createdDate DESC
+and another with the status closed equivalent
+I just made an open ticket with the SPIP label show it should show up
+There are existing tickets on the issues around kafka versions, e.g.
+https://issues.apache.org/jira/browse/SPARK-18057 that haven't gotten
+any committer weigh-in on direction.

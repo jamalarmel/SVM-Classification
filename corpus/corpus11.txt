@@ -1,0 +1,1506 @@
+So I'm currently working in Spark's DAGScheduler and related UI code, and
+I'm finding myself wondering why there are StageInfos distinct from Stages.
+ It seems like we go through some bookkeeping to make sure that we can get
+from a Stage to a StageInfo, which in turn is just a pairing of the Stage
+with a collection of (TaskInfo, TaskMetrics) pairs.  Why not avoid the
+bookkeeping and just put that collection of (TaskInfo, TaskMetrics) pairs
+right in the Stage itself?  I.e., directly change the Stage class to
+augment it with the collection instead of indirectly augmenting stages by
+going through the (potentially error-prone) mechanics of maintaining an
+association between a StageInfo distinct from the Stage.
+Or am I missing something?
+Ah, got it.  So Stage and TaskInfo are opaque outside spark, while
+TaskMetrics are visible.
+Is Google groups email formatting completely compatible with Apache lists?
+So how do these get created, and are we really handling them correctly?
+ What is prompting my questions is that I'm looking at making sure that the
+various data structures in the DAGScheduler shrink when appropriate instead
+of growing without bounds.  Jobs with no partitions and the "zero split
+job" test in the DAGSchedulerSuite really throw a wrench into the works.
+ That's because in the DAGScheduler we go part way along in handling this
+weird case as though it were a normal job submission, we start initializing
+or adding to various data structures, etc.; then we pretty much bail out in
+submitMissingTasks when we find out that there actually are no tasks to be
+done.  We remove the stage from the set of running stages, but we don't
+ever clean up pendingTasks, activeJobs, stageIdToStage, stageToInfos, and
+others because no tasks are ever submitted for the stage, so there are
+never any completion events, nor is the stage aborted -- i.e. the normal
+paths to cleanup are never taken.  The end result is that shuffleMap stages
+with no partitions (can these even occur?) never complete, and job's with
+no partitions would seem also to persist forever.
+In short, RDDs with no partitions do really weird things to the
+DAGScheduler.
+So, if there is no way to effectively prevent the creation of RDDs with no
+partitions, is there any reason why we can't short-circuit their handling
+within the DAGScheduler so that data structures are never built or
+populated for these weird things, or must we add a bunch of special-case
+cleanup code to submitMissingStages?
+We already do a quick, no-op return from DAGScheduler.runJob when there are
+no partitions submitted with the job, so running a job with no partitions
+in the usual way isn't a problem.  That still leaves at least the "zero
+split job" in the DAGSchedulerSuite and the possibility of shuffleMap
+stages with no partitions.  Is "zero split job" testing anything
+meaningful, or is its only purpose to cause me headaches?  Can shuffleMap
+stages actually have no partitions, or is this (also) a distraction posing
+as a legitimate problem?
+In short, when are RDDs with no partitions real things that we actually
+have to deal with?
+I'd need to see a clear and significant advantage to using off-heap RDDs
+directly within Spark vs. leveraging Tachyon.  What worries me is the
+combinatoric explosion of different caching and persistence mechanisms.
+ With too many of these, not only will users potentially be baffled
+(@user-list: "What are the performance trade-offs in
+using MEMORY_ONLY_SER_2 vs. MEMORY_ONLY vs. off-heap RDDs?  Or should I
+store some of my RDDs in Tachyon?  Which ones?", etc. ad infinitum), but
+we've got to make sure that all of the combinations work correctly.  At
+some point we end up needing to do some sort of caching/persistence manager
+to automate some of the choices and wrangle the permutations.
+That's not to say that off-heap RDDs are a bad idea or are necessarily the
+combinatoric last straw, but I'm concerned about adding significant
+complexity for only marginal gains in limited cases over a more general
+solution via Tachyon.  I'm willing to be shown that those concerns are
+misplaced.
+No, you don't necessarily need a separate storage level, but I don't think
+you can avoid the "when do I use on-heap RDDs vs. off-heap RDDs vs. RDDs in
+Tachyon vs. ...?" questions.  If off-heap RDDs don't gain us a lot over
+Tachyon in a lot of use cases, then I'm not sure that they are worth the
+extra complexity.  If you can show me how to do them really simply and so
+that their appropriate use cases are obvious, then that changes the
+calculus.
+Doc PRs were still open 4 hours ago.  At least for some of
+us.
+So are you planning to release 0.8 from the master branch (which is at
+a106ed8... now) or from branch-0.8?
+What is going to be the process for making pull requests?  Can they be made
+against the github mirror (https://github.com/apache/incubator-spark), or
+must we use some other way?
+Spark doesn't use Spray anymore.
+Okay, so is there any way to get github's compare view to be happy with
+differently-named repositories?  What I want is to be able to compare and
+generate a pull request between
+github.com/apache/incubator-spark:masterand, e.g.,
+github.com/markhamstra/spark:myBranch and not need to create a new
+github.com/markhamstra/incubator-spark.  It's bad enough that the
+differently-named repos don't show up in the compare-view drop-down
+choices, but I also haven't been able to find a hand-crafted URL that will
+make this work.
+Are these RCs not getting tagged in the repository, or am I just not
+looking in the right place?
+I should have tracked it down earlier when I started seeing persistent
+UISuite failures, but I finally got around to looking at it today.  We've
+got an annoying port conflict problem.  We're setting SparkUI.DEFAULT_PORT
+to 3030, which is the same port that Typesafe has chosen as the default
+Nailgun port for Zinc server.  The upshot is that if you are a developer
+using the Zinc server and trying to work on Spark, then you are going to
+see port conflicts if you don't change at least one of the default
+assignments.
+Either we need to pick a new default spark.ui.port and change all of the
+docs references from 3030 to the new port, or we need to at least add a
+note to the developer docs to make developers aware of the conflict.
+https://spark-project.atlassian.net/browse/SPARK-889
+You're right -- bad cut and paste from the wrong open browser window.
+ Sorry and thanks for the correction.
+I'm in the process of trying to build Apache-fied Spark into our stack at
+ClearStory.  We've been using Maven to do Debian packaging as found in the
+repl-bin module for quite a while, but that doesn't work now.  To see the
+failure, you need to build repl-bin with the `deb` profile -- e.g. "mvn
+-Prepl-bin,deb install" from the project directory.  The problem is with
+the buildnumber-maven-plugin, which is used to attach the 8-digit short SHA
+of the current git commit to the Debian package -- so, e.g.,
+spark_0.8.0-SNAPSHOT-b993b2a3_all.deb.  The buildnumber plugin relies upon
+the  tag to determine which source code management system should be
+used to lookup the version number.
+That all worked great until the following was added to spark/pom.xml:
+  
+    
+    
+    
+  
+The problem is that the parent pom that the above includes has this within
+it:
+  
+    scm:svn:
+http://svn.apache.org/repos/asf/maven/pom/tags/apache-11</connection
+    
+    
+  
+And that essentially overrides the  section of spark/pom.xml, which
+means that the buildnumber plugin thinks that we are using SVN instead of
+git, and the SHA lookup fails.
+So, that is one known problem in the Maven build.  I'm not at all certain
+that there aren't others or lurking problems because of different versions
+of dependencies, plugins, etc. being included by that org.apache:apache
+artifact and also specified within the Spark pom files.
+I'm pretty sure that we can't not include the equivalent of
+org.apache:apache:11, since there is a lot of important stuff in there to
+do Apache release management, etc.  So, is there another, equivalent
+artifact that we can use that doesn't confuse the  issue, or some
+other way around this problem?  It looks like there are some other
+git-specific plugins out there that we may be able to use instead of
+buildnumber-maven-plugin, so that may be a valid and necessary solution to
+the Debian packaging problem.
+Can someone who knows Maven better than I take a look at the overlap
+between org.apache:apache and the Spark pom files to see if there are
+problems lurking there?  Even if there aren't problems other than with the
+buildnumber plugin, we may be able to trim a lot out of the Spark poms that
+is already present in the apache parent pom.
+Yes, exactly.  If I comment out the reference to the parent Apache pom,
+then the buildnumber plugin works correctly.  Similarly if I leave the
+parent Apache pom reference in place but go into my local .m2 cache and
+comment out just the  in the org.apache:apache pom.  In other words,
+if both s are present, the buildnumber plugin only sees the SVN one
+from the Apache pom, which makes things go wrong.
+Ah hah!  Patrick figured it out:
+https://github.com/apache/incubator-spark/commit/905edf59db662868f55525118131cf102d366587.
+ The buildnumber plugin and Debian packaging works correctly again.
+ Thanks!  I'll go through the poms tomorrow and see if there are any other
+such incompletely overriden elements that could be causing us troubles.
+Right now I am seeing two problems with the maven build: 1) I just had a
+build fail from exhausted PermGen, so we probably need to increase
+MaxPermGen in spark/pom.xml; 2) Not all of the modules got picked up in the
+recent invocations of the maven-release-plugin -- did your prepare &
+release use -Phadoop2-yar,repl-bin , Patrick?
+[X] -1 Do not release this package because ...
+Prior, out-of-band discussion:
+Thanks for the insight Mark, we need to move this discussion to the
+So I went through org.apache:apache:11 to look for overlaps or potential
+conflicts with Spark's poms -- less than I expected.  I'm not sure whether
+we should add  and  (apache-incubating instead
+of apache) elements to the  of spark/pom.xml.  Other than that, we
+could drop the maven-jar-plugin from spark/pom.xml, since it already
+specified in a completely compatible way in org.apache:apache.  I didn't
+find any other problems other than that in , which Patrick has already
+addressed.
+Whoa there, cowboy!
+It's just a warning, and removing parameterized artifactIds (or versions)
+is a significant change in functionality that necessitates changes in user
+behavior.  At a minimum, this needs to be discussed before we go this
+route.  If we really want to get rid of the warnings right away, then we
+should try not to lose functionality and to require as little user behavior
+change as possible.  The Maven Archetype
+Plugin
+may
+be the right way to do that.
+Do we have some set-in-stone requirement to quash all maven warnings before
+release?  If not, I'd recommend leaving the parameterized pom files in
+place for now and change over to something like archetypes for 0.8.1 -- the
+change to use archetypes is bigger than I am comfortable with making
+hastily as we try to get 0.8.0 released.
+Ah sorry, I've gotten so used to using ClearStory's poms (where we make
+quite a lot of use of such parameterization) that I lost track of exactly
+when Spark's maven build was changed to work in a similar way.
+This all revolves around a basic difference of opinion as to whether the
+thing that specifies how a project is built should be a fixed, static
+document or is more of a program itself or a parameterized function that
+drives the build and results in an artifact.  SBT is of the latter opinion,
+while Maven (at least with Maven 3) is going the other way.  That means
+that building idiomatic Scala artifacts (which expect things like
+cross-versioning support and artifactIds that include the Scala binary
+version that was used to create them) is somewhat at odds with the Maven
+philosophy.  Hard-coding artifactIds, versions, and whatever else Maven now
+requires to guarantee that a pom file be a fixed, repeatable build
+description works okay for a single build of an artifact; and a user of
+just that built artifact won't have to change behavior if the pom is no
+longer parameterized.  However, users who are not just interested in using
+pre-built artifacts but also in modifying, adding to or reusing the code do
+have to change their behavior if parameterized Maven builds disappear (yes,
+you have pointed out the state of affairs with the 0.6 and 0.7 releases;
+I'll point out that some of those making further use of the code have been
+using the current, not-yet-released poms for a good while.)
+Without some form of parameterized Maven builds, developers who now rely
+upon such parameterized builds will have to choose to fork the Apache poms
+and maintain their own parameterized build, or to repeatedly and manually
+edit static Apache pom files in order to change artifactIds and dependency
+versions (which is a frequent need when integrating Spark into a much
+larger and more complicated technology stack), or to switch over to using
+SBT in order to get parameterized builds (which, of course, would
+necessitate a lot of other changes, not all of them welcome.)  Archetypes
+or something similar seems like a way to satisfy Maven's new requirement
+for static build configurations while at the same time providing a
+parameterized way to generate that configuration or a modified version of
+it -- solving the problem by adding a layer of abstraction.
+Yes, it looks like we need to do something to get 0.8.0 shipped and
+something to fix the problem longer term.  I agree that those somethings
+don't have to be the same thing, and that we can take this up again once
+the 0.8.0 dust has settled.
+Give me a day and I'll probably have more to say about how I'd like things
+to look in the future.
+As long as its just a simple replacement of parameters, it's not too hard
+to live with in the short term.  It's only if we let things fester and I
+have to start dealing with more complicated divergence between our poms and
+the Apache poms that things get more annoying.  If we can come up with a
+common, satisfactory solution for the longer term, then all is good.
+ Tomorrow, I'll try to get some sense of what CSD will be able to
+contribute to such a solution.
++1
+There are a few nits left to pick: 'sbt/sbt publish-local' isn't generating
+correct POM files because of the way the exclusions are defined in
+SparkBuild.scala using wildcards; looks like there may be some broken doc
+links generated in that task, as well; DriverSuite doesn't like to run from
+the maven build, complaining that 'sbt/sbt assembly' needs to be run first.
+None of these is enough for me to give RC6 a -1.
+If that will make the difference between releasing and not releasing, then
+sure; else I'd rather see the last niggles resolved, but that's enough for
+me to vote -1 -- so I'm a 0 unless you really need another +1.
+"not enough", of course.
+Yeah, sorry to say, but I think you've largely or completely duplicated
+work that has already been done.  If anything, the state of Prashant's
+current work is mostly ahead of yours since, among other things, he has
+already incorporated the changes I made to use ClassTag.
+That's the idea.  The fact is that there are still some significant chunks
+of pending development that are still over in the old repo.  For at least a
+little while longer, it's probably a good idea to post your intentions here
+before embarking on any large project.  That way we can point out any
+potential duplication or conflict.
+Whether you are contributing large or small changes, pull requests through
+github (as outlined previously) are by far the preferred method.
+Ah, okay -- sorry for misunderstanding.  Coordinating development is
+actually something that we haven't done a really good job of in the past.
+ Mostly that is because so many of the important efforts were done in the
+AMPLab, and there were enough small-scale projects that we haven't really
+had a lot of trouble with conflicting or duplicative development.  That's
+bound to change as more work gets done outside of the Lab and more
+contributors come on board.
+In the discussions we've had previously, we pretty much decided to give
+JIRA a go as a place to rendezvous and coordinate efforts -- and then many
+of us didn't do a very good job of following through on that intention.
+ The Berkeley developers have done a better job than most at adhering to
+this "Use JIRA" policy, and probably the rest of us should start emulating
+them by finding or opening tickets for things we want to work on and then
+using those tickets for design discussions and tracking who is currently
+working on the issue.
+Unless somebody has a better idea....
+https://github.com/apache/incubator-spark/commit/f3c60c9c0ce1f0c94174ecb903519b5fc4c696cd#diff-96515a7165082eff6dfecf69581c7349
+Already fixed for 0.8.1
+I'm busy working on upgrading an application stack of which Spark and Shark
+are components.  The 0.8.0 changes in how configuration, environment
+variables, and SPARK_JAVA_OPTS are handled are giving me some trouble, but
+I'm not sure whether it is just my trouble or a more general trouble with
+ExecutorRunner.buildJavaOpts.
+The essence of the problem is that workerLocalOpts and userOpts are both
+ending up with the same options set -- usually with the same value, but not
+always.  Having particular options set twice with the same values is, at
+best, pointless.  Having a particular option set twice with different
+values is causing my shark-server to fail to start.
+Now, at least in my circumstances, it wouldn't seem to ever make sense for
+any option to be inherited from both workerLocalOpts and userOpts; and that
+the value associated with any duplicate key in userOpts should override the
+value from workerLocalOpts.  I can customize ExecutorRunner for my
+environment (or look for some other work around), but what I am really
+wondering is whether the userOpts-override behavior is what we actually
+want in Spark instead of the current union of workerLocalOpts and userOpts?
+Or more to the point: What is our commitment to backward compatibility in
+point releases?
+Many Java developers will come to a library or platform versioned as x.y.z
+with the expectation that if their own code worked well using x.y.(z-1) as
+a dependency, then moving up to x.y.z will be painless and trivial.  That
+is not looking like it will be the case for Spark 0.8.0 and 0.8.1.
+We only need to look at Shark as an example of code built with a dependency
+on Spark to see the problem.  Shark 0.8.0 works with Spark 0.8.0.  Shark
+0.8.0 does not build with Spark 0.8.1-SNAPSHOT.  Presumably that lack of
+backwards compatibility will continue into the eventual release of Spark
+0.8.1, and that makes life hard on developers using Spark and Shark.  For
+example, a developer using the released version of Shark but wanting to
+pick up the bug fixes in Spark doesn't have a good option anymore since
+0.8.1-SNAPSHOT (or the eventual 0.8.1 release) doesn't work, and moving to
+the wild and woolly development on the master branches of Spark and Shark
+is not a good idea for someone trying to develop production code.  In other
+words, all of the bug fixes in Spark 0.8.1 are not accessible to this
+developer until such time as there are available 0.8.1-compatible versions
+of Shark and anything else built on Spark that this developer is using.
+The only other option is trying to cherry-pick commits from, e.g., Shark
+0.9.0-SNAPSHOT into Shark 0.8.0 until Shark 0.8.0 has been brought up to a
+point where it works with Spark 0.8.1.  But an application developer
+shouldn't need to do that just to get the bug fixes in Spark 0.8.1, and it
+is not immediately obvious just which Shark commits are necessary and
+sufficient to produce a correct, Spark-0.8.1-compatible version of Shark
+(indeed, there is no guarantee that such a thing is even possible.)  Right
+now, I believe that 67626ae3eb6a23efc504edf5aedc417197f072cf,
+488930f5187264d094810f06f33b5b5a2fde230a and
+bae19222b3b221946ff870e0cee4dba0371dea04 are necessary to get Shark to work
+with Spark 0.8.1-SNAPSHOT, but that those commits are not sufficient (Shark
+builds against Spark 0.8.1-SNAPSHOT with those cherry-picks, but I'm still
+seeing runtime errors.)
+In short, this is not a good situation, and we probably need a real 0.8
+maintenance branch that maintains backward compatibility with 0.8.0,
+because (at least to me) the current branch-0.8 of Spark looks more like
+another active development branch (in addition to the master and scala-2.10
+branches) than it does a maintenance branch.
+While that is good, it really isn't good enough.  Requiring updated source
+code for everything that uses Spark every time Spark goes from x.y.z to
+x.y.(z+1) is not going to win many friends among developers building on top
+of Spark.  Quite the opposite.
+I'd contend that you're playing pretty fast and loose with the notion of a
+public API.  Sure, there's a lot of stuff in Spark that you don't expect
+user programs to actually be using directly unless they are "special" code,
+such as Shark.  But the fact of the matter is that much of that stuff could
+be called by user code since it is not protected and is, strictly speaking,
+part of the public API -- even though it is not part of the published API
+or the expected-to-be-used API.
+There is a lot of room for cleanup and greater protection.
+If there is to be "special" code like Shark that can access Spark's
+internals, then arguable it should be rolled into and maintained as a
+standard part of Spark -- as are Streaming and MLlib.  Relying upon what is
+effectively a single platform of Spark + "special" code where the two
+pieces are frequently out of sync with each other is not fun.
+What JDK version on you using, Evan?
+I tried to reproduce your problem earlier today, but I wasn't even able to
+get through the assembly build -- kept hanging when trying to build the
+examples assembly.  Foregoing the assembly and running the tests would hang
+on FileServerSuite "Dynamically adding JARS locally" -- no stack trace,
+just hung.  And I was actually seeing a very similar stack trace to yours
+from a test suite of our own running against 0.8.1-SNAPSHOT -- not exactly
+the same because line numbers were different once it went into the java
+runtime, and it eventually ended up someplace a little different.  That got
+me curious about differences in Java versions, so I updated to the latest
+Oracle release (1.7.0_45).  Now it cruises right through the build and test
+of Spark master from before Matei merged your PR.  Then I logged into a
+machine that has 1.7.0_15 (7u15-2.3.7-0ubuntu1~11.10.1, actually)
+installed, and I'm right back to the hanging during the examples assembly
+(but passes FileServerSuite, oddly enough.)  Upgrading the JDK didn't
+improve the results of the ClearStory test suite I was looking at, so my
+misery isn't over; but yours might be with a newer JDK....
+Maybe I was bailing too early, Kay.  I'm sure I waited at least 15 mins,
+but maybe not 30.
+You're coming at the paper from a different context than that in which it
+was written.  The paper doesn't claim that RDD lineage and state could grow
+indefinitely after the Spark Streaming changes were made.  That growth was
+indefinite in early, pre-Streaming versions of Spark, however.
+All that I am saying is that before the checkpointing changes that came in
+with the Streaming additions, RDD lineage would grow indefintiely.  Now
+checkpointing causes pre-checkpoint lineage to be forgotten, so
+checkpointing is an effective means to control the growth of RDD state.
+Rebasing changes the SHAs, which isn't a good idea in a public and
+heavily-used repository.
+Not sure.  I haven't been able to discern any pattern as to what new code
+goes into both 0.9 and 0.8 vs. what goes only into 0.8, so I can't really
+tell whether 0.8.1 is done or if something has been overlooked and not
+cherry-picked from master.
+I'm aware of the changes file, but it really doesn't address the issue that
+I am raising.  The changes file just tells me what has gone into the
+release candidate.  In general, it doesn't tell me why those changes went
+in or provide any rationale by which to judge whether that is the complete
+set of changes that should go in.
+I talked some with Matei about related versioning and release issues last
+week, and I've raised them in other contexts previously, but I'm taking the
+liberty to annoy people again because I really am not happy with our
+current versioning and release process, and I really am of the opinion that
+we've got to start doing much better before I can vote in favor of a 1.0
+release.  I fully realize that this is not a 1.0 release, and that because
+we are pre-1.0 we still have a lot of flexibility with releases that break
+backward or forward compatibility and with version numbers that have
+nothing like the semantic meaning that they will eventually need to have;
+but it is not going to be easy to change our process and culture so that we
+produce the kind of stability and reliability that Spark users need to be
+able to depend upon and version numbers that clearly communicate what those
+users expect them to mean.  I think that we should start making those
+changes now.  Just because we have flexibility pre-1.0, that doesn't mean
+that we shouldn't start training ourselves now to work within the
+constraints of post-1.0 Spark.  If I'm to be happy voting for an eventual
+1.0 release candidate, I'll need to have seen at least one full development
+cycle that already adheres to the post-1.0 constraints, demonstrating the
+maturity of our development process.
+That demonstration cycle is clearly not this one -- and I understand that
+there were some compelling reasons (particularly with regard too getting a
+"full" release of Spark based on Scala 2.9.3 before we make the jump to
+2.10.  This "patch-level" release breaks binary compatibility and contains
+a lot of code that isn't anywhere close to meeting the criterion for
+inclusion in a real, post-1.0 patch-level release: essentially "changes
+that every, or nearly every, existing Spark user needs (not just wants),
+and that work with all existing and future binaries built with the prior
+patch-level version of Spark as a dependency."  Like I said, we are clearly
+nowhere close to that with the move from 0.8.0 to 0.8.1; but I also haven't
+been able to recognize any alternative criterion by which to judge the
+quality and completeness of this release candidate.
+Maybe there just isn't one, and I'm just going to have to swallow my
+concerns while watching 0.8.1 go out the door; but if we don't start doing
+better on this kind of thing in the future, you are going to start hearing
+more complaining from me. I just hope that it doesn't get to the point
+where I feel compelled to actively oppose an eventual 1.0 release
+candidate.
+Yup, I'm already started on that process.
+And it's not that I disagree with any particular change that was merged per
+se -- I haven't seen anything merged that most users won't want.  It's more
+that I object to the burden that our current development/versioning/release
+process puts on Spark users responsible for production code.  For them,
+adopting a new patch-level release should be a decision requiring almost no
+thinking since the new release should be essentially just bug-fixes that
+maintain full binary compatibility.  With our current process, those users
+have to suck in a bunch of new, less-tested, less-mature code that may
+comprise new features or functionality that the user doesn't want (at least
+not right away in production), but that they can't cleanly separate from
+the bug-fixes that they do want.  Our process simply has to change if we
+place users' desires ahead of Spark developers' desires.
+The assembly "hang" is something that I've also noticed over at least the
+past few weeks.  If you are seeing what I am seeing, then the build is not
+actually hung, but the building of assemblies takes a long time, a very
+long time, a very very long time on Macs.  It's just the build of
+assemblies via sbt on OSX that does this -- maven builds on Mac or any kind
+of build on Linux go much faster.  On a Mac that also has other things to
+do, I've seen the sbt assembly packaging take upwards of an hour.  Not good.
+SPARK-962 should be resolved before release.  See also:
+https://github.com/apache/incubator-spark/pull/195
+With the references to the way I changed Debian packaging for ClearStory,
+we should be at least 90% of the way toward doing it right for Apache.
+Probably not blockers, but there are still some non-deterministic test
+failures -- e.g. streaming CheckpointSuite.
+Whatever Debian package gets built has to work, so that's the first
+requirement.  I don't know how to decide whether a change is acceptable in
+0.8 or has to wait until 0.9, but the 0.9 packaging should definitely
+leverage the assembly sub-project, making repl-bin unnecessary.
+Well, 195 is sufficient to give you something that runs, but it doesn't run
+the same way as Spark built/distributed by other means -- e.g., after 195
+the package still uses something equivalent to the old `run` script instead
+of the current `spark-class` way.
+Well, what I've already done for ClearStory is very close to how Debian
+packaging should be done for Apache Spark.  That much can be put into a
+pull request quickly.  The only real issues are exactly how the packages
+should be named, checking that the metadata of the packages are exactly
+correct for an Apache release, and deciding whether we should be producing
+a spark-examples package, spark-tools package, separate the Java and Python
+APIs into their own packages, create a source package, etc.  What we've
+been doing up to now is essentially just the minimal packaging of a fat jar
+that can be deployed by Chef or something similar.  It's never really been
+put together in a way appropriate to go into a Debian or Ubuntu
+distribution, for instance.
+And I think 195 is sufficient to build something that works; but I haven't
+personally tested it.
+Spark has already supported async jobs for awhile now --
+https://github.com/apache/incubator-spark/pull/29, and they even work
+correctly after https://github.com/apache/incubator-spark/pull/232
+There are now implicit conversions from RDD to
+AsyncRDDActions,
+where async actions like countAsync are defined.
+Interesting, and confirmed: On my machine where `./sbt/sbt assembly` takes
+a long, long, looooong time to complete (a MBP, in my case), building three
+separate assemblies (`./sbt/sbt assembly/assembly`, `./sbt/sbt
+examples/assembly`, `./sbt/sbt tools/assembly`) takes much, much less time.
+I'm having fun with it.  And it's almost all Reynold's work, so I can't
+take credit for it.
+In code added to Spark over the past several months, I'm glad to see more
+use of `foreach`, `for`, `map` and `flatMap` over `Option` instead of
+pattern matching boilerplate.  There are opportunities to push `Option`
+idioms even further now that we are using Scala 2.10 in master, but I want
+to discuss the issue here a little bit before committing code whose form
+may be a little unfamiliar to some Spark developers.
+In particular, I really like the use of `fold` with `Option` to cleanly an
+concisely express the "do something if the Option is None; do something
+else with the thing contained in the Option if it is Some" code fragment.
+An example:
+Instead of...
+val driver = drivers.find(_.id == driverId)
+driver match {
+  case Some(d) =>
+    if (waitingDrivers.contains(d)) { waitingDrivers -= d }
+    else {
+      d.worker.foreach { w =>
+        w.actor ! KillDriver(driverId)
+      }
+    }
+    val msg = s"Kill request for $driverId submitted"
+    logInfo(msg)
+    sender ! KillDriverResponse(true, msg)
+  case None =>
+    val msg = s"Could not find running driver $driverId"
+    logWarning(msg)
+    sender ! KillDriverResponse(false, msg)
+}
+...using fold we end up with...
+driver.fold
+  {
+    val msg = s"Could not find running driver $driverId"
+    logWarning(msg)
+    sender ! KillDriverResponse(false, msg)
+  }
+  { d =>
+    if (waitingDrivers.contains(d)) { waitingDrivers -= d }
+    else {
+      d.worker.foreach { w =>
+        w.actor ! KillDriver(driverId)
+      }
+    }
+    val msg = s"Kill request for $driverId submitted"
+    logInfo(msg)
+    sender ! KillDriverResponse(true, msg)
+  }
+So the basic pattern (and my proposed formatting standard) for folding over
+an `Option[A]` from which you need to produce a B (which may be Unit if
+you're only interested in side effects) is:
+anOption.fold
+  {
+    // something that evaluates to a B if anOption = None
+  }
+  { a =>
+    // something that transforms `a` into a B if anOption = Some(a)
+  }
+Any thoughts?  Does anyone really, really hate this style of coding and
+oppose its use in Spark?
+On the contrary, it is the completely natural place for the initial value
+of the accumulator, and provides the expected result of folding over an
+empty collection.
+scala> val l: List[Int] = List()
+l: List[Int] = List()
+scala> l.fold(42)(_ + _)
+res0: Int = 42
+scala> val o: Option[Int] = None
+o: Option[Int] = None
+scala> o.fold(42)(_ + 1)
+res1: Int = 42
+I don't understand: What are you finding different in developing on OSX vs.
+Linux that requires tweaking?
+You don't need gcc to build Spark, and there is very little difference
+between developing and running Spark and Shark on OSX vs. Linux.  In fact,
+I dare say that most of the Spark committers develop primarily on MBPs and
+run it at different times on their local OSX machine and on physical or
+virtual Linux machines.
+Some do work with Spark as much as possible within IntelliJ or Eclipse (or
+Sublime), but I'm not one of them.  I work closer to your second option,
+with some Emacs and deployment tooling also thrown into the mix.  In short,
+you need to find someone else to answer questions about how to most fully
+use an IDE to develop Spark and/or Spark applications.
+And, of course, there are the bigger-hammer-than-GC-tuning approaches using
+some combination of unchecked, off-heap and Tachyon.
++1 LGTM
+Really?  Disabling config files seems to me to be a bigger/more onerous
+change for users than spark.speculation=true|false =>
+spark.speculation.enabled=true|false and spark.locality.wait =>
+spark.locality.wait.default.
++1
+groupByKey does merge the values associated with the same key in different
+partitions:
+scala> val rdd = sc.parallelize(List(1, 1, 1, 1),
+4).mapPartitionsWithIndex((idx, itr) => List(("foo", idx ->
+math.random),("bar", idx -> math.random)).toIterator)
+scala> rdd.collect.foreach(println)
+(foo,(0,0.7387266457142971))
+(bar,(0,0.06390701080780203))
+(foo,(1,0.3601832111876926))
+(bar,(1,0.5247725435958681))
+(foo,(2,0.7486323021599729))
+(bar,(2,0.9185837845634715))
+(foo,(3,0.17591718413623136))
+(bar,(3,0.12096331089133605))
+scala> rdd.groupByKey.collect.foreach(println)
+(foo,ArrayBuffer((0,0.8432285514154537), (1,0.3005967566708283),
+(2,0.6150820518108783), (3,0.4779052219014124)))
+(bar,ArrayBuffer((0,0.8190206253566251), (1,0.3465707665527258),
+(2,0.5187789456090471), (3,0.9612998198743644)))
+That was run on 0.8.0-incubating ...which raises a question that has been
+recurring to me of late: Why are people continuing to use 0.8.0 months
+after 0.8.1 has been out and when 0.9.0 is in release candidates?  It
+doesn't make a relevant difference in this case, but in general, chasing
+bugs in code that is two generations out-of-date doesn't make for very
+efficient development.  Spark is still pre-1.0 and is rapidly-developing
+software.  As such, you should expect that the pain of staying up-to-date
+is less than the pain of falling months behind -- but there is no avoiding
+pain in pre-1.0 software.  Once we reach more stability and more rigorous
+versioning/release practices with 1.0, it will make more sense to stick
+with a major.minor release for a while and only pick up the
+major.minor.patchlevel increments, but we're not there yet.
+Been done and undone, and will probably be redone for 1.0.  See
+https://mail.google.com/mail/ca/u/0/#search/config/143a6c39e3995882
+And it would be more helpful if I gave you a usable link http://apache-spark-developers-list.1001551.n3.nabble.com/Config-properties-broken-in-master-td208.html
+Sent from my iPhone
+Looks good.
+One question and one comment:
+How are Alpha components and higher level libraries which may add small
+features within a maintenance release going to be marked with that status?
+ Somehow/somewhere within the code itself, as just as some kind of external
+reference?
+I would strongly encourage that developers submitting pull requests include
+within the description of that PR whether you intend the contribution to be
+mergeable at the maintenance level, minor level, or major level.  That will
+help those of us doing code reviews and merges decide where the code should
+go and how closely to scrutinize the PR for changes that are not compatible
+with the intended release level.
+Yup, the intended merge level is just a hint, the responsibility still lies
+with the committers.  It can be a helpful hint, though.
+Imran:
+And moving master to 1.0.0-SNAPSHOT doesn't preclude that.  If anything, it
+turns that "ought to" into "must" -- which is another way of saying what
+Reynold said: "The point of 1.0 is for us to self-enforce API compatibility
+in the context of longer term support. If we continue down the 0.xx road,
+we will always have excuse for breaking APIs."
+1.0.0-SNAPSHOT doesn't mean that the API is final right now.  It means that
+what is released next will be final over what is intended to be the lengthy
+scope of a major release.  That means that adding new features and
+functionality (at least to core spark) should be a very low priority for
+this development cycle, and establishing the 1.0 API from what is already
+in 0.9.0 should be our first priority.  It wouldn't trouble me at all if
+not-strictly-necessary new features were left to hang out on the pull
+request queue for quite awhile until we are ready to add them in 1.1.0, if
+we were to do pretty much nothing else during this cycle except to get the
+1.0 API to where most of us agree that it is in good shape.
+If we're not adding new features and extending the 0.9.0 API, then there
+really is no need for a 0.10.0 minor-release, whose main purpose would be
+to collect the API additions from 0.9.0.  Bug-fixes go in 0.9.1-SNAPSHOT;
+bug-fixes and finalized 1.0 API go in 1.0.0-SNAPSHOT; almost all new
+features are put on hold and wait for 1.1.0-SNAPSHOT.
+... it seems possible that there could be new features we'd like to release
+We certainly can add new features to 1.0.0, but they will have to go
+through a rigorous review to be certain that they are things that we really
+want to commit to keeping going forward.  But after 1.0, that is true for
+any new feature proposal unless we create specifically experimental
+branches.  So what moving to 1.0.0-SNAPSHOT really means is that we are
+saying that we have gone beyond the development phase where more-or-less
+experimental features can be added to Spark releases only to be withdrawn
+later -- that time is done after 1.0.0-SNAPSHOT.  Now to be fair,
+tentative/experimental features have not been added willy-nilly to Spark
+over recent releases, and withdrawal/replacement has been about as limited
+in scope as could be fairly expected, so this shouldn't be a radically new
+and different development paradigm.  There are, though, some experiments
+that were added in the past and should probably now be withdrawn (or at
+least deprecated in 1.0.0, withdrawn in 1.1.0.)  I'll put my own
+contribution of mapWith, filterWith, et. al on the chopping block as an
+effort that, at least in its present form, doesn't provide enough extra
+over mapPartitionsWithIndex, and whose syntax is awkward enough that I
+don't believe these methods have ever been widely used, so that their
+inclusion in the 1.0 API is probably not warranted.
+There are other elements of Spark that also should be culled and/or
+refactored before 1.0.  Imran has listed a few. I'll also suggest that
+there are at least parts of alternative Broadcast variable implementations
+that should probably be left behind.  In any event, Imran is absolutely
+correct that we need to have a discussion about these issues.  Moving to
+1.0.0-SNAPSHOT forces us to begin that discussion.
+So, I'm +1 for 1.0.0-incubating-SNAPSHOT (and looking forward to losing the
+"incubating"!)
+I'm not sure that that is the conclusion that I would draw from the Hadoop
+example.  I would certainly agree that maintaining and supporting both an
+old and a new API is a cause of endless confusion for users.  If we are
+going to change or drop things from the API to reach 1.0, then we shouldn't
+be maintaining and support the prior way of doing things beyond a 1.0.0 ->
+1.1.0 deprecation cycle.
+I know that it can be done -- which is different from saying that I know how to set it up.
++1
+Whether that is a good idea or not depends largely, I think, on who will
+have control of that putative Apache Jenkins.  The
+AMPLab-now-mostly-Databricks guys (i.e. Andy and others) who did the work
+of setting up, configuring and maintaining the current Jenkins have done a
+great job and have been very responsive when Jenkins has needed attention.
+ I would require convincing that the Apache infra team could match that
+performance.
+I don't understand what you mean by this.  According to my current
+understanding, the next release of Spark other than maintenance releases on
+0.9.x is intended to be a major release, 1.0.0, and there are no plans for
+an intervening minor release, which would be 0.10.0.  Thus "the next minor
+release" would be 1.1.0, and I fail to see why we would wait for that
+instead of putting the dependency change (assuming that it is something
+that we do, indeed, want) in 1.0.0.
+Sounds good, now that we are all clear on what we mean.  Didn't mean to be
+a dick, just was a little confused on what you meant.
+It's actually a little more complicated than that, mostly due to the
+difference between private and private[this].  Allow me to demonstrate:
+package dummy
+class Foo1(a: Int, b: Int) {
+  private val c = a + b
+}
+class Foo2(a: Int, b: Int) {
+  private[this] val c = a + b
+}
+class Foo3(a: Int, b: Int) {
+  def getB = b
+}
+class Foo4(a: Int, private val b: Int) {
+  def getB = b
+}
+class Foo5(a: Int, private[this] val b: Int) {
+  def getB = b
+}
+scalac Foo.scala
+Now let's look at what we've got using `javap -c -private` on the resulting
+classes:
+public class dummy.Foo1 {
+  private final int c;
+  private int c();
+    Code:
+       0: aload_0
+       1: getfield      #13                 // Field c:I
+       4: ireturn
+  public dummy.Foo1(int, int);
+    Code:
+       0: aload_0
+       1: invokespecial #20                 // Method
+java/lang/Object."":()V
+       4: aload_0
+       5: iload_1
+       6: iload_2
+       7: iadd
+       8: putfield      #13                 // Field c:I
+      11: return
+}
+...compare that to Foo2 and note how `c` isn't a plain field in Foo1, but
+has an accessor method `private int c()`:
+public class dummy.Foo2 {
+  private final int c;
+  public dummy.Foo2(int, int);
+    Code:
+       0: aload_0
+       1: invokespecial #15                 // Method
+java/lang/Object."":()V
+       4: aload_0
+       5: iload_1
+       6: iload_2
+       7: iadd
+       8: putfield      #17                 // Field c:I
+      11: return
+}
+Okay?  So you really need private[this] if you want to generate plain Java
+fields.
+Now let's look at what happens when you close over an unannotated
+constructor parameter:
+public class dummy.Foo3 {
+  private final int b;
+  public int getB();
+    Code:
+       0: aload_0
+       1: getfield      #14                 // Field b:I
+       4: ireturn
+  public dummy.Foo3(int, int);
+    Code:
+       0: aload_0
+       1: iload_2
+       2: putfield      #14                 // Field b:I
+       5: aload_0
+       6: invokespecial #21                 // Method
+java/lang/Object."":()V
+       9: return
+}
+...which is not the same as what you get if you annotate `b` with `private
+val` -- notice `private int b()`:
+public class dummy.Foo4 {
+  private final int b;
+  private int b();
+    Code:
+       0: aload_0
+       1: getfield      #13                 // Field b:I
+       4: ireturn
+  public int getB();
+    Code:
+       0: aload_0
+       1: invokespecial #18                 // Method b:()I
+       4: ireturn
+  public dummy.Foo4(int, int);
+    Code:
+       0: aload_0
+       1: iload_2
+       2: putfield      #13                 // Field b:I
+       5: aload_0
+       6: invokespecial #23                 // Method
+java/lang/Object."":()V
+       9: return
+}
+...however, compare Foo3 to what you get when `b` is `private[this] val`:
+public class dummy.Foo5 {
+  private final int b;
+  public int getB();
+    Code:
+       0: aload_0
+       1: getfield      #14                 // Field b:I
+       4: ireturn
+  public dummy.Foo5(int, int);
+    Code:
+       0: aload_0
+       1: iload_2
+       2: putfield      #14                 // Field b:I
+       5: aload_0
+       6: invokespecial #21                 // Method
+java/lang/Object."":()V
+       9: return
+}
+There is at least potential for performance difference with the extra level
+of indirection of `private val` compared to `private[this] val`; so from
+that perspective, `private[this]` or closing over an unannotated
+constructor parameter is preferable to using a `private val` parameter.  On
+the other hand, having a field secretly spring into existence as soon an
+unannotated parameter is closed over does present problems.  On the third
+hand, annotating constructor parameters with `private` or `private[this]`
+is not the expected Scala way (i.e. unannotated parameters) of accessing
+those parameters privately within their respective classes.
+In other words, I don't have a good answer, just more things to consider.
+Usually inlined, not always.  From the infamous Coda Hale rant:
+4. Always use private[this]. Doing so avoids turning simple field access into an
+Is dropping Maven an option, or must we have it to comply with the Apache
+release process?
+As long as the SBT build doesn't start depending on some new functionality
+that doesn't have an easy analog in Maven, the canonical build being done
+only via SBT doesn't make too much difference to me.  Regardless, I'm going
+to need to continue to support customized builds that fit into my
+Maven-ized environment.  The way things work currently, I need at some
+point to examine every change to SparkBuild.scala and to the POM files to
+make sure that they are still in sync and that I have picked up all the
+appropriate changes into my builds.  If there are no more POM files to look
+at in the future (other than the SBT-generated ones), that actually
+simplifies my job in some respect (only one place to look for changes), as
+long as the translation from changed-Apache-SBT to changed-ClearStory-POM
+remains fairly obvious -- that's my basic requirement, as I said
+previously.
+I'm also curious what the vetting process will be for this spark-contrib
+code?  Does inclusion in spark-contrib mean that it has received some sort
+of review and official blessing, or is contrib just a dumping ground for
+code of questionable quality, utility, maintenance, etc.?
+Chill has been part of Spark releases since 0.8.0-incubating.
+Evan,
+Have you actually tried to build Spark using its POM file and sbt-pom-reader?
+ I just made a first, naive attempt, and I'm still sorting through just
+what this did and didn't produce.  It looks like the basic jar files are at
+least very close to correct, and may be just fine, but that building the
+assembly jars failed completely.
+It's not completely obvious to me how to proceed with what sbt-pom-reader
+produces in order build the assemblies, run the test suites, etc., so I'm
+wondering if you have already worked out what that requires?
+Yes, but the POM generated in that fashion is only sufficient for linking
+with Spark, not for building Spark or serving as a basis from which to
+build a customized Spark with Maven.  So, starting from SparkBuild.scala
+and generating a POM with make-pom, those who wish to build a customized
+Spark with Maven will have to figure out how to add various Maven plugins
+and other stuff to the generated POM to actually have something useful.
+ Going the other way, starting from a POM that is sufficient to build Spark
+and generating an SBT build with sbt-pom-reader, the Maven plugins in the
+POM appear to be ignored cleanly, but then the developer wishing to build
+Spark using SBT has the burden of figuring out how to add the equivalent of
+the Maven plugins in order to build the assemblies, among other things.
+ Neither way looks completely obvious to me to do programmatically.  Either
+should be do-able given sufficient development and maintenance resources,
+but that could be a pretty heavy commitment (and when Josh Suereth says wrt
+to sbt-pom-reader that mapping maven plugins into sbt is practically a
+failed task, I have every expectation that generating a completely
+satisfactory SBT build from a Maven build would be quite challenging.)
+Couple of comments: 1) Whether the Spark POM is produced by SBT or Maven
+shouldn't matter for those who just need to link against published
+artifacts, but right now SBT and Maven do not produce equivalent POMs for
+Spark -- I think....  2) Incremental builds using Maven are trivially more
+difficult than they are with SBT -- just start a Zinc daemon and forget
+about it.
+'to' is an exception to the usual rule, so (1 to folds).map {... } would be
+the best form.
+So what happens when having a shepherd is not helpful, e.g. when the
+designated shepherd gets encumbered with a pile of higher-priority
+responsibilities while the PR being shepherded is still in process?
+FYI, Spark master does build cleanly and the tests do run successfully with
+Scala version set to 2.10.4, so we can probably bump 1.0.0-SNAPSHOT to use
+the new version anytime we care to.
+Should be binary-compatible across 2.10.x, so yes.
+A basic Debian package can already be created from the Maven build: mvn
+-Pdeb ...
+What the "..." is kind of depends on what you're trying to accomplish.  You
+could be setting Hadoop version and other stuff in there, but if you go too
+much beyond a pretty basic build, you're probably also going to have to
+modify the  of the jdeb plugin in assembly/pom.xml to
+include/exclude just what you want/don't want in the Debian package.
+Anyway, a typical build would look something like 'mvn -U -Pdeb -DskipTests
+clean package', after which you should be able to find your .deb in
+assembly/target.
+...or at least you could do that if the Maven build wasn't broken right now.
+Whoops!  Looks like it was just my brain that was broken.
+The RAT path issue is now fixed, but it appears to me that some recent
+change has dramatically altered the behavior of the testing framework, so
+that I am now seeing many individual tests taking more than a minute to run
+and the complete test run taking a very, very long time.  I expect that
+this is what is causing Jenkins to now timeout repeatedly.
+I'm trying to decide whether attacking the underlying issue of
+RangePartitioner running eager jobs in rangeBounds (i.e. SPARK-1021) is a
+better option than a messy workaround for some async job-handling stuff
+that I am working on.  It looks like there have been a couple of aborted
+attempts to solve the problem, but no solution or clear path to one at this
+point.
+Has anybody made any further progress or does anyone have any new ideas on
+how to proceed?
+There were a few early/test RCs this cycle that were never put to a vote.
+Sorry, looks like an extra line got inserted in there.  One more try:
+val count = spark.parallelize(1 to NUM_SAMPLES).map { _ =>
+  val x = Math.random()
+  val y = Math.random()
+  if (x*x + y*y < 1) 1 else 0
+}.reduce(_ + _)
+Sorry for the duplication, but I think this is the current VOTE candidate
+-- we're not voting on rc8 yet?
++1, but just barely.  We've got quite a number of outstanding bugs
+identified, and many of them have fixes in progress.  I'd hate to see those
+efforts get lost in a post-1.0.0 flood of new features targeted at 1.1.0 --
+in other words, I'd like to see 1.0.1 retain a high priority relative to
+1.1.0.
+Looking through the unresolved JIRAs, it doesn't look like any of the
+identified bugs are show-stoppers or strictly regressions (although I will
+note that one that I have in progress, SPARK-1749, is a bug that we
+introduced with recent work -- it's not strictly a regression because we
+had equally bad but different behavior when the DAGScheduler exceptions
+weren't previously being handled at all vs. being slightly mis-handled
+now), so I'm not currently seeing a reason not to release.
+Actually, the better way to write the multi-line closure would be:
+val count = spark.parallelize(1 to NUM_SAMPLES).map { _ =>
+  val x = Math.random()
+  val y = Math.random()
+  if (x*x + y*y < 1) 1 else 0
+}.reduce(_ + _)
++1, but just barely.  We've got quite a number of outstanding bugs
+identified, and many of them have fixes in progress.  I'd hate to see those
+efforts get lost in a post-1.0.0 flood of new features targeted at 1.1.0 --
+in other words, I'd like to see 1.0.1 retain a high priority relative to
+1.1.0.
+Looking through the unresolved JIRAs, it doesn't look like any of the
+identified bugs are show-stoppers or strictly regressions (although I will
+note that one that I have in progress, SPARK-1749, is a bug that we
+introduced with recent work -- it's not strictly a regression because we
+had equally bad but different behavior when the DAGScheduler exceptions
+weren't previously being handled at all vs. being slightly mis-handled
+now), so I'm not currently seeing a reason not to release.
++1
+Which of the unresolved bugs in spark-core do you think will require an
+API-breaking change to fix?  If there are none of those, then we are still
+essentially on track for a 1.0.0 release.
+The number of contributions and pace of change now is quite high, but I
+don't think that waiting for the pace to slow before releasing 1.0 is
+viable.  If Spark's short history is any guide to its near future, the pace
+will not slow by any significant amount for any noteworthy length of time,
+but rather will continue to increase.  What we need to be aiming for, I
+think, is to have the great majority of those new contributions being made
+to MLLlib, GraphX, SparkSQL and other areas of the code that we have
+clearly marked as not frozen in 1.x. I think we are already seeing that,
+but if I am just not recognizing breakage of our semantic versioning
+guarantee that will be forced on us by some pending changes, now would be a
+good time to set me straight.
++1
+That is a past issue that we don't need to be re-opening now.  The present
+issue, and what I am asking, is which pending bug fixes does anyone
+anticipate will require breaking the public API guaranteed in rc9?
+I'm not trying to muzzle the discussion.  All I am saying is that we don't
+need to have the same discussion about 0.10 vs. 1.0 that we already had.
+ If you can tell me about specific changes in the current release candidate
+that occasion new arguments for why a 1.0 release is an unacceptable idea,
+then I'm listening.
+That's the crude way to do it.  If you run `sbt/sbt publishLocal`, then you
+can resolve the artifact from your local cache in the same way that you
+would resolve it if it were deployed to a remote cache.  That's just the
+build step.  Actually running the application will require the necessary
+jars to be accessible by the cluster nodes.
+That's all very old functionality in Spark terms, so it shouldn't have
+anything to do with your installation being out-of-date.  There is also no
+need to cast as long as the relevant implicit conversions are in scope:
+import org.apache.spark.SparkContext._
++1
++1
+Just a couple of FYI notes: With Zinc and the scala-maven-plugin, repl and
+incremental builds are also available to those doing day-to-day development
+using Maven.  As long as you don't have to delve into the extra boilerplate
+and verbosity of Maven's POMs relative to an SBT build file, there is
+little day-to-day functional difference between the two -- if anything, I
+find that Maven supports faster development cycles.
++1
+Doesn't look to me like this is used.  Does anybody recall what it was
+intended for?
+Actually, I'm thinking about re-purposing it.  There's a nasty behavior
+that I'll open a JIRA for soon, and that I'm thinking about addressing by
+introducing/using another ExecutorState transition.  The basic problem is
+that Master can be overly aggressive in calling removeApplication on
+ExecutorStateChanged.  For example, say you have a working, long-running
+Spark stand-alone-mode application and then try to add some more worker
+nodes, but manage to misconfigure the new nodes so that on the new nodes
+Executors never successfully start.  In that scenario, you will repeatedly
+end up in the !normalExit branch of Master's receive ExecutorStateChanged,
+quickly exceed ApplicationState.MAX_NUM_RETRY (a non-configurable 10, which
+is another irritation), and end up having your application killed off even
+though it is still running successfully on the old worker nodes.
+.
+.
+.
+.
+.
+.
+.
+.
+.
+...all works fine for me @2a732110d46712c535b75dd4f5a73761b6463aa8
+Sure, drop() would be useful, but breaking the "transformations are lazy;
+only actions launch jobs" model is abhorrent -- which is not to say that we
+haven't already broken that model for useful operations (cf.
+RangePartitioner, which is used for sorted RDDs), but rather that each such
+exception to the model is a significant source of pain that can be hard to
+work with or work around.
+I really wouldn't like to see another such model-breaking transformation
+added to the API.  On the other hand, being able to write transformations
+with dependencies on these kind of "internal" jobs is sometimes very
+useful, so a significant reworking of Spark's Dependency model that would
+allow for lazily running such internal jobs and making the results
+available to subsequent stages may be something worth pursuing.
+Rather than embrace non-lazy transformations and add more of them, I'd
+rather we 1) try to fully characterize the needs that are driving their
+creation/usage; and 2) design and implement new Spark abstractions that
+will allow us to meet those needs and eliminate existing non-lazy
+transformation.  They really mess up things like creation of asynchronous
+FutureActions, job cancellation and accounting of job resource usage, etc.,
+so I'd rather we seek a way out of the existing hole rather than make it
+deeper.
+You can find some of the prior, related discussion here:
+https://issues.apache.org/jira/browse/SPARK-1021
+Where and how is that fork being maintained?  I'm not seeing an obviously
+correct branch or tag in the main asf hive repo & github mirror.
+Getting and maintaining our own branch in the main asf hive repo is a
+non-starter or isn't workable?
+Of late, I've been coming across quite a few pull requests and associated
+JIRA issues that contain nothing indicating their purpose beyond a pretty
+minimal description of what the pull request does.  On the pull request
+itself, a reference to the corresponding JIRA in the title combined with a
+description that gives us a sketch of what the PR does is fine, but if
+there is no description in at least the JIRA of *why* you think some change
+to Spark would be good, then it often makes getting started on code reviews
+a little harder for those of us doing the reviews.  So, I'm requesting that
+if you are submitting a JIRA or pull request for something that isn't
+obviously a bug or bug fix, you please include some sort of motivation in
+at least the JIRA body so that the reviewers can more easily get through
+the head-scratching phase of trying to figure out why Spark might be
+improved by merging a pull request.
+See https://issues.apache.org/jira/browse/SPARK-3530 and this doc,
+referenced in that JIRA:
+https://docs.google.com/document/d/1rVwXRjWKfIb-7PI6b86ipytwbUH7irSNLF1_6dLmh8o/edit?usp=sharing
+https://github.com/apache/spark/pull/2576
+Your's are in the same ballpark with mine, where maven builds with zinc
+take about 1.4x the time to build with SBT.
++1 (binding)
+We include the scala-maven-plugin in spark/pom.xml, so equivalent
+functionality is available using Maven.  You can start a console session
+with `mvn scala:console`.
+Ok, strictly speaking, that's equivalent to your second class of
+examples, "development
+console", not the first "sbt console"
+The equivalent using Maven:
+- Start zinc
+- Build your assembly using the mvn "package" or "install" target
+("install" is actually the equivalent of SBT's "publishLocal") -- this step
+is the first step in
+http://spark.apache.org/docs/latest/building-with-maven.html#spark-tests-in-maven
+- Run all the tests in one module: mvn -pl core test
+- Run a specific suite: mvn -pl core
+-DwildcardSuites=org.apache.spark.rdd.RDDSuite test (the -pl option isn't
+strictly necessary if you don't mind waiting for Maven to scan through all
+the other sub-projects only to do nothing; and, of course, it needs to be
+something other than "core" if the test you want to run is in another
+sub-project.)
+You also typically want to carry along in each subsequent step any relevant
+command line options you added in the "package"/"install" step.
+And that is no different from how Hive has worked for a long time.
+In master, Reynold has already taken care of moving Row
+into org.apache.spark.sql; so, even though the implementation of Row (and
+GenericRow et al.) is in Catalyst (which is more optimizer than parser),
+that needn't be of concern to users of the API in its most recent state.
+I wouldn't go quite that far.  What we have now can serve as useful input
+to a deployment tool like Chef, but the user is then going to need to add
+some customization or configuration within the context of that tooling to
+get Spark installed just the way they want.  So it is not so much that the
+current Debian packaging can't be used as that it has never really been
+intended to be a completely finished product that a newcomer could, for
+example, use to install Spark completely and quickly to Ubuntu and have a
+fully-functional environment in which they could then run all of the
+examples, tutorials, etc.
+Getting to that level of packaging (and maintenance) is something that I'm
+not sure we want to do since that is a better fit with Bigtop and the
+efforts of Cloudera, Horton Works, MapR, etc. to distribute Spark.
+Yeah, I'm fine with that.
+So what are we expecting of Hive 0.12.0 builds with this RC?  I know not
+every combination of Hadoop and Hive versions, etc., can be supported, but
+even an example build from the "Building Spark" page isn't looking too good
+to me.
+Working from f97b0d4, the example build command works: mvn -Pyarn
+-Phadoop-2.4 -Dhadoop.version=2.4.0 -Phive -Phive-0.12.0
+-Phive-thriftserver -DskipTests clean package
+...but then running the tests results in multiple failures in the Hive and
+Hive Thrift Server sub-projects.
+Nothing that I can point to, so this may only be a problem in test scope.
+I am looking at a problem where some UDFs that run with 0.12 fail with
+0.13; but that problem is already present in Spark 1.2.x, so it's not a
+blocking regression for 1.3.  (Very likely a HiveFunctionWrapper serde
+problem, but I haven't run it to ground yet.)
+A LOADING Executor is on the way to RUNNING, but hasn't yet been registered with the Master, so it isn't quite ready to do useful work.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Is that correct, or is the JIRA just out of sync, since TD's PR was merged?
+https://github.com/apache/spark/pull/5008
++1
++1
++1
+Agreed.  The Spark project and community that Vinod describes do not
+resemble the ones with which I am familiar.
+This discussion belongs on the dev list.  Please post any replies there.
++1
+HiveSparkSubmitSuite is fine for me, but I do see the same issue with
+DataFrameStatSuite
+-- OSX 10.10.4, java
+1.7.0_75, -Phive -Phive-thriftserver -Phadoop-2.4 -Pyarn
++1
+But they started it!
+A bit more seriously, my perspective is that the Spark community and
+development process works very well and quite smoothly.  The only
+significant strains that I have witnessed during the time in which Spark
+has been Apache Spark have been when "ASF people" who otherwise have
+neither contributed to Spark development nor participated in the Spark
+community parachute in to tell us that we are doing things wrong and that
+we must change our practice in order to conform to their expectations of
+"The Apache Way".  Sometimes those admonitions are based on actual Apache
+bylaws and/or legal requirements, and we need to take them seriously.
+Other times they have seemed more subjective and have felt more like
+meddling or stirring up trouble in the community and with a process that is
+actually working very well.
+There is no 1.5.0-SNAPSHOT because 1.5.0 has already been released.  The
+current head of branch-1.5 is 1.5.1-SNAPSHOT -- soon to be 1.5.1 release
+candidates and then the 1.5.1 release.
+You're correct, Sean: That build change isn't in branch-1.5, so the
+two-phase build is still needed there.
+Should 1.5.2 wait for Josh's fix of SPARK-11293?
+There was a lot of discussion that preceded our arriving at this statement
+in the Spark documentation: "Maven is the official build tool recommended
+for packaging Spark, and is the build of reference."
+https://spark.apache.org/docs/latest/building-spark.html#building-with-sbt
+I'm not aware of anything new in the way of SBT tooling or your post,
+Jakob, that would lead us to reconsider the choice of Maven over SBT for
+the reference build of Spark.  Of course, I'm by no means the sole and
+final authority on the matter, but at least I am not seeing anything in
+your suggested approach that hasn't already been considered.  You're
+welcome to review the prior discussion and try to convince us that we've
+made the wrong choice, but I wouldn't expect that to be a quick and easy
+process.
++1
+For more than a small number of files, you'd be better off using
+SparkContext#union instead of RDD#union.  That will avoid building up a
+lengthy lineage.
+FiloDB is also closely reated.  https://github.com/tuplejump/FiloDB
+0
+Currently figuring out who is responsible for the regression that I am
+seeing in some user code ScalaUDFs that make use of Timestamps and where
+NULL from a CSV file read in via a TestHive#registerTestTable is now
+producing 1969-12-31 23:59:59.999999 instead of null.
++1
+I'm afraid you're correct, Krishna:
+core/src/main/scala/org/apache/spark/package.scala:  val SPARK_VERSION =
+"1.6.0-SNAPSHOT"
+docs/_config.yml:SPARK_VERSION: 1.6.0-SNAPSHOT
++1
++1
+You can, but you shouldn't.  Using backdoors to mutate the data in an RDD
+is a good way to produce confusing and inconsistent results when, e.g., an
+RDD's lineage needs to be recomputed or a Task is resubmitted on fetch
+failure.
+Do all of those thousands of Stages end up being actual Stages that need to
+be computed, or are the vast majority of them eventually "skipped" Stages?
+If the latter, then there is the potential to modify the DAGScheduler to
+avoid much of this behavior:
+https://issues.apache.org/jira/browse/SPARK-10193
+https://github.com/apache/spark/pull/8427
+https://github.com/apache/spark/pull/10608
++1
+Yes, it works in standalone mode.
+It's a pain in the ass.  Especially if some of your transitive dependencies
+never upgraded from 2.10 to 2.11.
+There aren't many such libraries, but there are a few.  When faced with one
+of those dependencies that still doesn't go beyond 2.10, you essentially
+have the choice of taking on the maintenance burden to bring the library up
+to date, or you do what is potentially a fairly larger refactoring to use
+an alternative but well-maintained library.
+Dropping Scala 2.10 support has to happen at some point, so I'm not
+fundamentally opposed to the idea; but I've got questions about how we go
+about making the change and what degree of negative consequences we are
+willing to accept.  Until now, we have been saying that 2.10 support will
+be continued in Spark 2.0.0.  Switching to 2.11 will be non-trivial for
+some Spark users, so abruptly dropping 2.10 support is very likely to delay
+migration to Spark 2.0 for those users.
+What about continuing 2.10 support in 2.0.x, but repeatedly making an
+obvious announcement in multiple places that such support is deprecated,
+that we are not committed to maintaining it throughout 2.x, and that it is,
+in fact, scheduled to be removed in 2.1.0?
+No, with 2.0 Spark really doesn't use Akka:
+https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/SparkConf.scala#L744
+My concern is that for some of those stuck using 2.10 because of some
+library dependency, three months isn't sufficient time to refactor their
+infrastructure to be compatible with Spark 2.0.0 if that requires Scala
+2.11.  The additional 3-6 months would make it much more feasible for those
+users to stay onboard for 2.0.x using the deprecated 2.10 support,
+migrating to 2.11 by the release of Spark 2.1.0.
+I agree with your general logic and understanding of semver.  That is why
+if we are going to violate the strictures of semver, I'd only be happy
+doing so if support for Java 7 and/or Scala 2.10 were clearly understood to
+be deprecated already in the 2.0.0 release -- i.e. from the outset not to
+be understood to be part of the semver guarantees implied in 2.x.
+Almost by definition the answer to that is "No; a library that hasn't been
+upgraded to Scala 2.11 is not being properly maintained."  That means that
+a user of such a library is already facing the choice of whether to take on
+the maintenance burden to bring the library up to date or to replace the
+unmaintained library with an alternative that is being properly
+maintained.  My concern is that either of those options will take more
+resources than some Spark users will have available in the ~3 months
+remaining before Spark 2.0.0, which will cause fragmentation into Spark 1.x
+and Spark 2.x user communities.
+Which is the bigger risk and cost, maintaining Scala 2.10 support for a
+while longer or fragmenting the Spark user community with the 2.0.0
+release?
+Why would the Executors shutdown when the Job is terminated?  Executors are
+bound to Applications, not Jobs.  Furthermore,
+unless spark.job.interruptOnCancel is set to true, canceling the Job at the
+Application and DAGScheduler level won't actually interrupt the Tasks
+running on the Executors.  If you do have interruptOnCancel set, then you
+can catch the interrupt exception within the Task.
+Yes, some organization do lag behind the current release by sometimes a
+significant amount.  That is a bug, not a feature -- and one that increases
+pressure toward fragmentation of the Spark community.  To date, that hasn't
+been a significant problem, and I think that is mainly because the factors
+motivating a decision not to upgrade in a timely fashion are almost
+entirely internal to a lagging organization -- Spark itself has tried to
+present minimal impediments to upgrading as soon as a new release is
+available.
+Changing the supported Java and Scala versions within the same quarter in
+which the next version is scheduled for release would represent more than a
+minimal impediment, and would increase fragmentation pressure to a degree
+with which I am not entirely comfortable.
+I don't believe the Scala compiler understands the difference between your
+two examples the same way that you do.  Looking at a few similar cases,
+I've only found the bytecode produced to be the same regardless of which
+style is used.
+FWIW, 3 should work as just `.map(function)`.
+I actually find my version of 3 more readable than the one with the `_`,
+which looks too much like a partially applied function.  It's a minor
+issue, though.
+It's not a question of whether the preview artifacts can be made available
+on Maven central, but rather whether they must be or should be.  I've got
+no problems leaving these unstable, transitory artifacts out of the more
+permanent, canonical repository.
+This is not a Databricks vs. The World situation, and the fact that some
+persist in forcing every issue into that frame is getting annoying.  There
+are good engineering and project-management reasons not to populate the
+long-term, canonical repository of Maven artifacts with what are known to
+be severely compromised builds of limited usefulness, particularly over
+time.  It is a legitimate dispute over whether these preview artifacts
+should be deployed to Maven Central, not one that must be seen as
+Databricks seeking improper advantage.
+I simply mean that it was released with the knowledge that there are still
+significant bugs in the preview that definitely would warrant a veto if
+this were intended to be on a par with other releases.  There have been
+repeated announcements to that effect, but developers finding the preview
+artifacts on Maven Central months from now may well not also see those
+announcements and related discussion.  The artifacts will be very stale and
+no longer useful for their limited testing purpose, but will persist in the
+repository.
+Precisely because the naming of the preview artifacts has to fall outside
+of the normal versioning, I can easily see incautious Maven users a few
+months from now mistaking the preview artifacts as
+spark-2.0-something-special instead of spark-2.0-something-stale.
+Fine.  I don't feel strongly enough about it to continue to argue against
+putting the artifacts on Maven Central.
+SPARK-15893 is resolved as a duplicate of SPARK-15899.  SPARK-15899 is
+Unresolved.
+It's also marked as Minor, not Blocker.
+No, that isn't necessarily enough to be considered a blocker.  A blocker
+would be something that would have large negative effects on a significant
+number of people trying to run Spark.  Arguably, something that prevents a
+minority of Spark developers from running unit tests on one OS does not
+qualify.  That's not to say that we shouldn't fix this, but only that it
+needn't block a 2.0.0 release.
+You've got to satisfy my curiosity, though.  Why would you want to run such
+a badly out-of-date version in production?  I mean, 2.0.0 is just about
+ready for release, and lagging three full releases behind, with one of them
+being a major version release, is a long way from where Spark is now.
+Yes.  https://github.com/apache/spark/pull/11796
+Why the push to remove Java 7 support as soon as possible (which is how I
+read your "cluster admins plan to migrate by date X, so Spark should end
+Java 7 support then, too")?  First, I don't think we should be removing
+Java 7 support until some time after all or nearly all relevant clusters
+are actually no longer running on Java 6, and that targeting removal of
+support at our best guess about when admins are just *planning* to migrate
+isn't a very good idea.  Second, I don't see the significant difficulty or
+harm in continuing to support Java 7 for a while longer.
+Sure, signalling well ahead of time is good, as is getting better
+performance from Java 8; but do either of those interests really require
+dropping Java 7 support sooner rather than later?
+Now, to retroactively copy edit myself, when I previously wrote "after all
+or nearly all relevant clusters are actually no longer running on Java 6",
+I meant "...no longer running on Java 7".  We should be at a point now
+where there aren't many Java 6 clusters left, but my sense is that there
+are still quite a number of Java 7 clusters around, and that there will be
+for a good while still.
+At this point, there is no target date set for 2.1.  That's something that
+we should do fairly soon, but right now there is at least a little room for
+discussion as to whether we want to continue with the same pace of releases
+that we targeted throughout the 1.x development cycles, or whether
+lengthening the release cycles by a month or two might be better (mainly by
+reducing the overhead fraction that comes from the constant-size
+engineering mechanics of coordinating and making a release.)
+Similar but not identical configuration (Java 8/macOs 10.12 with build/mvn
+-Phive -Phive-thriftserver -Phadoop-2.7 -Pyarn clean install);
+Similar but not identical failure:
+...
+- line wrapper only initialized once when used as encoder outer scope
+Spark context available as 'sc' (master = local-cluster[1,1,1024], app id =
+app-20160923150640-0000).
+Spark session available as 'spark'.
+Exception in thread "dispatcher-event-loop-1" java.lang.OutOfMemoryError:
+GC overhead limit exceeded
+Exception in thread "dispatcher-event-loop-7" java.lang.OutOfMemoryError:
+GC overhead limit exceeded
+- define case class and create Dataset together with paste mode
+java.lang.OutOfMemoryError: GC overhead limit exceeded
+- should clone and clean line object in ClosureCleaner *** FAILED ***
+  java.util.concurrent.TimeoutException: Futures timed out after [10
+minutes]
+...
+Spark's branch-2.0 is a maintenance branch, effectively meaning that only
+bug-fixes will be added to it.  There are other maintenance branches (such
+as branch-1.6) that are also receiving bug-fixes in theory, but not so much
+in fact as maintenance branches get older.  The major and minor version
+numbers of maintenance branches stay fixed, with only the patch-level
+version number changing as new releases are made from a maintenance
+branch.  Thus, the next release from branch-2.0 will be 2.0.1, the set of
+bug-fixes contributing to the next branch-2.0 release will result in 2.0.2,
+etc.
+New work, both bug-fixes and non-bug-fixes, is contributed to the master
+branch.  New releases from the master branch increment the minor version
+number (unless they include API-breaking changes, in which case the major
+version number changes -- e.g. Spark 1.x.y to Spark 2.0.0).  Thus the first
+release from the current master branch will be 2.1.0, the next will be
+2.2.0, etc.
+There should be active "next JIRA numbers" for whatever will be the next
+release from the master as well as each of the maintenance branches.
+This is all just basic SemVer (http://semver.org/), so it surprises me some
+that you are finding the concepts to be new, difficult or frustrating.
+I've got a couple of build niggles that should really be investigated at
+some point (what look to be OOM issues in spark-repl when building and
+testing with mvn in a single pass instead of in two passes with -DskipTests
+first; the killing of ssh sessions by YarnClusterSuite), but these aren't
+anything that should hold up the release.
++1
++1
+And I'll dare say that for those with Spark in production, what is more
+important is that maintenance releases come out in a timely fashion than
+that new features are released one month sooner or later.
+If we're going to cut another RC, then it would be good to get this in as
+well (assuming that it is merged shortly):
+https://github.com/apache/spark/pull/15213
+It's not a regression, and it shouldn't happen too often, but when failed
+stages don't get resubmitted it is a fairly significant issue.
+0
+RC4 is causing a build regression for me on at least one of my machines.
+RC3 built and ran tests successfully, but the tests consistently fail with
+RC4 unless I revert 9e91a1009e6f916245b4d4018de1664ea3decfe7,
+"[SPARK-15703][SCHEDULER][CORE][WEBUI] Make ListenerBus event queue size
+configurable (branch 2.0)".  This is using build/mvn -U -Pyarn -Phadoop-2.7
+-Pkinesis-asl -Phive -Phive-thriftserver -Dpyspark -Dsparkr -DskipTests
+clean package; build/mvn -U -Pyarn -Phadoop-2.7 -Pkinesis-asl -Phive
+-Phive-thriftserver -Dpyspark -Dsparkr test.  Environment is macOS 10.12,
+Java 1.8.0_102.
+There are no tests that go red.  Rather, the core tests just end after...
+...
+BlockManagerSuite:
+...
+- overly large block
+- block compression
+- block store put failure
+...with only the generic "[ERROR] Failed to execute goal
+org.scalatest:scalatest-maven-plugin:1.0:test (test) on project
+spark-core_2.11: There are test failures".
+I'll try some other environments today to see whether I can turn this 0
+into either a -1 or +1, but right now that commit is looking deeply
+suspicious to me.
+Thanks for doing the investigation.  What I found out yesterday is that my
+other macOs 10.12 machine ran into the same issue, while various Linux
+machines did not, so there may well be an OS-specific component to this
+particular OOM-in-tests problem.  Unfortunately, increasing the heap as you
+suggest doesn't resolve the issue for me -- even if I increase it all the
+way to 6g.  This does appear to be environment-specific (and not an
+environment that I would expect to see in Spark deployments), so I agree
+that this is not a blocker.
+I looked a bit into the other annoying issue that I've been seeing for
+awhile now with the shell terminating when YarnClusterSuite is run on an
+Ubuntu 16.0.4 box.  Both Sean Owen and I have run into this problem when
+running the tests over an ssh connection, and we each assumed that it was
+an ssh-specific problem.  Yesterday, though, I spent some time logged
+directly into both a normal graphical sessions and console sessions, and I
+am seeing similar problems there. Running the tests from the graphical
+session actually ends up failing and kicking me all the way out to the
+login screen when YarnClusterSuite is run, while doing the same from the
+console ends up terminating the shell.  All very strange, and I don't have
+much of a clue what is going on yet, but it also seems to quite specific to
+this environment, so I wouldn't consider this issue to be a blocker, either
+I'm not a fan of the SEP acronym.  Besides it prior established meaning of
+"Somebody else's problem", the are other inappropriate or offensive
+connotations such as this Australian slang that often gets shortened to
+just "sep":  http://www.urbandictionary.com/define.php?term=Seppo
+There were at least a couple of ideas behind the original thinking on using
+both of those Maps: 1) We needed the ability to efficiently get from jobId
+to both ActiveJob objects and to sets of associated Stages, and using both
+Maps here was an opportunity to do a little sanity checking to make sure
+that the Maps looked at least minimally consistent for the Job at issue; 2)
+Similarly, it could serve as a kind of hierarchical check -- first, for the
+Job which we are being asked to cancel, that we ever knew enough to even
+register its existence; second, that for a JobId that passes the first
+test, that we still have an ActiveJob that can be canceled.
+Now, without doing a bunch of digging into the code archives, I can't tell
+you for sure whether those ideas were ever implemented completely correctly
+or whether they still make valid sense in the current code, but from
+looking at the lines that you highlighted, I can tell you that even if the
+ideas still make sense and are worth carrying forward, the current code
+doesn't implement them correctly.  In particular, if it is possible for the
+`jobId` to not be in `jobIdToActiveJob`, we're going to produce a
+`NoSuchElementException` for the missing key instead of handling it or even
+reporting it in a more useful way.
+Alright, that does it!  Who is responsible for this "straw-man" abuse
+that is becoming too commonplace in the Spark community?  "Straw-man" does
+not mean something like "trial balloon" or "run it up the flagpole and see
+if anyone salutes", and I would really appreciate it if Spark developers
+would stop using "straw-man" to mean anything other than its established
+meaning: The logical fallacy of declaring victory by knocking down an
+easily defeated argument or position that the opposition has never actually
+made.
+The advice to avoid idioms that may not be universally understood is good.
+My further issue with the misuse of "straw-man" (which really is not, or
+should not be, separable from "straw-man argument") is that a "straw-man"
+in the established usage is something that is always intended to be a
+failure or designed to be obviously and fatally flawed.  That's what makes
+it fundamentally different from a trial balloon or a first crack at
+something or a prototype or an initial design proposal -- these are all
+intended, despite any remaining flaws, to have merits that are likely worth
+pursuing further, whereas a straw-man is only intended to be knocked apart
+as a way to preclude and put an end to further consideration of something.
+What's changed since the last time we discussed these issues, about 7
+months ago?  Or, another way to formulate the question: What are the
+threshold criteria that we should use to decide when to end Scala 2.10
+and/or Java 7 support?
+No, I think our intent is that using a deprecated language version can
+generate warnings, but that it should still work; whereas once we remove
+support for a language version, then it really is ok for Spark developers to
+do things not compatible with that version and for users attempting to use
+that version to encounter errors.
+With that understanding, the first steps toward removing support for Scala
+2.10 and/or Java 7 would be to deprecate them in 2.1.0.  Actual removal of
+support could then occur at the earliest in 2.2.0.
+Take a look at spark.sql.adaptive.enabled and the ExchangeCoordinator.  A
+single, fixed-sized sql.shuffle.partitions is not the only way to control
+the number of partitions in an Exchange -- if you are willing to deal with
+code that is still off by by default.
+AFAIK, the adaptive shuffle partitioning still isn't completely ready to be
+made the default, and there are some corner issues that need to be
+addressed before this functionality is declared finished and ready.  E.g.,
+the current logic can make data skew problems worse by turning One Big
+Partition into an even larger partition before the ExchangeCoordinator
+decides to create a new one.  That can be worked around by changing the
+logic to "If including the nextShuffleInputSize would exceed the target
+partition size, then start a new partition":
+https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/execution/exchange/ExchangeCoordinator.scala#L173
+If you're willing to work around those kinds of issues to fit your use
+case, then I do know that the adaptive shuffle partitioning can be made to
+work well even if it is not perfect.  It would be nice, though, to see
+adaptive partitioning be finished and hardened to the point where it
+becomes the default, because a fixed number of shuffle partitions has some
+significant limitations and problems.
+You still have the problem that even within a single Job it is often the
+case that not every Exchange really wants to use the same number of shuffle
+partitions.
+Yes, I see the same.
+http://spark.apache.org/committers.html
+NOt so much about between applications, rather multiple frameworks within
+an application, but still related:
+https://cs.stanford.edu/~matei/papers/2017/cidr_weld.pdf
+Yes, this is part of Matei's current research, for which code is not yet
+publicly available at all, much less in a form suitable for production use.
+Which is why I'm thinking that we should pull 2.10 support out of master
+soon -- either immediately or right after 2.2 goes into RC or full release.
+Sorry, for some reason I was thinking that we have branch-2.2 cut already.
+If we're not going to pull Scala 2.10 out of 2.2.0, then we should wait at
+least until that branch is cut before we pull it out of master -- but I'd
+still argue for not long after that so that the 2.12 work can start.
+-0 on voting on whether we need a vote.

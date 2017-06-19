@@ -1,0 +1,1944 @@
+We use sbt-scalariform in our company, and it can automatically format
+the coding style when runs `sbt compile`.
+https://github.com/sbt/sbt-scalariform
+We ask our developers to run `sbt compile` before commit, and it's
+really nice to see everyone has the same spacing and indentation.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Wed, Jan 8, 2014 at 9:50 PM, Reynold Xin  wrote:
+A pull request for scalariform.
+https://github.com/apache/incubator-spark/pull/365
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Wed, Jan 8, 2014 at 10:09 PM, DB Tsai  wrote:
+Initially, we also had the same concern, so we started from limited
+set of rules. Gradually, we found that it increases the productivity
+and readability of our codebase.
+PS, Scalariform is compatible with the Scala Style Guide in the sense
+that, given the right preference settings, source code that is
+initially compiliant with the Style Guide will not become uncompliant
+after formatting. In a number of cases, running the formatter will
+make uncompliant source more compliant.
+I added the configuration option in the latest PR to limit the set of
+rules. The options are https://github.com/mdr/scalariform
+When developers wants to choose their own style for whatever reasons,
+they can source directives to turn it off by `// format: OFF`.
+Just quickly run the formatter, and I found that Spark is in general
+in good shape; most of the changes are extra space after semicolon.
+-  def run[K: Manifest, V <: Vertex : Manifest, M <: Message[K] :
+Manifest, C: Manifest](
++  def run[K: Manifest, V <: Vertex: Manifest, M <: Message[K]:
+Manifest, C: Manifest](
+-  def addFile(file: File) : String = {
++ def addFile(file: File): String = {
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Thu, Jan 9, 2014 at 12:32 AM, Patrick Wendell  wrote:
+Hi guys,
+First of all, we would like to thank all the Spark community for
+building such great platform for big data processing. We built the
+multinomial logistic regression with LBFGS optimizer in Spark, and
+LBFGS is a limited memory version of quasi-newton method which allows
+us to train a very high-dimensional data without computing the Hessian
+matrix as newton method required.
+In Strata Conference, we did a great demo using Spark with our MLOR to
+train mnist8m dataset. We're able to train the model in 5 mins with 50
+iterations, and get 86% accuracy. The first iteration takes 19.8s, and
+the remaining iterations take about 5~7s.
+We did comparison between LBFGS and SGD, and often we saw 10x less
+steps in LBFGS while the cost of per step is the same (just computing
+the gradient).
+The following is the paper by Prof. Ng at Stanford comparing different
+optimizers including LBFGS and SGD. They use them in the context of
+deep learning, but worth as reference.
+http://cs.stanford.edu/~jngiam/papers/LeNgiamCoatesLahiriProchnowNg2011.pdf
+We would like to break our MLOR with LBFGS into three patches to
+contribute to the community.
+1) LBFGS optimizer - which can be used in logistic regression, and
+liner regression or replacing any algorithms using SGD.
+The core underneath LBFGS Java implementation we used is from RISO
+project, and the author, Robert is so kind to relicense it to GPL and
+Apache2 dual license.
+We're almost ready to submit a PR for LBFGS, see our github fork,
+https://github.com/AlpineNow/incubator-spark/commits/dbtsai-LBFGS
+However, we don't use Updater in LBFGS since it designs for GD, and
+for LBFGS, we don't need stepSize, and adaptive learning rate, etc.
+While it seems to be difficult to fit the LBFGS updater logic (well,
+in lbfgs library, the new weights is returned given old weights, loss,
+and gradient) into the current framework, I was thinking to abstract
+out the code computing the gradient and loss terms of regularization
+into different place so that different optimizer can also use it. Any
+suggestion about this?
+2) and 3), we will add the MLOR gradient to MLLib, and add a few
+examples. Finally, we will have some tweak using mapPartition instead
+of map to further improve the performance.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+Hi Deb,
+On Tue, Feb 25, 2014 at 7:07 AM, Debasish Das  wrote:
+Based on what I read here, there is no problem to include CPL code in
+apache project
+as long as the code isn't modified, and we include the maven binary.
+https://www.apache.org/legal/3party.html
+We found that hessian based solvers don't scale as the # of features grow, and
+we have lots of customers trying to train sparse input. That's our motivation to
+work on L-BFGS which approximate hessian using just a few vectors.
+Just take a look at MALLET, and it does have L-BFGS and its variant OWL-QN
+which can tackle L1 problem. Since implementing L-BFGS is very subtle, I don't
+know the quality of the mallet implementation. Personally, I
+implemented one based
+on textbook, and not very stable. If MALLET is robust, I'll go for it
+since it has more
+features, and already in maven.
+I think it will not impact performance even it's not blas optimized
+nor multi-threaded,
+since most of the parallelization is in computing gradientSum and
+lossSum in Spark,
+and the optimizer just takes gradientSum, lossSum, and weights to get
+the newWeights.
+As a result, 99.9% of time is in computing gradientSum and lossSum.
+Only small amount
+of time is in optimization.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+Hi Deb,
+On Tue, Feb 25, 2014 at 7:07 AM, Debasish Das  wrote:
+Based on what I read here, there is no problem to include CPL code in
+apache project
+as long as the code isn't modified, and we include the maven binary.
+https://www.apache.org/legal/3party.html
+We found that hessian based solvers don't scale as the # of features grow, and
+we have lots of customers trying to train sparse input. That's our motivation to
+work on L-BFGS which approximate hessian using just a few vectors.
+Just take a look at MALLET, and it does have L-BFGS and its variant OWL-QN
+which can tackle L1 problem. Since implementing L-BFGS is very subtle, I don't
+know the quality of the mallet implementation. Personally, I
+implemented one based
+on textbook, and not very stable. If MALLET is robust, I'll go for it
+since it has more
+features, and already in maven.
+I think it will not impact performance even it's not blas optimized
+nor multi-threaded,
+since most of the parallelization is in computing gradientSum and
+lossSum in Spark,
+and the optimizer just takes gradientSum, lossSum, and weights to get
+the newWeights.
+As a result, 99.9% of time is in computing gradientSum and lossSum.
+Only small amount
+of time is in optimization.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+I find some comparison between Mallet vs Fortran version. The result
+is closed but not the same.
+http://t3827.ai-mallet-development.aitalk.info/help-with-l-bfgs-t3827.html
+Here is LBFGS-B
+Cost: 0.6902411220175793
+Gradient: -5.453609E-007, -2.858372E-008, -1.369706E-007
+Theta: -0.014186210102171406, -0.303521206706629, -0.018132348904129902
+And Mallet LBFGS (Tollerance .000000000000001)
+Cost: 0.6902412268833071
+Gradient: 0.000117, -4.615523E-005, 0.000114
+Theta: -0.013914961040040107, -0.30419883021414335, -0.016838481937958744
+So this shows me, that Mallet is close, but Plain ol Gradient Descent
+and LBFGS-B are really close.
+I see that Mallet also has a "LineOptimizer" and "Evaluator" that I
+have yet to explore...
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Tue, Feb 25, 2014 at 11:16 AM, DB Tsai  wrote:
+I find some comparison between Mallet vs Fortran version. The result
+is closed but not the same.
+http://t3827.ai-mallet-development.aitalk.info/help-with-l-bfgs-t3827.html
+Here is LBFGS-B
+Cost: 0.6902411220175793
+Gradient: -5.453609E-007, -2.858372E-008, -1.369706E-007
+Theta: -0.014186210102171406, -0.303521206706629, -0.018132348904129902
+And Mallet LBFGS (Tollerance .000000000000001)
+Cost: 0.6902412268833071
+Gradient: 0.000117, -4.615523E-005, 0.000114
+Theta: -0.013914961040040107, -0.30419883021414335, -0.016838481937958744
+So this shows me, that Mallet is close, but Plain ol Gradient Descent
+and LBFGS-B are really close.
+I see that Mallet also has a "LineOptimizer" and "Evaluator" that I
+have yet to explore...
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Tue, Feb 25, 2014 at 11:16 AM, DB Tsai  wrote:
+Hi Deb, Xiangrui
+I just moved the LBFGS code to maven central, and cleaned up the code
+a little bit.
+https://github.com/AlpineNow/incubator-spark/commits/dbtsai-LBFGS
+After looking at Mallet, the api is pretty simple, and it's probably
+can be easily tested
+based on my PR.
+It will be tricky to just benchmark the time of optimizers by
+excluding the parallel gradientSum
+and lossSum computation, and I don't have good approach yet. Let's
+compare the accuracy for the time being.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Tue, Feb 25, 2014 at 12:07 PM, Debasish Das  wrote:
+Hi Deb,
+The PR is here
+https://github.com/apache/spark/pull/53
+Hi Evan,
+I think we need to refactor the optimization methods and also the way
+we write algorithms. For example, if I want to use the new
+optimization method in  LogisticRegression.scala, I need to implement
+LogisticRegressionWithLBFGS class and object which are mostly
+identical to LogisticRegressionWithSGD. I'll open a JIRA for this.
+I just submit the LBFGS PR https://github.com/apache/spark/pull/53 ,
+and it depends on a bug fix in another PR
+https://github.com/apache/spark/pull/40
+Any comment and feedback is welcome.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+Hi Deb,
+1) The LBFGS code I published to maven central is here,
+https://github.com/dbtsai/lbfgs  You can fork it, and publish it
+locally so that mllib can use it. I also want to add orthant wise for
+L1, so we can work together to make it happen.
+I think ideally, we can rewrite it in scala, and move the optimizer to
+spark codebase. But I don't know how easy it is to write a very robust
+lbfgs.
+2) I think the most easy way is just fork
+https://github.com/AlpineNow/spark/, and checkout dbtsai-lbfgs branch.
+We also need sparse support as well. Do we have good infrastructure
+around this?
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Sun, Mar 2, 2014 at 10:23 AM, Debasish Das  wrote:
+Hi Deb,
+Based on what I saw from
+https://github.com/tjhunter/scalanlp-core/blob/master/learn/src/main/scala/breeze/optimize/OWLQN.scala
+, it seems that it's not difficult to implement OWL-QN once LBFGS is
+done.
+I tried to convert the code from Fortran L-BFGS-B implementation to
+java using f2j; the translated code is just a messy, and it just
+doesn't work at all. There is no license issue here. Any idea about
+how to approach this?
+I don't think it's merged into master. Still have couple things needed
+to be cleaned up. Just open the PR to have public feedback.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+Hi Deb,
+I had tried breeze L-BFGS algorithm, and when I tried it couple weeks
+ago, it's not as stable as the fortran implementation. I guessed the
+problem is in the line search related thing. Since we may bring breeze
+dependency for the sparse format support as you pointed out, we can
+just try to fix the L-BFGS in breeze, and we can get OWL-QN and
+L-BFGS-B.
+What do you think?
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Mon, Mar 3, 2014 at 3:52 PM, DB Tsai  wrote:
+Hi Xiangrui,
+It seems that Robert is busy recently. I setup the org.riso in
+maven central for him, and I was waiting for his response for
+a while without any news. So, I decided to maintain myself.
+I'm more favor of using breeze for both sparse and optimization
+core math library. When I tried L-BFGS in breeze with iris dataset
+using multinomial logistic regression, it converged to NaN for unknown
+reasons, while the Fortran one converged to the solution similar to Newton
+method. For some datasets, the L-BFGS in breeze can converge to
+correct solution.
+We may talk to David and understand the implementation difference
+between them.
+I agree that we need to rework on the updater to make it to generic;
+however, it may take a very long time to design it right. How about
+we open another story for this? Once we finish this PR (either use
+fortran or breeze implementation), and get it merge, let's have a design
+discussion around this. It may be more effective since we can design a
+architecture that have to work for both cases in the codebase, and will
+be easier to think about the edge case for it.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Tue, Mar 4, 2014 at 9:53 AM, Xiangrui Meng  wrote:
+Hi David,
+On Tue, Mar 4, 2014 at 8:13 PM, dlwh  wrote:
+I'm working on a reproducible test case using breeze vs fortran
+implementation to show the problem I've run into. The test will be in
+one of the test cases in my Spark fork, is it okay for you to
+investigate the issue? Or do I need to make it as a standalone test?
+Will send you the test later today.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+Hi David,
+On Tue, Mar 4, 2014 at 8:13 PM, dlwh  wrote:
+I'm working on a reproducible test case using breeze vs fortran
+implementation to show the problem I've run into. The test will be in
+one of the test cases in my Spark fork, is it okay for you to
+investigate the issue? Or do I need to make it as a standalone test?
+Will send you the test later today.
+Thanks.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+Hi David,
+I can converge to the same result with your breeze LBFGS and Fortran
+implementations now. Probably, I made some mistakes when I tried
+breeze before. I apologize that I claimed it's not stable.
+See the test case in BreezeLBFGSSuite.scala
+https://github.com/AlpineNow/spark/tree/dbtsai-breezeLBFGS
+This is training multinomial logistic regression against iris dataset,
+and both optimizers can train the models with 98% training accuracy.
+There are two issues to use Breeze in Spark,
+1) When the gradientSum and lossSum are computed distributively in
+custom defined DiffFunction which will be passed into your optimizer,
+Spark will complain LBFGS class is not serializable. In
+BreezeLBFGS.scala, I've to convert RDD to array to make it work
+locally. It should be easy to fix by just having LBFGS to implement
+Serializable.
+2) Breeze computes redundant gradient and loss. See the following log
+from both Fortran and Breeze implementations.
+Thanks.
+Fortran:
+Iteration -1: loss 1.3862943611198926, diff 1.0
+Iteration 0: loss 1.5846343143210866, diff 0.14307193024217352
+Iteration 1: loss 1.1242501524477688, diff 0.29053004039012126
+Iteration 2: loss 1.0930151243303563, diff 0.027782962952189336
+Iteration 3: loss 1.054036932835569, diff 0.03566113127440601
+Iteration 4: loss 0.9907956302751622, diff 0.05999907649459571
+Iteration 5: loss 0.9184205380342829, diff 0.07304737423337761
+Iteration 6: loss 0.8259870936519937, diff 0.10064381175132982
+Iteration 7: loss 0.6327447552109574, diff 0.23395293458364716
+Iteration 8: loss 0.5534101162436359, diff 0.1253815427665277
+Iteration 9: loss 0.4045020086612566, diff 0.26907321376758075
+Iteration 10: loss 0.3078824990823728, diff 0.23885980452569627
+Breeze:
+Iteration -1: loss 1.3862943611198926, diff 1.0
+Mar 6, 2014 3:59:11 PM com.github.fommil.netlib.BLAS 
+WARNING: Failed to load implementation from:
+com.github.fommil.netlib.NativeSystemBLAS
+Mar 6, 2014 3:59:11 PM com.github.fommil.netlib.BLAS 
+WARNING: Failed to load implementation from:
+com.github.fommil.netlib.NativeRefBLAS
+Iteration 0: loss 1.3862943611198926, diff 0.0
+Iteration 1: loss 1.5846343143210866, diff 0.14307193024217352
+Iteration 2: loss 1.1242501524477688, diff 0.29053004039012126
+Iteration 3: loss 1.1242501524477688, diff 0.0
+Iteration 4: loss 1.1242501524477688, diff 0.0
+Iteration 5: loss 1.0930151243303563, diff 0.027782962952189336
+Iteration 6: loss 1.0930151243303563, diff 0.0
+Iteration 7: loss 1.0930151243303563, diff 0.0
+Iteration 8: loss 1.054036932835569, diff 0.03566113127440601
+Iteration 9: loss 1.054036932835569, diff 0.0
+Iteration 10: loss 1.054036932835569, diff 0.0
+Iteration 11: loss 0.9907956302751622, diff 0.05999907649459571
+Iteration 12: loss 0.9907956302751622, diff 0.0
+Iteration 13: loss 0.9907956302751622, diff 0.0
+Iteration 14: loss 0.9184205380342829, diff 0.07304737423337761
+Iteration 15: loss 0.9184205380342829, diff 0.0
+Iteration 16: loss 0.9184205380342829, diff 0.0
+Iteration 17: loss 0.8259870936519939, diff 0.1006438117513297
+Iteration 18: loss 0.8259870936519939, diff 0.0
+Iteration 19: loss 0.8259870936519939, diff 0.0
+Iteration 20: loss 0.6327447552109576, diff 0.233952934583647
+Iteration 21: loss 0.6327447552109576, diff 0.0
+Iteration 22: loss 0.6327447552109576, diff 0.0
+Iteration 23: loss 0.5534101162436362, diff 0.12538154276652747
+Iteration 24: loss 0.5534101162436362, diff 0.0
+Iteration 25: loss 0.5534101162436362, diff 0.0
+Iteration 26: loss 0.40450200866125635, diff 0.2690732137675816
+Iteration 27: loss 0.40450200866125635, diff 0.0
+Iteration 28: loss 0.40450200866125635, diff 0.0
+Iteration 29: loss 0.30788249908237314, diff 0.23885980452569502
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Wed, Mar 5, 2014 at 2:00 PM, David Hall  wrote:
+Hi David,
+I can converge to the same result with your breeze LBFGS and Fortran
+implementations now. Probably, I made some mistakes when I tried
+breeze before. I apologize that I claimed it's not stable.
+See the test case in BreezeLBFGSSuite.scala
+https://github.com/AlpineNow/spark/tree/dbtsai-breezeLBFGS
+This is training multinomial logistic regression against iris dataset,
+and both optimizers can train the models with 98% training accuracy.
+There are two issues to use Breeze in Spark,
+1) When the gradientSum and lossSum are computed distributively in
+custom defined DiffFunction which will be passed into your optimizer,
+Spark will complain LBFGS class is not serializable. In
+BreezeLBFGS.scala, I've to convert RDD to array to make it work
+locally. It should be easy to fix by just having LBFGS to implement
+Serializable.
+2) Breeze computes redundant gradient and loss. See the following log
+from both Fortran and Breeze implementations.
+Thanks.
+Fortran:
+Iteration -1: loss 1.3862943611198926, diff 1.0
+Iteration 0: loss 1.5846343143210866, diff 0.14307193024217352
+Iteration 1: loss 1.1242501524477688, diff 0.29053004039012126
+Iteration 2: loss 1.0930151243303563, diff 0.027782962952189336
+Iteration 3: loss 1.054036932835569, diff 0.03566113127440601
+Iteration 4: loss 0.9907956302751622, diff 0.05999907649459571
+Iteration 5: loss 0.9184205380342829, diff 0.07304737423337761
+Iteration 6: loss 0.8259870936519937, diff 0.10064381175132982
+Iteration 7: loss 0.6327447552109574, diff 0.23395293458364716
+Iteration 8: loss 0.5534101162436359, diff 0.1253815427665277
+Iteration 9: loss 0.4045020086612566, diff 0.26907321376758075
+Iteration 10: loss 0.3078824990823728, diff 0.23885980452569627
+Breeze:
+Iteration -1: loss 1.3862943611198926, diff 1.0
+Mar 6, 2014 3:59:11 PM com.github.fommil.netlib.BLAS 
+WARNING: Failed to load implementation from:
+com.github.fommil.netlib.NativeSystemBLAS
+Mar 6, 2014 3:59:11 PM com.github.fommil.netlib.BLAS 
+WARNING: Failed to load implementation from:
+com.github.fommil.netlib.NativeRefBLAS
+Iteration 0: loss 1.3862943611198926, diff 0.0
+Iteration 1: loss 1.5846343143210866, diff 0.14307193024217352
+Iteration 2: loss 1.1242501524477688, diff 0.29053004039012126
+Iteration 3: loss 1.1242501524477688, diff 0.0
+Iteration 4: loss 1.1242501524477688, diff 0.0
+Iteration 5: loss 1.0930151243303563, diff 0.027782962952189336
+Iteration 6: loss 1.0930151243303563, diff 0.0
+Iteration 7: loss 1.0930151243303563, diff 0.0
+Iteration 8: loss 1.054036932835569, diff 0.03566113127440601
+Iteration 9: loss 1.054036932835569, diff 0.0
+Iteration 10: loss 1.054036932835569, diff 0.0
+Iteration 11: loss 0.9907956302751622, diff 0.05999907649459571
+Iteration 12: loss 0.9907956302751622, diff 0.0
+Iteration 13: loss 0.9907956302751622, diff 0.0
+Iteration 14: loss 0.9184205380342829, diff 0.07304737423337761
+Iteration 15: loss 0.9184205380342829, diff 0.0
+Iteration 16: loss 0.9184205380342829, diff 0.0
+Iteration 17: loss 0.8259870936519939, diff 0.1006438117513297
+Iteration 18: loss 0.8259870936519939, diff 0.0
+Iteration 19: loss 0.8259870936519939, diff 0.0
+Iteration 20: loss 0.6327447552109576, diff 0.233952934583647
+Iteration 21: loss 0.6327447552109576, diff 0.0
+Iteration 22: loss 0.6327447552109576, diff 0.0
+Iteration 23: loss 0.5534101162436362, diff 0.12538154276652747
+Iteration 24: loss 0.5534101162436362, diff 0.0
+Iteration 25: loss 0.5534101162436362, diff 0.0
+Iteration 26: loss 0.40450200866125635, diff 0.2690732137675816
+Iteration 27: loss 0.40450200866125635, diff 0.0
+Iteration 28: loss 0.40450200866125635, diff 0.0
+Iteration 29: loss 0.30788249908237314, diff 0.23885980452569502
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Wed, Mar 5, 2014 at 2:00 PM, David Hall  wrote:
+On Thu, Mar 6, 2014 at 4:26 PM, David Hall  wrote:
+It will live in the controller node. Only RDD operations are per-node
+thing. I'm calling RDD operations inside the DiffFunction, so Spark
+should not serialize anything. But it seems that Spark serialize evey
+parent objects; can Spark anyone confirm this?
+It will nice to have LBFHS do this automatically. Just try
+CachedDiffFunction, and it works.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Thu, Mar 6, 2014 at 4:26 PM, David Hall  wrote:
+It will live in the controller node. Only RDD operations are per-node
+thing. I'm calling RDD operations inside the DiffFunction, so Spark
+should not serialize anything. But it seems that Spark serialize evey
+parent objects; can Spark anyone confirm this?
+It will nice to have LBFHS do this automatically. Just try
+CachedDiffFunction, and it works.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+Hi Xiangrui,
+I think it doesn't matter whether we use Fortran/Breeze/RISO for
+optimizers since optimization only takes << 1% of time. Most of the
+time is in gradientSum and lossSum parallel computation.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Thu, Mar 6, 2014 at 7:10 PM, Xiangrui Meng  wrote:
+Hi Xiangrui,
+I think it doesn't matter whether we use Fortran/Breeze/RISO for
+optimizers since optimization only takes << 1% of time. Most of the
+time is in gradientSum and lossSum parallel computation.
+Sincerely,
+DB Tsai
+Machine Learning Engineer
+Alpine Data Labs
+--------------------------------------
+Web: http://alpinenow.com/
+On Thu, Mar 6, 2014 at 7:10 PM, Xiangrui Meng  wrote:
+Hi guys,
+The latest PR uses Breeze's L-BFGS implement which is introduced by
+Xiangrui's sparse input format work in SPARK-1212.
+https://github.com/apache/spark/pull/353
+Now, it works with the new sparse framework!
+Any feedback would be greatly appreciated.
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Apr 3, 2014 at 5:02 PM, DB Tsai  wrote:
+Hi Debasish,
+The L-BFGS solver will be in the master like GD solver, and the part
+that is parallelized is computing the gradient of each input row, and
+summing them up.
+I prefer to make the optimizer plug-able instead of adding new
+LogisticRegressionWithLBFGS since 98% of the code will be the same.
+Nice to have something like this,
+class LogisticRegression private (
+    var optimizer: Optimizer)
+  extends GeneralizedLinearAlgorithm[LogisticRegressionModel]
+The following parameters will be setup in the optimizers, and they
+should because they are part of optimization parameters.
+    var stepSize: Double,
+    var numIterations: Int,
+    var regParam: Double,
+    var miniBatchFraction: Double
+Xiangrui, what do you think?
+For now, you can use my L-BFGS solver by copying and pasting the
+LogisticRegressionWithSGD code, and changing the optimizer to L-BFGS.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Tue, Apr 8, 2014 at 9:42 AM, Debasish Das  wrote:
+Hi guys,
+We're going to hold a series of meetups about machine learning with
+Spark in San Francisco.
+The first one will be on April 24. Xiangrui Meng from Databricks will
+talk about Spark, Spark/Python, features engineering, and MLlib.
+See http://www.meetup.com/sfmachinelearning/events/174560212/ for detail.
+The next one on May 1 will be join event with Cloudera talking about
+unsupervised learning and multinomial logistic regression with L-BFGS
+with Spark.
+See http://www.meetup.com/sfmachinelearning/events/176105932/
+If you would like to share anything related to machine learning with
+Spark in SF Machine Learning Meetup, please let me know.
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+I think mini batch is still useful for L-BFGS.
+One of the use-cases can be initialized the weights by training with
+the smaller subsamples of data using mini batch with L-BFGS.
+Then we could use the weights trained with mini batch to start another
+training process with full data.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Tue, Apr 8, 2014 at 4:05 PM, Debasish Das  wrote:
+I don't experiment it. That's the use-case in theory I could think of. ^^
+However, from what I saw, BFGS converges really fast so that I only
+need 20~30 iterations in general.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Tue, Apr 8, 2014 at 4:45 PM, Debasish Das  wrote:
+You can construct the Breeze vector by
+    val breezeVector = breeze.linalg.DenseVector.zeros[Double](length)
+If you want to convert to mllib vector, you can do
+    val mllibVector = Vectors.fromBreeze(breezeVector)
+If you want to convert back to breeze vector,
+    val newBreezeVector = mllibVector.toBreeze
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Apr 10, 2014 at 1:12 PM, Patrick Wendell  wrote:
+You can construct the Breeze vector by
+    val breezeVector = breeze.linalg.DenseVector.zeros[Double](length)
+If you want to convert to mllib vector, you can do
+    val mllibVector = Vectors.fromBreeze(breezeVector)
+If you want to convert back to breeze vector,
+    val newBreezeVector = mllibVector.toBreeze
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Apr 10, 2014 at 1:12 PM, Patrick Wendell  wrote:
+I always got
+=========================================================================
+Could not find Apache license headers in the following files:
+ !????? /root/workspace/SparkPullRequestBuilder/python/metastore/db.lck
+ !????? /root/workspace/SparkPullRequestBuilder/python/metastore/service.properties
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+Hi guys,
+I'm trying to update LBFGS documentation so I need to generate html
+document to see if everything looks great. However, mv I get the following
+error.
+Conversion error: There was an error converting 'docs/cluster-overview.md'.
+error: MaRuKu encountered problem(s) while converting your markup.. Use
+--trace to view backtrace
+I'm using ruby 2.1.1p76 and jekyll 1.5.1 installed by gem as instruction.
+Do I miss anything?
+Also, in the instruction, if we want to skip the api docs, we can do the
+following.
+# Skip generating API docs (which takes a while)
+$ SKIP_SCALADOC=1 jekyll build
+But what does"SKIP_SCALADOC=1" mean? export SKIP_SCALADOC=1?
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+This is the trace.
+  Conversion error: There was an error converting 'docs/cluster-overview.md
+'.
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/converters/markdown/maruku_parser.rb:45:in
+`print_errors_and_fail': MaRuKu encountered problem(s) while converting
+your markup. (MaRuKu::Exception)
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/converters/markdown/maruku_parser.rb:50:in
+`convert'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/converters/markdown.rb:39:in
+`convert'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/convertible.rb:57:in
+`transform'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/convertible.rb:153:in
+`do_layout'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/page.rb:115:in
+`render'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/site.rb:239:in
+`block in render'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/site.rb:238:in
+`each'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/site.rb:238:in
+`render'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/site.rb:39:in
+`process'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/command.rb:18:in
+`process_site'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/commands/build.rb:23:in
+`build'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/lib/jekyll/commands/build.rb:7:in
+`process'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/jekyll-1.5.1/bin/jekyll:77:in
+`block (2 levels) in <top (required)>'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/commander-4.1.6/lib/commander/command.rb:180:in
+`call'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/commander-4.1.6/lib/commander/command.rb:180:in
+`call'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/commander-4.1.6/lib/commander/command.rb:155:in
+`run'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/commander-4.1.6/lib/commander/runner.rb:422:in
+`run_active_command'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/commander-4.1.6/lib/commander/runner.rb:82:in
+`run!'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/commander-4.1.6/lib/commander/delegates.rb:8:in
+`run!'
+from
+/Users/dbtsai/.rbenv/versions/2.1.1/lib/ruby/gems/2.1.0/gems/commander-4.1.6/lib/commander/import.rb:10:in
+`block in <top (required)>'
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Tue, Apr 22, 2014 at 11:26 PM, DB Tsai  wrote:
+Hi all,
+I'm benchmarking Logistic Regression in MLlib using the newly added
+optimizer LBFGS and GD. I'm using the same dataset and the same methodology
+in this paper, http://www.csie.ntu.edu.tw/~cjlin/papers/l1.pdf
+I want to know how Spark scale while adding workers, and how optimizers and
+input format (sparse or dense) impact performance.
+The benchmark code can be found here,
+https://github.com/dbtsai/spark-lbfgs-benchmark
+The first dataset I benchmarked is a9a which only has 2.2MB. I duplicated
+the dataset, and made it 762MB to have 11M rows. This dataset has 123
+features and 11% of the data are non-zero elements.
+In this benchmark, all the dataset is cached in memory.
+As we expect, LBFGS converges faster than GD, and at some point, no matter
+how we push GD, it will converge slower and slower.
+However, it's surprising that sparse format runs slower than dense format.
+I did see that sparse format takes significantly smaller amount of memory
+in caching RDD, but sparse is 40% slower than dense. I think sparse should
+be fast since when we compute x wT, since x is sparse, we can do it faster.
+I wonder if there is anything I'm doing wrong.
+The attachment is the benchmark result.
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+123 features per rows, and in average, 89% are zeros.
+On Apr 23, 2014 9:31 PM, "Evan Sparks"  wrote:
+Any suggestion for sparser dataset? Will test more tomorrow in the office.
+On Apr 23, 2014 9:33 PM, "Evan Sparks"  wrote:
+The figure showing the Log-Likelihood vs Time can be found here.
+https://github.com/dbtsai/spark-lbfgs-benchmark/raw/fd703303fb1c16ef5714901739154728550becf4/result/a9a11M.pdf
+Let me know if you can not open it.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, Apr 23, 2014 at 9:34 PM, Shivaram Venkataraman  wrote:
+In mllib, the weight, and gradient are dense. Only feature is sparse.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, Apr 23, 2014 at 10:16 PM, David Hall  wrote:
+ps, it doesn't make sense to have weight and gradient sparse unless
+with strong L1 penalty.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, Apr 23, 2014 at 10:17 PM, DB Tsai  wrote:
+Not yet since it's running in the cluster. Will run locally with
+profiler. Thanks for help.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, Apr 23, 2014 at 10:22 PM, David Hall  wrote:
+The figure showing the Log-Likelihood vs Time can be found here.
+https://github.com/dbtsai/spark-lbfgs-benchmark/raw/fd703303fb1c16ef5714901739154728550becf4/result/a9a11M.pdf
+Let me know if you can not open it. Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, Apr 23, 2014 at 9:34 PM, Shivaram Venkataraman
+ wrote:
+Hi Xiangrui,
+Yes, I'm using yarn-cluster mode, and I did check # of executors I
+specified are the same as the actual running executors.
+For caching and materialization, I've the timer in optimizer after calling
+count(); as a result, the time for materialization in cache isn't in the
+benchmark.
+The difference you saw is actually from dense feature or sparse feature
+vector. For LBFGS and GD dense feature, you can see the first iteration
+takes the same time. It's true for GD.
+I'm going to run rcv1.binary which only has 0.15% non-zero elements to
+verify the hypothesis.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Apr 24, 2014 at 1:09 AM, Xiangrui Meng  wrote:
+I'm doing the timer in runMiniBatchSGD after  val numExamples = data.count()
+See the following. Running rcv1 dataset now, and will update soon.
+    val startTime = System.nanoTime()
+    for (i <- 1 to numIterations) {
+      // Sample a subset (fraction miniBatchFraction) of the total data
+      // compute and sum up the subgradients on this subset (this is one
+map-reduce)
+      val (gradientSum, lossSum) = data.sample(false, miniBatchFraction, 42
++ i)
+        .aggregate((BDV.zeros[Double](weights.size), 0.0))(
+          seqOp = (c, v) => (c, v) match { case ((grad, loss), (label,
+features)) =>
+            val l = gradient.compute(features, label, weights,
+Vectors.fromBreeze(grad))
+            (grad, loss + l)
+          },
+          combOp = (c1, c2) => (c1, c2) match { case ((grad1, loss1),
+(grad2, loss2)) =>
+            (grad1 += grad2, loss1 + loss2)
+          })
+      /**
+       * NOTE(Xinghao): lossSum is computed using the weights from the
+previous iteration
+       * and regVal is the regularization value computed in the previous
+iteration as well.
+       */
+      stochasticLossHistory.append(lossSum / miniBatchSize + regVal)
+      val update = updater.compute(
+        weights, Vectors.fromBreeze(gradientSum / miniBatchSize), stepSize,
+i, regParam)
+      weights = update._1
+      regVal = update._2
+      timeStamp.append(System.nanoTime() - startTime)
+    }
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Apr 24, 2014 at 1:44 PM, Xiangrui Meng  wrote:
+rcv1.binary is too sparse (0.15% non-zero elements), so dense format will
+not run due to out of memory. But sparse format runs really well.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Apr 24, 2014 at 1:54 PM, DB Tsai  wrote:
+Another interesting benchmark.
+*News20 dataset - 0.14M row, 1,355,191 features, 0.034% non-zero elements.*
+LBFGS converges in 70 seconds, while GD seems to be not progressing.
+Dense feature vector will be too big to fit in the memory, so only conduct
+the sparse benchmark.
+I saw the sometimes the loss bumps up, and it's weird for me. Since the
+cost function of logistic regression is convex, it should be monotonically
+decreasing.  David, any suggestion?
+The detail figure:
+https://github.com/dbtsai/spark-lbfgs-benchmark/raw/0b774682e398b4f7e0ce01a69c44000eb0e73454/result/news20.pdf
+*Rcv1 dataset - 6.8M row, 677,399 features, 0.15% non-zero elements.*
+LBFGS converges in 25 seconds, while GD also seems to be not progressing.
+Only conduct sparse benchmark for the same reason. I also saw the loss
+bumps up for unknown reason.
+The detail figure:
+https://github.com/dbtsai/spark-lbfgs-benchmark/raw/0b774682e398b4f7e0ce01a69c44000eb0e73454/result/rcv1.pdf
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Apr 24, 2014 at 2:36 PM, DB Tsai  wrote:
+Hi David,
+I'm recording the loss history in the DiffFunction implementation, and
+that's why the rejected step is also recorded in my loss history.
+Is there any api in Breeze LBFGS to get the history which already excludes
+the reject step? Or should I just call "iterations" method and check
+"iteratingShouldStop" instead?
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Apr 25, 2014 at 3:10 PM, David Hall  wrote:
+Also, how many failure of rejection will terminate the optimization
+process? How is it related to "numberOfImprovementFailures"?
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sun, Apr 27, 2014 at 11:28 PM, DB Tsai  wrote:
+I think I figure it out. Instead of calling minimize, and record the loss
+in the DiffFunction, I should do the following.
+val states = lbfgs.iterations(new CachedDiffFunction(costFun),
+initialWeights.toBreeze.toDenseVector)
+states.foreach(state => lossHistory.append(state.value))
+All the losses in states should be decreasing now. Am I right?
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sun, Apr 27, 2014 at 11:31 PM, DB Tsai  wrote:
+Hi David,
+I got most of the stuff working, and the loss is monotonically decreasing
+by getting the history from iterator of state.
+However, in the costFun, I need to know what current iteration is it for
+miniBatch, which means for one iteration, if optimizer calls costFun
+several times for line search, it should pass the same iteration into
+costFun. So I pass the lbfgs optimizer into costFun as the following code,
+and try to find the current iteration in lbfgs object. Unfortunately, it
+seems that the current iteration is not available in this object.
+Any idea for getting this in costFun? Originally, I've a counter inside
+costFun which gives the # of iterations. However, it's not what I want now
+since it also counts line search.
+val lbfgs = new BreezeLBFGS[BDV[Double]](maxNumIterations, numCorrections,
+convergenceTol)
+val costFun =
+      new CostFun(data, gradient, updater, miniBatchFraction, lbfgs,
+miniBatchSize)
+val states = lbfgs.iterations(new CachedDiffFunction(costFun),
+initialWeights.toBreeze.toDenseVector)
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, Apr 28, 2014 at 8:55 AM, David Hall  wrote:
+Hi David,
+I got most of the stuff working, and the loss is monotonically decreasing
+by getting the history from iterator of state.
+However, in the costFun, I need to know what current iteration is it for
+miniBatch, which means for one iteration, if optimizer calls costFun
+several times for line search, it should pass the same iteration into
+costFun. So I pass the lbfgs optimizer into costFun as the following code,
+and try to find the current iteration in lbfgs object. Unfortunately, it
+seems that the current iteration is not available in this object.
+Any idea for getting this in costFun? Originally, I've a counter inside
+costFun which gives the # of iterations. However, it's not what I want now
+since it also counts line search.
+val lbfgs = new BreezeLBFGS[BDV[Double]](maxNumIterations, numCorrections,
+convergenceTol)
+val costFun =
+      new CostFun(data, gradient, updater, miniBatchFraction, lbfgs,
+miniBatchSize)
+val states = lbfgs.iterations(new CachedDiffFunction(costFun),
+initialWeights.toBreeze.toDenseVector)
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, Apr 28, 2014 at 8:55 AM, David Hall  wrote:
+Hi All,
+Since we're launching Spark Yarn Job in our tomcat application, the default
+behavior of calling System.exit when job is finished or runs into any error
+isn't desirable.
+We create this PR https://github.com/apache/spark/pull/490 to address this
+issue. Since the logical is fairly straightforward, we wonder if this can
+be reviewed and have this in 1.0.
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+Have a quick hack to understand the behavior of SLBFGS
+(Stochastic-LBFGS) by overwriting the breeze iterations method to get the
+current LBFGS step to ensure that the objective function is the same during
+the line search step. David, the following is my code, have a better way to
+inject into it?
+https://github.com/dbtsai/spark/tree/dbtsai-lbfgshack
+Couple findings,
+1) miniBatch (using rdd sample api) for each iteration is slower than full
+data training when the full data is cached. Probably because sample is not
+efficiency in Spark.
+2) Since in the line search steps, we use the same sample of data (the same
+objective function), the SLBFGS actually converges well.
+3) For news20 dataset, with 0.05 miniBatch size, it takes 14 SLBFGS steps
+(29 data iterations, 74.5seconds) to converge to loss < 0.10. For LBFGS
+with full data training, it takes 9 LBFGS steps (12 data iterations, 37.6
+seconds) to converge to loss < 0.10.
+It seems that as long as the noisy gradient happens in different SLBFGS
+steps, it still works.
+(ps, I also tried in line search step, I use different sample of data, and
+it just doesn't work as we expect.)
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, Apr 28, 2014 at 8:55 AM, David Hall  wrote:
+Yeah, the approximation of hssian in LBFGS isn't stateless, and it does
+depend on previous LBFGS step as Xiangrui also pointed out. It's surprising
+that it works without error message. I also saw the loss is fluctuating
+like SGD during the training.
+We will remove the miniBatch mode in LBFGS in Spark before we've deeper
+understanding of how "stochastic" LBFGS works.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Tue, Apr 29, 2014 at 9:50 PM, David Hall  wrote:
+You could easily achieve this by mapPartition. However, it seems that it
+can not be done by using aggregate type of operation. I can see that it's a
+general useful operation. For now, you could use mapPartition.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sun, May 4, 2014 at 1:12 AM, Manish Amde  wrote:
++1  Would be nice that we can use different type in Vector.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, May 5, 2014 at 2:41 PM, Debasish Das  Hi,
+Breeze could take any type (Int, Long, Double, and Float) in the matrix
+template.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, May 5, 2014 at 2:56 PM, Debasish Das  Is this a breeze issue or breeze can take templates on float / double ?
+David,
+Could we use Int, Long, Float as the data feature spaces, and Double for
+optimizer?
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, May 5, 2014 at 3:06 PM, David Hall  wrote:
+Hi Deb,
+For K possible outcomes in multinomial logistic regression,  we can have
+K-1 independent binary logistic regression models, in which one outcome is
+chosen as a "pivot" and then the other K-1 outcomes are separately
+regressed against the pivot outcome. See my presentation for technical
+detail http://www.slideshare.net/dbtsai/2014-0501-mlor
+Since mllib only supports one linear model per classification model, there
+will be some infrastructure work to support MLOR in mllib. But if you want
+to implement yourself with the L-BFGS solver in mllib, you can follow the
+equation in my slide, and it will not be too difficult.
+I can give you the gradient method for multinomial logistic regression, you
+just need to put the K-1 intercepts in the right place.
+  def computeGradient(y: Double, x: Array[Double], lambda: Double, w:
+Array[Array[Double]], b: Array[Double],
+    gradient: Array[Double]): (Double, Int) = {
+    val classes = b.length + 1
+    val yy = y.toInt
+    def alpha(i: Int): Int = {
+      if (i == 0) 1 else 0
+    }
+    def delta(i: Int, j: Int): Int = {
+      if (i == j) 1 else 0
+    }
+    var denominator: Double = 1.0
+    val numerators: Array[Double] = Array.ofDim[Double](b.length)
+    var predicted = 1
+    {
+      var i = 0
+      var j = 0
+      var acc: Double = 0
+      while (i < b.length) {
+        acc = b(i)
+        j = 0
+        while (j < x.length) {
+          acc += x(j) * w(i)(j)
+          j += 1
+        }
+        numerators(i) = math.exp(acc)
+        if (i > 0 && numerators(i) > numerators(predicted - 1)) {
+          predicted = i + 1
+        }
+        denominator += numerators(i)
+        i += 1
+      }
+      if (numerators(predicted - 1) < 1) {
+        predicted = 0
+      }
+    }
+    {
+      // gradient has dim of (classes-1) * (x.length+1)
+      var i = 0
+      var m1: Int = 0
+      var l1: Int = 0
+      while (i < (classes - 1) * (x.length + 1)) {
+        m1 = i % (x.length + 1) // m0 is intercept
+        l1 = (i - m1) / (x.length + 1) // l + 1 is class
+        if (m1 == 0) {
+          gradient(i) += (1 - alpha(yy)) * delta(yy, l1 + 1) -
+numerators(l1) / denominator
+        } else {
+          gradient(i) += ((1 - alpha(yy)) * delta(yy, l1 + 1) -
+numerators(l1) / denominator) * x(m1 - 1)
+        }
+        i += 1
+      }
+    }
+    val loglike: Double = math.round(y).toInt match {
+      case 0 => math.log(1.0 / denominator)
+      case _ => math.log(numerators(math.round(y - 1).toInt) / denominator)
+    }
+    (loglike, predicted)
+  }
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Tue, May 13, 2014 at 4:08 AM, Debasish Das  Hi,
+Yes.
+On May 16, 2014 8:39 AM, "Andrew Or"  wrote:
+Finally find a way out of the ClassLoader maze! It took me some times to
+understand how it works; I think it worths to document it in a separated
+thread.
+We're trying to add external utility.jar which contains CSVRecordParser,
+and we added the jar to executors through sc.addJar APIs.
+If the instance of CSVRecordParser is created without reflection, it
+raises *ClassNotFound
+Exception*.
+data.mapPartitions(lines => {
+    val csvParser = new CSVRecordParser((delimiter.charAt(0))
+    lines.foreach(line => {
+      val lineElems = csvParser.parseLine(line)
+    })
+    ...
+    ...
+ )
+If the instance of CSVRecordParser is created through reflection, it works.
+data.mapPartitions(lines => {
+    val loader = Thread.currentThread.getContextClassLoader
+    val CSVRecordParser =
+        loader.loadClass("com.alpine.hadoop.ext.CSVRecordParser")
+    val csvParser = CSVRecordParser.getConstructor(Character.TYPE)
+        .newInstance(delimiter.charAt(0).asInstanceOf[Character])
+    val parseLine = CSVRecordParser
+        .getDeclaredMethod("parseLine", classOf[String])
+    lines.foreach(line => {
+       val lineElems = parseLine.invoke(csvParser,
+line).asInstanceOf[Array[String]]
+    })
+    ...
+    ...
+ )
+This is identical to this question,
+http://stackoverflow.com/questions/7452411/thread-currentthread-setcontextclassloader-without-using-reflection
+It's not intuitive for users to load external classes through reflection,
+but couple available solutions including 1) messing around
+systemClassLoader by calling systemClassLoader.addURI through reflection or
+2) forking another JVM to add jars into classpath before bootstrap loader
+are very tricky.
+Any thought on fixing it properly?
+@Xiangrui,
+netlib-java jniloader is loaded from netlib-java through reflection, so
+this problem will not be seen.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+The reflection actually works. But you need to get the loader by `val
+loader = Thread.currentThread.getContextClassLoader` which is set by Spark
+executor. Our team verified this, and uses it as workaround.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sun, May 18, 2014 at 9:46 AM, Xiangrui Meng  wrote:
+The jars are included in my driver, and I can successfully use them in the
+driver. I'm working on a patch, and it's almost working. Will submit a PR
+soon.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sun, May 18, 2014 at 11:58 AM, Patrick Wendell  @db - it's possible that you aren't including the jar in the classpath
+Since the additional jars added by sc.addJars are through http server, even
+it works, we still want to have a better way due to scalability (imagine
+that thousands of workers downloading jars from driver).
+If we ignore the fundamental scalability issue, this can be fixed by using
+the customClassloader to create a wrapped class, and in this wrapped class,
+the classloader is inherited from the customClassloader so that users don't
+need to do reflection in the wrapped class. I'm working on this now.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+Hi Sean,
+It's true that the issue here is classloader, and due to the classloader
+delegation model, users have to use reflection in the executors to pick up
+the classloader in order to use those classes added by sc.addJars APIs.
+However, it's very inconvenience for users, and not documented in spark.
+I'm working on a patch to solve it by calling the protected method addURL
+in URLClassLoader to update the current default classloader, so no
+customClassLoader anymore. I wonder if this is an good way to go.
+  private def addURL(url: URL, loader: URLClassLoader){
+    try {
+      val method: Method =
+classOf[URLClassLoader].getDeclaredMethod("addURL", classOf[URL])
+      method.setAccessible(true)
+      method.invoke(loader, url)
+    }
+    catch {
+      case t: Throwable => {
+        throw new IOException("Error, could not add URL to system
+classloader")
+      }
+    }
+  }
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sun, May 18, 2014 at 11:57 PM, Sean Owen  wrote:
+Good summary! We fixed it in branch 0.9 since our production is still in
+0.9. I'm porting it to 1.0 now, and hopefully will submit PR for 1.0
+tonight.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, May 19, 2014 at 7:38 PM, Sandy Ryza  wrote:
+In 1.0, there is a new option for users to choose which classloader has
+higher priority via spark.files.userClassPathFirst, I decided to submit the
+PR for 0.9 first. We use this patch in our lab and we can use those jars
+added by sc.addJar without reflection.
+https://github.com/apache/spark/pull/834
+Can anyone comment if it's a good approach?
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, May 19, 2014 at 7:42 PM, DB Tsai  wrote:
+This will be another separate story.
+Since in the yarn deployment, as Sandy said, the app.jar will be always in
+the systemclassloader which means any object instantiated in app.jar will
+have parent loader of systemclassloader instead of custom one. As a result,
+the custom class loader in yarn will never work without specifically using
+reflection.
+Solution will be not using system classloader in the classloader hierarchy,
+and add all the resources in system one into custom one. This is the
+approach of tomcat takes.
+Or we can directly overwirte the system class loader by calling the
+protected method `addURL` which will not work and throw exception if the
+code is wrapped in security manager.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, May 21, 2014 at 1:13 PM, Sandy Ryza  wrote:
+How about the jars added dynamically? Those will be in customLoader's
+classpath but not in the system one. Unfortunately, when we reference to
+those jars added dynamically in primary jar, the default classloader will
+be the system one not the custom one.
+It works in standalone mode since the primary jar is not in the system
+loader but custom one, so when we reference those jars added dynamically,
+we can find it without reflection.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, May 21, 2014 at 2:10 PM, Xiangrui Meng  wrote:
+@Xiangrui
+How about we send the primary jar and secondary jars into distributed cache
+without adding them into the system classloader of executors. Then we add
+them using custom classloader so we don't need to call secondary jars
+through reflection in primary jar. This will be consistent to what we do in
+standalone mode, and also solve the scalability of jar distribution issue.
+@Koert
+Yes, that's why I suggest we can either ignore the parent classloader of
+custom class loader to solve this as you say. In this case, we need add the
+all the classpath of the system loader into our custom one (which doesn't
+have parent) so we will not miss the default java classes. This is how
+tomcat works.
+@Patrick
+I agree that we should have the fix by Xiangrui first, since it solves most
+of the use case. I don't know when people will use dynamical addJar in Yarn
+since it's most useful for interactive environment.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, May 21, 2014 at 2:57 PM, Koert Kuipers  wrote:
+Sometimes for this case, I will just standardize without centerization. I
+still get good result.
+Sent from my Google Nexus 5
+On May 28, 2014 7:03 PM, "Xiangrui Meng"  wrote:
+Sometimes for this case, I will just standardize without centerization. I
+still get good result.
+Sent from my Google Nexus 5
+On May 28, 2014 7:03 PM, "Xiangrui Meng"  wrote:
++1
+On Jul 5, 2014 1:39 PM, "Michael Armbrust"  wrote:
+I've a clean clone of spark master repository, and I generated the
+intellij project file by sbt gen-idea as usual. There are two issues
+we have after merging SPARK-1776 (read dependencies from Maven).
+1) After SPARK-1776, sbt gen-idea will download the dependencies from
+internet even those jars are in local cache. Before merging, the
+second time we run gen-idea will not download anything but use the
+jars in cache.
+2) The tests with spark local context can not be run in the intellij.
+It will show the following exception.
+The current workaround we've are checking out any snapshot before
+merging to gen-idea, and then switch back to current master. But this
+will not work when the master deviate too much from the latest working
+snapshot.
+[ERROR] [07/14/2014 16:27:49.967] [ScalaTest-run] [Remoting] Remoting
+error: [Startup timed out] [
+akka.remote.RemoteTransportException: Startup timed out
+at akka.remote.Remoting.akka$remote$Remoting$$notifyError(Remoting.scala:129)
+at akka.remote.Remoting.start(Remoting.scala:191)
+at akka.remote.RemoteActorRefProvider.init(RemoteActorRefProvider.scala:184)
+at akka.actor.ActorSystemImpl._start$lzycompute(ActorSystem.scala:579)
+at akka.actor.ActorSystemImpl._start(ActorSystem.scala:577)
+at akka.actor.ActorSystemImpl.start(ActorSystem.scala:588)
+at akka.actor.ActorSystem$.apply(ActorSystem.scala:111)
+at akka.actor.ActorSystem$.apply(ActorSystem.scala:104)
+at org.apache.spark.util.AkkaUtils$.createActorSystem(AkkaUtils.scala:104)
+at org.apache.spark.SparkEnv$.create(SparkEnv.scala:153)
+at org.apache.spark.SparkContext.(SparkContext.scala:202)
+at org.apache.spark.SparkContext.(SparkContext.scala:117)
+at org.apache.spark.SparkContext.(SparkContext.scala:132)
+at org.apache.spark.mllib.util.LocalSparkContext$class.beforeAll(LocalSparkContext.scala:29)
+at org.apache.spark.mllib.optimization.LBFGSSuite.beforeAll(LBFGSSuite.scala:27)
+at org.scalatest.BeforeAndAfterAll$class.beforeAll(BeforeAndAfterAll.scala:187)
+at org.apache.spark.mllib.optimization.LBFGSSuite.beforeAll(LBFGSSuite.scala:27)
+at org.scalatest.BeforeAndAfterAll$class.run(BeforeAndAfterAll.scala:253)
+at org.apache.spark.mllib.optimization.LBFGSSuite.run(LBFGSSuite.scala:27)
+at org.scalatest.tools.SuiteRunner.run(SuiteRunner.scala:55)
+at org.scalatest.tools.Runner$$anonfun$doRunRunRunDaDoRunRun$3.apply(Runner.scala:2563)
+at org.scalatest.tools.Runner$$anonfun$doRunRunRunDaDoRunRun$3.apply(Runner.scala:2557)
+at scala.collection.immutable.List.foreach(List.scala:318)
+at org.scalatest.tools.Runner$.doRunRunRunDaDoRunRun(Runner.scala:2557)
+at org.scalatest.tools.Runner$$anonfun$runOptionallyWithPassFailReporter$2.apply(Runner.scala:1044)
+at org.scalatest.tools.Runner$$anonfun$runOptionallyWithPassFailReporter$2.apply(Runner.scala:1043)
+at org.scalatest.tools.Runner$.withClassLoaderAndDispatchReporter(Runner.scala:2722)
+at org.scalatest.tools.Runner$.runOptionallyWithPassFailReporter(Runner.scala:1043)
+at org.scalatest.tools.Runner$.run(Runner.scala:883)
+at org.scalatest.tools.Runner.run(Runner.scala)
+at org.jetbrains.plugins.scala.testingSupport.scalaTest.ScalaTestRunner.runScalaTest2(ScalaTestRunner.java:141)
+at org.jetbrains.plugins.scala.testingSupport.scalaTest.ScalaTestRunner.main(ScalaTestRunner.java:32)
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)
+at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)
+at java.lang.reflect.Method.invoke(Method.java:597)
+at com.intellij.rt.execution.application.AppMain.main(AppMain.java:134)
+Caused by: java.util.concurrent.TimeoutException: Futures timed out
+after [10000 milliseconds]
+at scala.concurrent.impl.Promise$DefaultPromise.ready(Promise.scala:219)
+at scala.concurrent.impl.Promise$DefaultPromise.result(Promise.scala:223)
+at scala.concurrent.Await$$anonfun$result$1.apply(package.scala:107)
+at scala.concurrent.BlockContext$DefaultBlockContext$.blockOn(BlockContext.scala:53)
+at scala.concurrent.Await$.result(package.scala:107)
+at akka.remote.Remoting.start(Remoting.scala:173)
+... 35 more
+]
+An exception or error caused a run to abort: Futures timed out after
+[10000 milliseconds]
+java.util.concurrent.TimeoutException: Futures timed out after [10000
+milliseconds]
+at scala.concurrent.impl.Promise$DefaultPromise.ready(Promise.scala:219)
+at scala.concurrent.impl.Promise$DefaultPromise.result(Promise.scala:223)
+at scala.concurrent.Await$$anonfun$result$1.apply(package.scala:107)
+at scala.concurrent.BlockContext$DefaultBlockContext$.blockOn(BlockContext.scala:53)
+at scala.concurrent.Await$.result(package.scala:107)
+at akka.remote.Remoting.start(Remoting.scala:173)
+at akka.remote.RemoteActorRefProvider.init(RemoteActorRefProvider.scala:184)
+at akka.actor.ActorSystemImpl._start$lzycompute(ActorSystem.scala:579)
+at akka.actor.ActorSystemImpl._start(ActorSystem.scala:577)
+at akka.actor.ActorSystemImpl.start(ActorSystem.scala:588)
+at akka.actor.ActorSystem$.apply(ActorSystem.scala:111)
+at akka.actor.ActorSystem$.apply(ActorSystem.scala:104)
+at org.apache.spark.util.AkkaUtils$.createActorSystem(AkkaUtils.scala:104)
+at org.apache.spark.SparkEnv$.create(SparkEnv.scala:153)
+at org.apache.spark.SparkContext.(SparkContext.scala:202)
+at org.apache.spark.SparkContext.(SparkContext.scala:117)
+at org.apache.spark.SparkContext.(SparkContext.scala:132)
+at org.apache.spark.mllib.util.LocalSparkContext$class.beforeAll(LocalSparkContext.scala:29)
+at org.apache.spark.mllib.optimization.LBFGSSuite.beforeAll(LBFGSSuite.scala:27)
+at org.scalatest.BeforeAndAfterAll$class.beforeAll(BeforeAndAfterAll.scala:187)
+at org.apache.spark.mllib.optimization.LBFGSSuite.beforeAll(LBFGSSuite.scala:27)
+at org.scalatest.BeforeAndAfterAll$class.run(BeforeAndAfterAll.scala:253)
+at org.apache.spark.mllib.optimization.LBFGSSuite.run(LBFGSSuite.scala:27)
+at org.scalatest.tools.SuiteRunner.run(SuiteRunner.scala:55)
+at org.scalatest.tools.Runner$$anonfun$doRunRunRunDaDoRunRun$3.apply(Runner.scala:2563)
+at org.scalatest.tools.Runner$$anonfun$doRunRunRunDaDoRunRun$3.apply(Runner.scala:2557)
+at scala.collection.immutable.List.foreach(List.scala:318)
+at org.scalatest.tools.Runner$.doRunRunRunDaDoRunRun(Runner.scala:2557)
+at org.scalatest.tools.Runner$$anonfun$runOptionallyWithPassFailReporter$2.apply(Runner.scala:1044)
+at org.scalatest.tools.Runner$$anonfun$runOptionallyWithPassFailReporter$2.apply(Runner.scala:1043)
+at org.scalatest.tools.Runner$.withClassLoaderAndDispatchReporter(Runner.scala:2722)
+at org.scalatest.tools.Runner$.runOptionallyWithPassFailReporter(Runner.scala:1043)
+at org.scalatest.tools.Runner$.run(Runner.scala:883)
+at org.scalatest.tools.Runner.run(Runner.scala)
+at org.jetbrains.plugins.scala.testingSupport.scalaTest.ScalaTestRunner.runScalaTest2(ScalaTestRunner.java:141)
+at org.jetbrains.plugins.scala.testingSupport.scalaTest.ScalaTestRunner.main(ScalaTestRunner.java:32)
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)
+at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)
+at java.lang.reflect.Method.invoke(Method.java:597)
+at com.intellij.rt.execution.application.AppMain.main(AppMain.java:134)
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
++1
+Tested with my Ubuntu Linux.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Jul 17, 2014 at 6:36 PM, Matei Zaharia  wrote:
+I'm working on it with weighted regularization. The problem is that
+OWLQN doesn't work nicely with Updater now since all the L1 logic
+should be in OWLQN instead of L1Updater.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Jul 18, 2014 at 1:38 PM, Debasish Das  wrote:
+Hi Patrick,
+I started to work on the documentation about my work in spark. Since
+it has lots of dependencies to get the document build setup locally,
+it will be nice that people are able to verify/preview the document
+build for each PR. Is it possible to build the doc in Jenkins, and
+have a link pointing to the doc in github comment?
+Also, it will be very handy to have the test report link in the github
+comment like this one,
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/17283/testReport/
+Then developers can easily find which tests fail the build.
+(ps, seems that the build system is not merging the PR approved by
+committer now.)
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+One related question, is mllib jar independent from hadoop version (doesnt
+use hadoop api directly)? Can I use mllib jar compile for one version of
+hadoop and use it in another version of hadoop?
+Sent from my Google Nexus 5
+On Aug 6, 2014 8:29 AM, "Debasish Das"  wrote:
+After sbt gen-idea , you can open the intellji project directly without
+going through pom.xml
+If u want to compile inside intellji, you have to remove one of the messo
+jar. This is an open issue, and u can find the detail in JIRA.
+Sent from my Google Nexus 5
+On Aug 6, 2014 8:54 PM, "Ron Gonzalez"  wrote:
+To be specific, I was discussing this PR with Debasish which reduces
+lots of issues when sending big objects to executors without using
+broadcast explicitly.
+Broadcast RDD object once per TaskSet (instead of sending it for every task)
+https://issues.apache.org/jira/browse/SPARK-2521
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, Aug 20, 2014 at 3:19 PM, Debasish Das  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Yanbo,
+We made the change here
+https://github.com/apache/spark/commit/5d25c0b74f6397d78164b96afb8b8cbb1b15cfbd
+Those apis to set the parameters are very difficult to maintain, so we
+decide not to provide them. In next release, Spark 1.2, we will have a
+better api design for parameter setting.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sat, Sep 13, 2014 at 2:12 AM, Yanbo Liang  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Will,
+We're also very interested in windowing support in SparkSQL. Let's us
+know once this is available for testing. Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Tue, Sep 23, 2014 at 8:39 AM, Will Benton  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Can you check the loss of both LBFGS and SGD implementation? One
+reason maybe SGD doesn't converge well and you can see that by
+comparing both log-likelihoods. One other potential reason maybe the
+label of your training data is totally separable, so you can always
+increase the log-likelihood by multiply a constant to the weights.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Sun, Sep 28, 2014 at 11:48 AM, Yanbo Liang  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Cody and Michael,
+We ran into the same issue. Each day of data we have is stored into
+one parquet, and we want to query it against monthly parquet data. The
+data for each data is around 600GB, and we use 300 executors with 8GB
+memory for each executor. Without the patch, it took forever, and
+crashed in the end.
+With patch, for table obtained by unionAll with 5 parquets (around
+3TB), it takes 199.126 seconds to execute a simple HIVE query, while
+it takes 64.36 seconds for individual parquet file. Great work, this
+patch solves the issue. Hopefully to see this in next 1.1 series.
+Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Sep 12, 2014 at 9:07 PM, Michael Armbrust
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+You dont have to include breeze jar which is already in spark assembly jar.
+For native one, its optional.
+Sent from my Google Nexus 5
+On Oct 3, 2014 8:04 PM, "Priya Ch"  wrote:
+Nice to hear that your experiment is consistent to my assumption. The
+current L1/L2 will penalize the intercept as well which is not idea.
+I'm working on GLMNET in Spark using OWLQN, and I can exactly get the
+same solution as R but with scalability in # of rows and columns. Stay
+tuned!
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Mon, Sep 29, 2014 at 11:45 AM, Yanbo Liang  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Yanbo,
+As Xiangrui said, the feature scaling in training step is transparent
+to users, and
+in theory, with/without feature scaling, the optimization should
+converge to the same
+solution after transforming to the original space.
+In short, we do the training in the scaled space, and get the weights
+in the scaled space.
+Then we transform the weights to the original space so it's
+transparent to users.
+GLMNET package in R does the same thing, and I think we should do it
+instead of asking
+users to do it using pipeline API since not all the users know this stuff.
+Also, in GLMNET package, there are different strategies to do feature
+scalling for linear regression
+and logistic regression; as a result, we don't want to make it public
+api naively without addressing
+different use-case.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Wed, Nov 26, 2014 at 12:06 PM, Xiangrui Meng  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+As Marcelo said, CDH5.3 is based on hadoop 2.3, so please try
+./make-distribution.sh -Pyarn -Phive -Phadoop-2.3
+-Dhadoop.version=2.3.0-cdh5.1.3 -DskipTests
+See the detail of how to change the profile at
+https://spark.apache.org/docs/latest/building-with-maven.html
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Dec 5, 2014 at 12:54 PM, Marcelo Vanzin  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+oh, I meant to say cdh5.1.3 used by Jakub's company is based on 2.3. You
+can see it from the first part of the Cloudera's version number - "2.3.0-cdh
+5.1.3".
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Dec 5, 2014 at 1:38 PM, Sean Owen  wrote:
+Hi Xiangrui,
+It seems that it's stateless so will be hard to implement
+regularization path. Any suggestion to extend it? Thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Okay, I got it. In Estimator, fit(dataset: SchemaRDD, paramMaps:
+Array[ParamMap]): Seq[M] can be overwritten to implement
+regularization path. Correct me if I'm wrong.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+My Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Dec 12, 2014 at 11:37 AM, DB Tsai  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I'm working on LinearRegressionWithElasticNet using OWLQN now. This
+will do the data standardization internally so it's transparent to
+users. With OWLQN, you don't have to manually choose stepSize. Will
+send out PR soon next week.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Thu, Jan 15, 2015 at 8:46 AM, devl.development
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Alexander,
+When you use `reduce` to aggregate the vectors, those will actually be
+pulled into driver, and merged over there. Obviously, it's not
+scaleable given you are doing deep neural networks which have so many
+coefficients.
+Please try treeReduce instead which is what we do in linear regression
+and logistic regression.
+See https://github.com/apache/spark/blob/branch-1.1/mllib/src/main/scala/org/apache/spark/mllib/optimization/LBFGS.scala
+for example.
+val (gradientSum, lossSum) = data.treeAggregate((Vectors.zeros(n), 0.0))(
+seqOp = (c, v) => (c, v) match { case ((grad, loss), (label, features)) =>
+val l = localGradient.compute(
+features, label, bcW.value, grad)
+(grad, loss + l)
+},
+combOp = (c1, c2) => (c1, c2) match { case ((grad1, loss1), (grad2, loss2)) =>
+axpy(1.0, grad2, grad1)
+(grad1, loss1 + loss2)
+})
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Jan 23, 2015 at 10:00 AM, Ulanov, Alexander
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Alexander,
+For `reduce`, it's an action that will collect all the data from
+mapper to driver, and perform the aggregation in driver. As a result,
+if the output from the mapper is very large, and the numbers of
+partitions in mapper are large, it might cause a problem.
+For `treeReduce`, as the name indicates, the way it works is in the
+first layer, it aggregates the output of the mappers two by two
+resulting half of the numbers of output. And then, we continuously do
+the aggregation layer by layer. The final aggregation will be done in
+driver but in this time, the numbers of data are small.
+By default, depth 2 is used, so if you have so many partitions of
+large vector, this may still cause issue. You can increase the depth
+into higher numbers such that in the final reduce in driver, the
+number of partitions are very small.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+Blog: https://www.dbtsai.com
+LinkedIn: https://www.linkedin.com/in/dbtsai
+On Fri, Jan 23, 2015 at 12:07 PM, Ulanov, Alexander
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+It's a bug in breeze's side. Once David fixes it and publishes it to
+maven, we can upgrade to breeze 0.11.2. Please file a jira ticket for
+this issue. thanks.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+Blog: https://www.dbtsai.com
+On Sun, Mar 15, 2015 at 12:45 AM, Yu Ishikawa
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I did the benchmark when I used the if-else statement to switch the
+binary & multinomial logistic loss and gradient, and there is no
+performance hit at all. However, I'm refactoring the LogisticGradient
+code so the addBias and scaling can be done in LogisticGradient
+instead of the input dataset to avoid the second cache. In this case,
+the code will be more complicated, so I will split the code into two
+paths. Will be done in another PR.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+Blog: https://www.dbtsai.com
+On Wed, Mar 25, 2015 at 11:57 AM, Joseph Bradley  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+1)  Norm(weights, N) will return (w_1^N + w_2^N +....)^(1/N), so norm
+* norm is required.
+2) This is bug as you said. I intend to fix this using weighted
+regularization, and intercept term will be regularized with weight
+zero. https://github.com/apache/spark/pull/1518 But I never actually
+have time to finish it. In the meantime, I'm fixing this without this
+framework in new ML pipeline framework.
+3) I think in the long term, we need weighted regularizer instead of
+updater which couples regularization and adaptive step size update for
+GD which is not needed in other optimization package.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+Blog: https://www.dbtsai.com
+On Tue, Apr 7, 2015 at 3:03 PM, Ulanov, Alexander
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Theodore,
+I'm currently working on elastic-net regression in ML framework, and I
+decided not to have any extra layer of abstraction for now but focus
+on accuracy and performance. We may come out with proper solution
+later. Any idea is welcome.
+Sincerely,
+DB Tsai
+-------------------------------------------------------
+Blog: https://www.dbtsai.com
+On Tue, Apr 14, 2015 at 6:54 AM, Theodore Vasiloudis
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I thought LGPL is okay but GPL is not okay for Apache project.
+On Saturday, May 23, 2015, Patrick Wendell  wrote:
+-- 
+Sent from my iPhone
+Hi Liu,
+In ML, even after extracting the data into RDD, the versions between MLib
+and ML are quite different. Due to legacy design, in MLlib, we use Updater
+for handling regularization, and this layer of abstraction also does
+adaptive step size which is only for SGD. In order to get it working with
+LBFGS, some hacks were being done here and there, and in Updater, all the
+components including intercept are regularized which is not desirable in
+many cases. Also, in the legacy design, it's hard for us to do in-place
+standardization to improve the convergency rate. As a result, at some
+point, we decide to ditch those abstractions, and customize them for each
+algorithms. (Even LiR and LoR use different tricks to have better
+performance for numerical optimization, so it's hard to share code at that
+time. But I can see the point that we have working code now, so it's time
+to try to refactor those code to share more.)
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Blog: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Mon, Oct 12, 2015 at 1:24 AM, YiZhi Liu  wrote:
+There is a JIRA for this. I know Holden is interested in this.
+On Thursday, October 22, 2015, YiZhi Liu  wrote:
+-- 
+- DB
+Sent from my iPhone
+Interesting. For feature sub-sampling, is it per-node or per-tree? Do
+you think you can implement generic GBM and have it merged as part of
+Spark codebase?
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Mon, Oct 26, 2015 at 11:42 AM, Meihua Wu
+ wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Also, does it support categorical feature?
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Mon, Oct 26, 2015 at 4:06 PM, DB Tsai  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Meihua,
+For categorical features, the ordinal issue can be solved by trying
+all kind of different partitions 2^(q-1) -1 for q values into two
+groups. However, it's computational expensive. In Hastie's book, in
+9.2.4, the trees can be trained by sorting the residuals and being
+learnt as if they are ordered. It can be proven that it will give the
+optimal solution. I have a proof that this works for learning
+regression trees through variance reduction.
+I'm also interested in understanding how the L1 and L2 regularization
+within the boosting works (and if it helps with overfitting more than
+shrinkage).
+Thanks.
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Mon, Oct 26, 2015 at 8:37 PM, Meihua Wu  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+For the constrains like all weights >=0, people do LBFGS-B which is
+supported in our optimization library, Breeze.
+https://github.com/scalanlp/breeze/issues/323
+However, in Spark's LiR, our implementation doesn't have constrain
+implementation. I do see this is useful given we're experimenting
+SLIM: Sparse Linear Methods for recommendation,
+http://www-users.cs.umn.edu/~xning/papers/Ning2011c.pdf which requires
+all the weights to be positive (Eq. 3) to represent positive relations
+between items.
+In summary, it's possible and not difficult to add this constrain to
+our current linear regression, but currently, there is no open source
+implementation in Spark.
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Sun, Nov 1, 2015 at 9:22 AM, Zhiliang Zhu  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi YiZhi,
+Sure. I think Holden already created a JIRA for this. Please
+coordinate with Holden, and keep me in the loop. Thanks.
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Mon, Nov 2, 2015 at 7:32 AM, YiZhi Liu  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+The workaround is have your code in the same package, or write some
+utility wrapper in the same package so you can use them in your code.
+Mostly we implement those BLAS for our own need, and we don't have
+general use-case in mind. As a result, if we open them up prematurely,
+it will add our api maintenance cost. Once it's getting mature, and
+people are asking for them, we will gradually make them public.
+Thanks.
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Sat, Nov 28, 2015 at 5:20 AM, Sasaki Kai  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I used reflection initially, but I found it's very slow especially in
+a tight loop. Maybe caching the reflection can help which I never try.
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0xAF08DF8D
+On Mon, Nov 30, 2015 at 2:15 PM, Burak Yavuz  wrote:
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Congrats, Xiao!
+Sincerely,
+DB Tsai
+----------------------------------------------------------
+Web: https://www.dbtsai.com
+PGP Key ID: 0x9DCC1DBD7FC7BBB2
+On Wed, Oct 5, 2016 at 2:36 PM, Fred Reiss  wrote:
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org

@@ -1,0 +1,1614 @@
+if spark wants to compete as an alternative for mapreduce on hadoop
+clusters, then the assumption should not be that 99.9% of time data will
+fit in memory. it will not.
+however that said, i am fine with a solution where one has to use DISK_ONLY
+for this, since that is exactly what mapreduce does too anyhow.
+Totally agree with Paul: a library should not pick the slf4j backend. It
+defeats the purpose of slf4j. That big ugly warning is there to alert
+people that its their responsibility to pick the back end...
+the issue is that slf4j uses static binding. you can put only one slf4j
+backend on the classpath, and that's what it uses. more than one is not
+allowed.
+so you either keep the slf4j-log4j12 dependency for spark, and then you
+took away people's choice of slf4j backend which is considered bad form for
+a library, or you do not include it and then people will always get the big
+fat ugly warning and slf4j logging will not flow to log4j.
+including log4j itself is not necessary a problem i think?
+well "static binding" is probably the wrong terminology but you get the
+idea. multiple backends are not allowed and cause an even uglier warning...
+see also here:
+https://github.com/twitter/scalding/pull/636
+and here:
+https://groups.google.com/forum/#!topic/cascading-user/vYvnnN_15ls
+all me being annoying and complaining about slf4j-log4j12 dependencies
+(which did get removed).
+got it. that sounds reasonable
+yes in sbt assembly you can exclude jars (although i never had a need for
+this) and files in jars.
+for example i frequently remove log4j.properties, because for whatever
+reason hadoop decided to include it making it very difficult to use our own
+logging config.
+We maintain in house spark build using sbt. We have no problem using sbt
+assembly. We did add a few exclude statements for transitive dependencies.
+The main enemy of assemblies are jars that include stuff they shouldn't
+(kryo comes to mind, I think they include logback?), new versions of jars
+that change the provider/artifact without changing the package (asm), and
+incompatible new releases (protobuf). These break the transitive resolution
+process. I imagine that's true for any build tool.
+Besides shading I don't see anything maven can do sbt cannot, and if I
+understand it correctly shading is not done currently using the build tool.
+Since spark is primarily scala/akka based the main developer base will be
+familiar with sbt (I think?). Switching build tool is always painful. I
+personally think it is smarter to put this burden on a limited number of
+upstream integrators than on the community. However that said I don't think
+its a problem for us to maintain an sbt build in-house if spark switched to
+maven.
+The problem is, the complete spark dependency graph is fairly large,
+and there are lot of conflicting versions in there.
+In particular, when we bump versions of dependencies - making managing
+this messy at best.
+Now, I have not looked in detail at how maven manages this - it might
+just be accidental that we get a decent out-of-the-box assembled
+shaded jar (since we dont do anything great to configure it).
+With current state of sbt in spark, it definitely is not a good
+solution : if we can enhance it (or it already is ?), while keeping
+the management of the version/dependency graph manageable, I dont have
+any objections to using sbt or maven !
+Too many exclude versions, pinned versions, etc would just make things
+unmanageable in future.
+Regards,
+Mridul
+i dont buy the argument that we should use it because its the most common.
+if all we would do is use what is most common then we should switch to
+java, svn and maven
+yes. the Build.scala file behaves like a configuration file mostly, but
+because it is scala you can use the full power of a real language when
+needed. also i found writing sbt plugins doable (but not easy).
+github is not aware of the new repo being a "base-fork", so its not easy to
+re-point pull requests. i am guessing it didnt get cloned from the
+incubator spark one?
+Thanks
+i am still unsure what is wrong with sbt assembly. i would like a
+real-world example of where it does not work, that i can run.
+this is what i know:
+1) sbt assembly works fine for version conflicts for an artifact. no
+exclusion rules are needed.
+2) if artifacts have the same classes inside yet are not recognized as
+different versions of the same artifact (due to renaming of artifacts
+typically, or due to the inclusion of classes from another jar) then a
+manual exclusion rule will be needed, or else sbt will apply a simple but
+programmable rule to pick one class and drop the rest. i do not see how
+maven could do this better or without manual exclusion rules.
+does maven support cross building for different scala versions?
+we do this inhouse all the time with sbt. i know spark does not cross build
+at this point, but is it guaranteed to stay that way?
+if you shade asm 4.0 then wont you be forced to build your own version of
+everything that uses asm 4.0?
+currently we exclude asm 3.x. curious to know what is wrong with that? is
+it breaking functionality somewhere else?
+we have a maven corporate repository inhouse and of course we also use
+maven central. sbt can handle retrieving from and publishing to maven
+repositories just fine. we have maven, ant/ivy and sbt projects depending
+on each others artifacts. not sure i see the issue there.
+Asm is such a mess. And their suggested solution being everyone should
+shade it sounds pretty awful to me (not uncommon to have shaded asm 15
+times in a single project). But I guess it you are right that shading is
+only way to deal with it at this point...
+MappedRDD does:
+firstParent[T].iterator(split, context).map(f)
+and FlatMappedRDD:
+firstParent[T].iterator(split, context).flatMap(f)
+do yeah seems like its a map or flatMap over the iterator inside, not the
+RDD itself, sort of...
+just going head first without any thinking, it changed flatMap to
+flatMapData and added a flatMap. for FlatMappedRDD my compute is:
+firstParent[T].iterator(split, context).flatMap(f andThen (_.compute(split,
+context)))
+scala> val x = sc.parallelize(1 to 100)
+scala> x.flatMap _
+res0: (Int => org.apache.spark.rdd.RDD[Nothing]) =>
+org.apache.spark.rdd.RDD[Nothing] = 
+my f for flatMap is now f: T => RDD[U], however, i am not sure how to write
+a useful function for this :)
+i believe kryo serialization uses runtime class, not declared class
+we have no issues serializing covariant scala lists
+classes compiled with java7 run fine on java6 if you specified "-target
+1.6". however if thats the case generally you should also be able to also
+then compile it with java 6 just fine.
+something compiled with java7 with "-target 1.7" will not run on java 6
+thats confusing. it seems to me the breeze dependency has been compiled
+with java 6, since the mllib tests passed fine for me with java 6
+patrick,
+this has happened before, that a commit introduced java 7 code/dependencies
+and your build didnt fail, i think it was when reynold upgraded to jetty 9.
+must be that your entire build infrastructure runs java 7...
+also, i thought scala 2.10 was binary compatible, but does not seem to be
+the case. the spark artifacts for scala 2.10.4 dont work for me, since we
+are still on scala 2.10.3, but when i recompiled and published spark with
+scala 2.10.3 everything was fine again.
+errors i see:
+java.lang.ClassNotFoundException: scala.None$
+fun stuff!
+i suggest we stick to 2.10.3, since otherwise it seems that (surprisingly)
+you force everyone to upgrade
+see here for similar issue
+http://mail-archives.apache.org/mod_mbox/spark-user/201401.mbox/%3CCALNFXi2hBSyCkPpnBJBYJnPv3dSLNw8VpL_6caEn3yfXCykO=w@mail.gmail.com%3E
+i noticed there is a dependency on tachyon in spark core 1.0.0-SNAPSHOT.
+how does that work? i believe tachyon is written in java 7, yet spark
+claims to be java 6 compatible.
+it all depends on what kind of traversing. if its point traversing then a
+random access based something would be great.
+if its more scan-like traversl then spark will fit
+i believe matei has said before that he would like to crossbuild for 2.10
+and 2.11, given that the difference is not as big as between 2.9 and 2.10.
+but dont know when this would happen...
+db tsai, i do not think userClassPathFirst is working, unless the classes
+you load dont reference any classes already loaded by the parent
+classloader (a mostly hypothetical situation)... i filed a jira for this
+here:
+https://issues.apache.org/jira/browse/SPARK-1863
+i suspect there are more cdh4 than cdh5 clusters. most people plan to move
+to cdh5 within say 6 months.
+custom spark builds should not be the answer. at least not if spark ever
+wants to have a vibrant community for spark apps.
+spark does support a user-classpath-first option, which would deal with
+some of these issues, but I don't think it works.
+my experience is that there are still a lot of java 6 clusters out there.
+also distros that bundle spark still support java 6
+100 max width seems very restrictive to me.
+even the most restrictive environment i have for development (ssh with
+emacs) i get a lot more characters to work with than that.
+personally i find the code harder to read, not easier. like i kept
+wondering why there are weird newlines in the
+middle of constructors and such, only to realise later it was because of
+the 100 character limit.
+also, i find "mvn package" erroring out because of style errors somewhat
+excessive. i understand that a pull request needs to conform to "the style"
+before being accepted, but this means i cant even run tests on code that
+does not conform to the style guide, which is a bit silly.
+i keep going out for coffee while package and tests run, only to come back
+for an annoying error that my line is 101 characters and therefore nothing
+ran.
+is there some maven switch to disable the style checks?
+best! koert
+Hey Ted,
+i tried:
+mvn clean package -DskipTests -Dscalastyle.failOnViolation=false
+no luck, still get
+[ERROR] Failed to execute goal
+org.scalastyle:scalastyle-maven-plugin:0.4.0:check (default) on project
+spark-core_2.10: Failed during scalastyle execution: You have 3 Scalastyle
+violation(s). -> [Help 1]
+great thanks i will do that
+thanks ted.
+apologies for complaining about maven here again, but this is the first
+time i seriously use it for development, and i am completely unfamiliar
+with it.
+a few more issues:
+"mvn clean package -DskipTests" takes about 30 mins for me. thats painful
+since its needed for the tests. does anyone know any tricks to speed it up?
+(besides getting a better laptop). does zinc help?
+does scalastyle overwrite files? after i do "mvn package" emacs is
+completely confused and for every file it says "it has been edited" and i
+need to re-open it. not helpful for a development cycle. i think i am
+simply going to edit the pom and remove scalacheck for development.
+mvn test runs through the projects until one fails. then it skips the rest!
+since its very likely that i get a failure in some subproject, this means
+its nearly impossible to do a general test run and get a good sense of the
+status of the project. for example:
+[INFO]
+------------------------------------------------------------------------
+[INFO] Reactor Summary:
+[INFO]
+[INFO] Spark Project Parent POM .......................... SUCCESS [2.199s]
+[INFO] Spark Project Core ................................ SUCCESS
+[39:43.028s]
+[INFO] Spark Project Bagel ............................... SUCCESS [42.569s]
+[INFO] Spark Project GraphX .............................. SUCCESS
+[3:22.104s]
+[INFO] Spark Project Streaming ........................... SUCCESS
+[7:12.592s]
+[INFO] Spark Project ML Library .......................... SUCCESS
+[10:32.682s]
+[INFO] Spark Project Tools ............................... SUCCESS [17.070s]
+[INFO] Spark Project Catalyst ............................ SUCCESS
+[3:03.470s]
+[INFO] Spark Project SQL ................................. SUCCESS
+[5:23.993s]
+[INFO] Spark Project Hive ................................ FAILURE
+[2:08.387s]
+[INFO] Spark Project REPL ................................ SKIPPED
+[INFO] Spark Project Assembly ............................ SKIPPED
+[INFO] Spark Project External Twitter .................... SKIPPED
+[INFO] Spark Project External Kafka ...................... SKIPPED
+[INFO] Spark Project External Flume Sink ................. SKIPPED
+[INFO] Spark Project External Flume ...................... SKIPPED
+[INFO] Spark Project External ZeroMQ ..................... SKIPPED
+[INFO] Spark Project External MQTT ....................... SKIPPED
+[INFO] Spark Project Examples ............................ SKIPPED
+in this case i dont care about Hive, but i would have liked to see REPL
+run, and Kafka.
+oh i found some stuff about tests and how to continue them, gonna try that
+now (-fae switch). should have googled before asking...
+thanks everyone, very helpful
+hello all,
+we at tresata wrote a library to provide for batch integration between
+spark and kafka (distributed write of rdd to kafa, distributed read of rdd
+from kafka). our main use cases are (in lambda architecture jargon):
+* period appends to the immutable master dataset on hdfs from kafka using
+spark
+* make non-streaming data available in kafka with periodic data drops from
+hdfs using spark. this is to facilitate merging the speed and batch layer
+in spark-streaming
+* distributed writes from spark-streaming
+see here:
+https://github.com/tresata/spark-kafka
+best,
+koert
+yes it does. although the core of spark is written in scala it also
+maintains java and python apis, and there is plenty of work for those to
+contribute to.
+what i am trying to say is: structured data != sql
+"The context is that SchemaRDD is becoming a common data format used for
+bringing data into Spark from external systems, and used for various
+components of Spark, e.g. MLlib's new pipeline API."
+i agree. this to me also implies it belongs in spark core, not sql
+hey matei,
+i think that stuff such as SchemaRDD, columar storage and perhaps also
+query planning can be re-used by many systems that do analysis on
+structured data. i can imagine panda-like systems, but also datalog or
+scalding-like (which we use at tresata and i might rebase on SchemaRDD at
+some point). SchemaRDD should become the interface for all these. and
+columnar storage abstractions should be re-used between all these.
+currently the sql tie in is way beyond just the (perhaps unfortunate)
+naming convention. for example a core part of the SchemaRD abstraction is
+Row, which is org.apache.spark.sql.catalyst.expressions.Row, forcing anyone
+that want to build on top of SchemaRDD to dig into catalyst, a SQL Parser
+(if i understand it correctly, i have not used catalyst, but it looks
+neat). i should not need to include a SQL parser just to use structured
+data in say a panda-like framework.
+best, koert
+thats great. guess i was looking at a somewhat stale master branch...
+to me the word DataFrame does come with certain expectations. one of them
+is that the data is stored columnar. in R data.frame internally uses a list
+of sequences i think, but since lists can have labels its more like a
+SortedMap[String, Array[_]]. this makes certain operations very cheap (such
+as adding a column).
+in Spark the closest thing would be a data structure where per Partition
+the data is also stored columnar. does spark SQL already use something like
+that? Evan mentioned "Spark SQL columnar compression", which sounds like
+it. where can i find that?
+thanks
+so i understand the success or spark.sql. besides the fact that anything
+with the words SQL in its name will have thousands of developers running
+towards it because of the familiarity, there is also a genuine need for a
+generic RDD that holds record-like objects, with field names and runtime
+types. after all that is a successfull generic abstraction used in many
+structured data tools.
+but to me that abstraction is as simple as:
+trait SchemaRDD extends RDD[Row] {
+  def schema: StructType
+}
+and perhaps another abstraction to indicate it intends to be column
+oriented (with a few methods to efficiently extract a subset of columns).
+so that could be DataFrame.
+such simple contracts would allow many people to write loaders for this
+(say from csv) and whatnot.
+what i do not understand why it has to be much more complex than this. but
+if i look at DataFrame it has so much additional stuff, that has (in my
+eyes) nothing to do with generic structured data analysis.
+for example to implement DataFrame i need to implement about 40 additional
+methods!? and for some the SQLness is obviously leaking into the
+abstraction. for example why would i care about:
+  def registerTempTable(tableName: String): Unit
+best, koert
+thanks matei its good to know i can create them like that
+reynold, yeah somehow the words sql gets me going :) sorry...
+yeah agreed that you need new transformations to preserve the schema info.
+i misunderstood and thought i had to implement the bunch but that is
+clearly not necessary as matei indicated.
+allright i am clearly being slow/dense here, but now it makes sense to
+me....
+see email below. reynold suggested i send it to dev instead of user
+i would like to use objectFile with some tweaks to the hadoop conf.
+currently there is no way to do that, except recreating objectFile myself.
+and some of the code objectFile uses i have no access to, since its private
+to spark.
+the (compression) codec parameter that is now part of many saveAs...
+methods came from a similar need. see SPARK-763
+hadoop has many options like this. you either going to have to allow many
+more of these optional arguments to all the methods that read from hadoop
+inputformats and write to hadoop outputformats, or you force people to
+re-create these methods using HadoopRDD, i think (if thats even possible).
+my personal preference would be something like a Map[String, String] that
+only reflects the changes you want to make the Configuration for the given
+input/output format (so system wide defaults continue to come from
+sc.hadoopConfiguration), similarly to what cascading/scalding did, but am
+arbitrary Configuration will work too.
+i will make a jira and pullreq when i have some time.
+yeah fair enough
+i think i might be misunderstanding, but shouldnt java 6 currently be used
+in jenkins?
+we also launch jobs programmatically, both on standalone mode and
+yarn-client mode. in standalone mode it always worked, in yarn-client mode
+we ran into some issues and were forced to use spark-submit, but i still
+have on my todo list to move back to a normal java launch without
+spark-submit at some point.
+for me spark is a library that i use to do distributed computations within
+my app, and ideally a  library should not tell me how to launch my app. i
+mean, if multiple libraries that i use all had their own launch script i
+would get stuck very quickly.... hadoop jar vs spark-submit vs kiji launch
+vs hbase jar.... bad idea, i think!
+however i do understand the practical reasons why spark-submit can about...
+this looks like a mistake in FrequentItems to me. if the map is full
+(map.size==size) then it should still add the new item (after removing
+items from the map and decrementing counts).
+if its not a mistake then at least it looks to me like the algo is
+different than described in the paper. is this maybe on purpose?
+if DataFrame aspires to be more than a vehicle for SQL then i think it
+would be mistake to allow multiple column names. it is very confusing.
+pandas indeed allows this and it has led to many bugs. R does not allow it
+for data.frame (it renames the name dupes).
+i would consider a csv with duplicate column names invalid and it should
+not be loaded, or if it is loaded dupes should be renamed (e.g. append a
+"1" to the name).
+DataFrame did check for duplicate column names until Sep 2014, but then the
+check got pushed into the SQL planner making DataFrame standalone (so
+without SQL) less useful as an API.
+i filed a jira about this a while ago here:
+https://issues.apache.org/jira/browse/SPARK-8817
+People who do upstream builds of spark (think bigtop and hadoop distros)
+are used to legacy systems like maven, so maven is the default build. I
+don't think it will change.
+Any improvements for the sbt build are of course welcome (it is still used
+by many developers), but i would not do anything that increases the burden
+of maintaining two build systems.
+if there is no strong preference for one dependencies policy over another,
+but consistency between the 2 systems is desired, then i believe maven can
+be made to behave like ivy pretty easily with a setting in the pom
+thats interesting...
+if i understand it correctly it would cause compatibility breaks for
+applications on top of spark, because those applications use the exact same
+current resolution logic (so basically they are maven apps), and the change
+would make them inconsistent?
+by that logic all existing applications on top of spark that do not use
+maven are already in danger of incompatibly breaks?
+or am i completely misunderstanding?
+this makes the implications of spark switching to maven a while back
+somewhat more serious than i realized.
+on the other hand we use sbt for our spark apps and this has never been an
+issue for us, so i am not sure how real/serious this compatibility issue is.
+, assuming those applications
+because those applications are maven applications that currently use the
+same exact logic,
+because you publish a pom
+because those applications build on top of spark currently assume
+oh ok i think i got it... i hope! since the app runs with the spark
+assembly jar on its classpath, the exact version as resolved by spark's
+build process is actually on the apps classpath.
+sorry didnt mean the pollute this thread with my own dependency resolution
+confusion.
+good point about dropping <2.2 for hadoop. you dont want to deal with
+protobuf 2.4 for example
+if i wanted to pimp DataFrame to add subtract and intersect myself with a
+physical operator, without needing to modify spark directly, is that
+currently possible/intended? or will i run into the private[spark] issue?
+thanks thats all i needed
+i noticed some things stopped working on datasets in spark 2.0.0-SNAPSHOT,
+and with a confusing error message (cannot resolved some column with input
+columns []).
+for example in 1.6.0-SNAPSHOT:
+scala> val ds = sc.parallelize(1 to 10).toDS
+ds: org.apache.spark.sql.Dataset[Int] = [value: int]
+scala> ds.map(x => Option(x))
+res0: org.apache.spark.sql.Dataset[Option[Int]] = [value: int]
+and same commands in 2.0.0-SNAPSHOT:
+scala> val ds = sc.parallelize(1 to 10).toDS
+ds: org.apache.spark.sql.Dataset[Int] = [value: int]
+scala> ds.map(x => Option(x))
+org.apache.spark.sql.AnalysisException: cannot resolve 'value' given input
+columns: [];
+  at
+org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.failAnalysis(package.scala:42)
+  at
+org.apache.spark.sql.catalyst.analysis.CheckAnalysis$$anonfun$checkAnalysis$1$$anonfun$apply$2.applyOrElse(CheckAnalysis.scala:60)
+  at
+org.apache.spark.sql.catalyst.analysis.CheckAnalysis$$anonfun$checkAnalysis$1$$anonfun$apply$2.applyOrElse(CheckAnalysis.scala:57)
+  at
+org.apache.spark.sql.catalyst.trees.TreeNode$$anonfun$transformUp$1.apply(TreeNode.scala:284)
+  at
+org.apache.spark.sql.catalyst.trees.TreeNode$$anonfun$transformUp$1.apply(TreeNode.scala:284)
+  at
+org.apache.spark.sql.catalyst.trees.CurrentOrigin$.withOrigin(TreeNode.scala:70)
+  at
+org.apache.spark.sql.catalyst.trees.TreeNode.transformUp(TreeNode.scala:283)
+  at
+org.apache.spark.sql.catalyst.plans.QueryPlan.transformExpressionUp$1(QueryPlan.scala:162)
+  at org.apache.spark.sql.catalyst.plans.QueryPlan.org
+$apache$spark$sql$catalyst$plans$QueryPlan$$recursiveTransform$2(QueryPlan.scala:172)
+  at
+org.apache.spark.sql.catalyst.plans.QueryPlan$$anonfun$org$apache$spark$sql$catalyst$plans$QueryPlan$$recursiveTransform$2$1.apply(QueryPlan.scala:176)
+  at
+scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:245)
+  at
+scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:245)
+  at scala.collection.immutable.List.foreach(List.scala:381)
+  at scala.collection.TraversableLike$class.map(TraversableLike.scala:245)
+  at scala.collection.immutable.List.map(List.scala:285)
+  at org.apache.spark.sql.catalyst.plans.QueryPlan.org
+$apache$spark$sql$catalyst$plans$QueryPlan$$recursiveTransform$2(QueryPlan.scala:176)
+  at
+org.apache.spark.sql.catalyst.plans.QueryPlan$$anonfun$2.apply(QueryPlan.scala:181)
+  at scala.collection.Iterator$$anon$11.next(Iterator.scala:370)
+  at scala.collection.Iterator$class.foreach(Iterator.scala:742)
+  at scala.collection.AbstractIterator.foreach(Iterator.scala:1194)
+  at
+scala.collection.generic.Growable$class.$plus$plus$eq(Growable.scala:59)
+  at
+scala.collection.mutable.ArrayBuffer.$plus$plus$eq(ArrayBuffer.scala:104)
+  at
+scala.collection.mutable.ArrayBuffer.$plus$plus$eq(ArrayBuffer.scala:48)
+  at scala.collection.TraversableOnce$class.to(TraversableOnce.scala:308)
+  at scala.collection.AbstractIterator.to(Iterator.scala:1194)
+  at
+scala.collection.TraversableOnce$class.toBuffer(TraversableOnce.scala:300)
+  at scala.collection.AbstractIterator.toBuffer(Iterator.scala:1194)
+  at
+scala.collection.TraversableOnce$class.toArray(TraversableOnce.scala:287)
+  at scala.collection.AbstractIterator.toArray(Iterator.scala:1194)
+  at
+org.apache.spark.sql.catalyst.plans.QueryPlan.transformExpressionsUp(QueryPlan.scala:181)
+  at
+org.apache.spark.sql.catalyst.analysis.CheckAnalysis$$anonfun$checkAnalysis$1.apply(CheckAnalysis.scala:57)
+  at
+org.apache.spark.sql.catalyst.analysis.CheckAnalysis$$anonfun$checkAnalysis$1.apply(CheckAnalysis.scala:50)
+  at
+org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:122)
+  at
+org.apache.spark.sql.catalyst.trees.TreeNode$$anonfun$foreachUp$1.apply(TreeNode.scala:121)
+  at
+org.apache.spark.sql.catalyst.trees.TreeNode$$anonfun$foreachUp$1.apply(TreeNode.scala:121)
+  at scala.collection.immutable.List.foreach(List.scala:381)
+  at
+org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:121)
+  at
+org.apache.spark.sql.catalyst.analysis.CheckAnalysis$class.checkAnalysis(CheckAnalysis.scala:50)
+  at
+org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis(Analyzer.scala:46)
+  at
+org.apache.spark.sql.catalyst.encoders.ExpressionEncoder.resolve(ExpressionEncoder.scala:322)
+  at org.apache.spark.sql.Dataset.(Dataset.scala:81)
+  at org.apache.spark.sql.Dataset.(Dataset.scala:92)
+  at org.apache.spark.sql.Dataset.mapPartitions(Dataset.scala:339)
+  at org.apache.spark.sql.Dataset.map(Dataset.scala:323)
+  ... 43 elided
+i observed similar issues with user defined types
+(org.apache.spark.sql.types.UserDefinedType) in Dataset. trying to insert a
+UserDefinedType in Dataset[Row] fails with input columns [].
+yeah i was surprised with the Option. it works in 1.6.0-SNAPSHOT, and its a
+pretty neat way to indicate nullability i guess.
+i will file jira. i saw similar behavior with other types than Option. this
+was just the easiest to show.
+since a type alias is purely a convenience thing for the scala compiler,
+does option 1 mean that the concept of DataFrame ceases to exist from a
+java perspective, and they will have to refer to Dataset?
+dataframe df1:
+schema:
+StructType(StructField(x,IntegerType,true))
+explain:
+== Physical Plan ==
+MapPartitions , obj#135: object, [if (input[0, object].isNullAt)
+null else input[0, object].get AS x#128]
++- MapPartitions , createexternalrow(if (isnull(x#9)) null else
+x#9), [input[0, object] AS obj#135]
+   +- WholeStageCodegen
+      :  +- Project [_1#8 AS x#9]
+      :     +- Scan ExistingRDD[_1#8]
+show:
++---+
+|  x|
++---+
+|  2|
+|  3|
++---+
+dataframe df2:
+schema:
+StructType(StructField(x,IntegerType,true), StructField(y,StringType,true))
+explain:
+== Physical Plan ==
+MapPartitions , createexternalrow(x#2, if (isnull(y#3)) null
+else y#3.toString), [if (input[0, object].isNullAt) null else input[0,
+object].get AS x#130,if (input[0, object].isNullAt) null else
+staticinvoke(class org.apache.spark.unsafe.types.UTF8String, StringType,
+fromString, input[0, object].get, true) AS y#131]
++- WholeStageCodegen
+   :  +- Project [_1#0 AS x#2,_2#1 AS y#3]
+   :     +- Scan ExistingRDD[_1#0,_2#1]
+show:
++---+---+
+|  x|  y|
++---+---+
+|  1|  1|
+|  2|  2|
+|  3|  3|
++---+---+
+i run:
+df1.join(df2, Seq("x")).show
+i get:
+java.lang.UnsupportedOperationException: No size estimation available for
+objects.
+at org.apache.spark.sql.types.ObjectType.defaultSize(ObjectType.scala:41)
+at
+org.apache.spark.sql.catalyst.plans.logical.UnaryNode$$anonfun$6.apply(LogicalPlan.scala:323)
+at
+org.apache.spark.sql.catalyst.plans.logical.UnaryNode$$anonfun$6.apply(LogicalPlan.scala:323)
+at
+scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:245)
+at
+scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:245)
+at scala.collection.immutable.List.foreach(List.scala:381)
+at scala.collection.TraversableLike$class.map(TraversableLike.scala:245)
+at scala.collection.immutable.List.map(List.scala:285)
+at
+org.apache.spark.sql.catalyst.plans.logical.UnaryNode.statistics(LogicalPlan.scala:323)
+at
+org.apache.spark.sql.execution.SparkStrategies$CanBroadcast$.unapply(SparkStrategies.scala:87)
+now sure what changed, this ran about a week ago without issues (in our
+internal unit tests). it is fully reproducible, however when i tried to
+minimize the issue i could not reproduce it by just creating data frames in
+the repl with the same contents, so it probably has something to do with
+way these are created (from Row objects and StructTypes).
+best, koert
+https://issues.apache.org/jira/browse/SPARK-13531
+we are not, but it seems reasonable to me that a user has the ability to
+implement their own serializer.
+can you refactor and break compatibility, but not make it private?
+in this commit
+8301fadd8d269da11e72870b7a889596e3337839
+Author: Marcelo Vanzin 
+Date:   Mon Mar 14 14:27:33 2016 -0700
+[SPARK-13626][CORE] Avoid duplicate config deprecation warnings.
+the following change was made
+-class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging {
++class SparkConf private[spark] (loadDefaults: Boolean) extends Cloneable
+with Logging {
+i use the constructor new SparkConf(false) to build a SparkConf for our
+in-house unit tests (where i do not want system properties to change meddle
+with things).
+is this API change on purpose?
+i have been using spark 2.0 snapshots with some libraries build for spark
+1.0 so far (simply because it worked). in last few days i noticed this new
+error:
+[error] Uncaught exception when running
+com.tresata.spark.sql.fieldsapi.FieldsApiSpec: java.lang.AbstractMethodError
+sbt.ForkMain$ForkError: java.lang.AbstractMethodError: null
+    at org.apache.spark.Logging$class.log(Logging.scala:46)
+    at
+com.tresata.spark.sorted.PairRDDFunctions.log(PairRDDFunctions.scala:13)
+so it seems spark made binary incompatible changes in logging.
+i do not think spark 2.0 is trying to have binary compatibility with 1.0 so
+i assume this is a non-issue, but just in case the assumptions are
+different (or incompatibilities are actively minimized) i wanted to point
+it out.
+i am trying to understand some parts of the catalyst optimizer. but i
+struggle with one bigger picture issue:
+LogicalPlan extends TreeNode, which makes sense since the optimizations
+rely on tree transformations like transformUp and transformDown.
+but how can a LogicalPlan be a tree? isnt it really a DAG? if it is
+possible to create diamond-like operator dependencies, then assumptions
+made in tree transformations could be wrong? for example pushing a limit
+operator down into a child sounds safe, but if that same child is also used
+by another operator (so it has another parent, no longer a tree) then its
+not safe at all.
+what am i missing here?
+thanks! koert
+makes sense
+note that Logging was not private[spark] in 1.x, which is why i used it.
+oh i just noticed the big warning in spark 1.x Logging
+ * NOTE: DO NOT USE this class outside of Spark. It is intended as an
+internal utility.
+ *       This will likely be changed or removed in future releases.
+one of our unit tests broke with changes in spark 2.0 snapshot in last few
+days (or maybe i simple missed it longer). i think it boils down to this:
+val df1 = sc.makeRDD(1 to 3).toDF
+val df2 = df1.map(row => Row(row(0).asInstanceOf[Int] +
+1))(RowEncoder(df1.schema))
+println(s"schema before ${df1.schema} and after ${df2.schema}")
+i get:
+schema before StructType(StructField(value,IntegerType,false)) and after
+StructType(StructField(value,IntegerType,true))
+it is the change in nullability that i did not expect.
+the good news is, that from an shared infrastructure perspective, most
+places have zero scala, so the upgrade is actually very easy. i can see how
+it would be different for say twitter....
+i think that logic is reasonable, but then the same should also apply to
+scala 2.10, which is also unmaintained/unsupported at this point (basically
+has been since march 2015 except for one hotfix due to a license
+incompatibility)
+who wants to support scala 2.10 three years after they did the last
+maintenance release?
+i asked around a little, and the general trend at our clients seems to be
+that they plan to upgrade the clusters to java 8 within the year.
+so with that in mind i wish this was a little later (i would have preferred
+a java-8-only spark at the end of year). but since a major spark version
+only comes around every so often, i guess it makes sense to make the jump
+now. so:
++1 on dropping java 7
++1 on dropping scala 2.10
+i would especially like to point out (as others have before me) that nobody
+has come in and said they actually need scala 2.10 support, so that seems
+like the easiest choice to me of all.
+if scala prior to sbt 2.10.4 didn't support java 8, does that mean that 3rd
+party scala libraries compiled with a scala version < 2.10.4 might not work
+on java 8?
+Spark still runs on akka. So if you want the benefits of the latest akka
+(not saying we do, was just an example) then you need to drop scala 2.10
+oh wow, had no idea it got ripped out
+as long as we don't lock ourselves into supporting scala 2.10 for the
+entire spark 2 lifespan it sounds reasonable to me
+we ran into similar issues and it seems related to the new memory
+management. can you try:
+spark.memory.useLegacyMode = true
+can you try:
+spark.shuffle.reduceLocality.enabled=false
+do i need to run sbt package before doing tests?
+not sure why, but i am getting this today using spark 2 snapshots...
+i am on java 7 and scala 2.11
+16/04/15 12:35:46 WARN TaskSetManager: Lost task 2.0 in stage 3.0 (TID 15,
+localhost): java.lang.ClassFormatError: Duplicate field name&signature in
+class file
+org/apache/spark/sql/catalyst/expressions/GeneratedClass$SpecificMutableProjection
+    at java.lang.ClassLoader.defineClass1(Native Method)
+    at java.lang.ClassLoader.defineClass(ClassLoader.java:800)
+    at
+org.codehaus.janino.ByteArrayClassLoader.findClass(ByteArrayClassLoader.java:66)
+    at java.lang.ClassLoader.loadClass(ClassLoader.java:425)
+    at java.lang.ClassLoader.loadClass(ClassLoader.java:358)
+    at
+org.apache.spark.sql.catalyst.expressions.GeneratedClass.generate(Unknown
+Source)
+    at
+org.apache.spark.sql.catalyst.expressions.codegen.GenerateMutableProjection$$anonfun$create$2.apply(GenerateMutableProjection.scala:140)
+    at
+org.apache.spark.sql.catalyst.expressions.codegen.GenerateMutableProjection$$anonfun$create$2.apply(GenerateMutableProjection.scala:139)
+    at
+org.apache.spark.sql.execution.aggregate.AggregationIterator.generateProcessRow(AggregationIterator.scala:178)
+    at
+org.apache.spark.sql.execution.aggregate.AggregationIterator.(AggregationIterator.scala:197)
+    at
+org.apache.spark.sql.execution.aggregate.SortBasedAggregationIterator.(SortBasedAggregationIterator.scala:39)
+    at
+org.apache.spark.sql.execution.aggregate.SortBasedAggregate$$anonfun$doExecute$1$$anonfun$3.apply(SortBasedAggregate.scala:80)
+    at
+org.apache.spark.sql.execution.aggregate.SortBasedAggregate$$anonfun$doExecute$1$$anonfun$3.apply(SortBasedAggregate.scala:71)
+    at
+org.apache.spark.rdd.RDD$$anonfun$mapPartitionsInternal$1$$anonfun$apply$23.apply(RDD.scala:768)
+    at
+org.apache.spark.rdd.RDD$$anonfun$mapPartitionsInternal$1$$anonfun$apply$23.apply(RDD.scala:768)
+    at
+org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:38)
+    at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:318)
+    at org.apache.spark.rdd.RDD.iterator(RDD.scala:282)
+    at
+org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:38)
+    at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:318)
+    at org.apache.spark.rdd.RDD.iterator(RDD.scala:282)
+    at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:72)
+    at org.apache.spark.scheduler.Task.run(Task.scala:86)
+    at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:239)
+    at
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+    at java.util.concurrent.ThreadPoolExecutor$
+i find version 3 without the _ also more readable
+i tried for the first time to run our own in-house unit tests on spark 2,
+and i get the error below.
+has anyone seen this?
+it is reproducible. i tried latest java 7 and it is still there.
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x00007f7c3a4b1f54, pid=21939, tid=140171011417856
+#
+# JRE version: Java(TM) SE Runtime Environment (7.0_75-b13) (build
+1.7.0_75-b13)
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (24.75-b04 mixed mode
+linux-amd64 compressed oops)
+# Problematic frame:
+# V  [libjvm.so+0x747f54]  _Copy_arrayof_conjoint_jlongs+0x44
+more info:
+Stack: [0x00007f7c1b47e000,0x00007f7c1b57f000],  sp=0x00007f7c1b57a9a8,
+free space=1010k
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native
+code)
+V  [libjvm.so+0x747f54]  _Copy_arrayof_conjoint_jlongs+0x44
+j  sun.misc.Unsafe.copyMemory(Ljava/lang/Object;JLjava/lang/Object;JJ)V+0
+j
+org.apache.spark.unsafe.Platform.copyMemory(Ljava/lang/Object;JLjava/lang/Object;JJ)V+34
+j  org.apache.spark.unsafe.types.UTF8String.getBytes()[B+76
+j  org.apache.spark.unsafe.types.UTF8String.toString()Ljava/lang/String;+5
+j
+org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificSafeProjection.apply(Ljava/lang/Object;)Ljava/lang/Object;+876
+j
+org.apache.spark.sql.catalyst.encoders.ExpressionEncoder.fromRow(Lorg/apache/spark/sql/catalyst/InternalRow;)Ljava/lang/Object;+5
+j
+org.apache.spark.sql.Dataset$$anonfun$org$apache$spark$sql$Dataset$$execute$1$1$$anonfun$apply$13.apply(Lorg/apache/spark/sql/catalyst/InternalRow;)Ljava/lang/Object;+11
+j
+org.apache.spark.sql.Dataset$$anonfun$org$apache$spark$sql$Dataset$$execute$1$1$$anonfun$apply$13.apply(Ljava/lang/Object;)Ljava/lang/Object;+5
+J 13277 C2
+scala.collection.mutable.ArrayOps$ofRef.map(Lscala/Function1;Lscala/collection/generic/CanBuildFrom;)Ljava/lang/Object;
+(7 bytes) @ 0x00007f7c25eeae08 [0x00007f7c25eead40+0xc8]
+j
+org.apache.spark.sql.Dataset$$anonfun$org$apache$spark$sql$Dataset$$execute$1$1.apply()Ljava/lang/Object;+43
+j
+org.apache.spark.sql.execution.SQLExecution$.withNewExecutionId(Lorg/apache/spark/sql/SparkSession;Lorg/apache/spark/sql/execution/QueryExecution;Lscala/Function0;)Ljava/lang/Object;+106
+j
+org.apache.spark.sql.Dataset.withNewExecutionId(Lscala/Function0;)Ljava/lang/Object;+12
+j  org.apache.spark.sql.Dataset.org
+$apache$spark$sql$Dataset$$execute$1()Ljava/lang/Object;+9
+j
+org.apache.spark.sql.Dataset$$anonfun$org$apache$spark$sql$Dataset$$collect$1.apply(Lorg/apache/spark/sql/Dataset;)Ljava/lang/Object;+4
+j
+org.apache.spark.sql.Dataset$$anonfun$org$apache$spark$sql$Dataset$$collect$1.apply(Ljava/lang/Object;)Ljava/lang/Object;+5
+j
+org.apache.spark.sql.Dataset.withCallback(Ljava/lang/String;Lorg/apache/spark/sql/Dataset;Lscala/Function1;)Ljava/lang/Object;+25
+j  org.apache.spark.sql.Dataset.org
+$apache$spark$sql$Dataset$$collect(Z)Ljava/lang/Object;+20
+j  org.apache.spark.sql.Dataset.collect()Ljava/lang/Object;+2
+Created issue:
+https://issues.apache.org/jira/browse/SPARK-15062
+with the introduction of SparkSession SQLContext changed from being a lazy
+val to a def.
+however this is troublesome if you want to do:
+import someDataset.sqlContext.implicits._
+because it is no longer a stable identifier, i think? i get:
+stable identifier required, but someDataset.sqlContext.implicits found.
+anyone else seen this?
+yes it works fine if i switch to using the implicits on the SparkSession
+(which is a val)
+but do we want to break the old way of doing the import?
+sure i can do that
+hello all, we are slowly expanding our test coverage for spark
+2.0.0-SNAPSHOT to more in-house projects. today i ran into this issue...
+this runs fine:
+val df = sc.parallelize(List(("1", "2"), ("3", "4"))).toDF("a", "b")
+df
+  .map(row => row)(RowEncoder(df.schema))
+  .select("a", "b")
+  .show
+however this fails:
+val df = sc.parallelize(List(("1", "2"), ("3", "4"))).toDF("a", "b")
+df
+  .map(row => row)(RowEncoder(df.schema))
+  .select("b", "a")
+  .show
+the error is:
+java.lang.Exception: failed to compile:
+org.codehaus.commons.compiler.CompileException: File 'generated.java', Line
+94, Column 57: Expression "mapelements_isNull" is not an rvalue
+/* 001 */ public Object generate(Object[] references) {
+/* 002 */   return new GeneratedIterator(references);
+/* 003 */ }
+/* 004 */
+/* 005 */ /** Codegened pipeline for:
+/* 006 */ * Project [b#11,a#10]
+/* 007 */ +- SerializeFromObject [if (input[0,
+org.apache.spark.sql.Row].isNullAt) null else staticinvoke(class org.ap...
+/* 008 */   */
+/* 009 */ final class GeneratedIterator extends
+org.apache.spark.sql.execution.BufferedRowIterator {
+/* 010 */   private Object[] references;
+/* 011 */   private scala.collection.Iterator inputadapter_input;
+/* 012 */   private UnsafeRow project_result;
+/* 013 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder
+project_holder;
+/* 014 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter
+project_rowWriter;
+/* 015 */   private Object[] deserializetoobject_values;
+/* 016 */   private org.apache.spark.sql.types.StructType
+deserializetoobject_schema;
+/* 017 */   private UnsafeRow deserializetoobject_result;
+/* 018 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder
+deserializetoobject_holder;
+/* 019 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter
+deserializetoobject_rowWriter;
+/* 020 */   private UnsafeRow mapelements_result;
+/* 021 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder
+mapelements_holder;
+/* 022 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter
+mapelements_rowWriter;
+/* 023 */   private UnsafeRow serializefromobject_result;
+/* 024 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder
+serializefromobject_holder;
+/* 025 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter
+serializefromobject_rowWriter;
+/* 026 */   private UnsafeRow project_result1;
+/* 027 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder
+project_holder1;
+/* 028 */   private
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter
+project_rowWriter1;
+/* 029 */
+/* 030 */   public GeneratedIterator(Object[] references) {
+/* 031 */     this.references = references;
+/* 032 */   }
+/* 033 */
+/* 034 */   public void init(int index, scala.collection.Iterator inputs[])
+{
+/* 035 */     partitionIndex = index;
+/* 036 */     inputadapter_input = inputs[0];
+/* 037 */     project_result = new UnsafeRow(2);
+/* 038 */     this.project_holder = new
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder(project_result,
+64);
+/* 039 */     this.project_rowWriter = new
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter(project_holder,
+2);
+/* 040 */
+/* 041 */     this.deserializetoobject_schema =
+(org.apache.spark.sql.types.StructType) references[0];
+/* 042 */     deserializetoobject_result = new UnsafeRow(1);
+/* 043 */     this.deserializetoobject_holder = new
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder(deserializetoobject_result,
+32);
+/* 044 */     this.deserializetoobject_rowWriter = new
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter(deserializetoobject_holder,
+1);
+/* 045 */     mapelements_result = new UnsafeRow(1);
+/* 046 */     this.mapelements_holder = new
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder(mapelements_result,
+32);
+/* 047 */     this.mapelements_rowWriter = new
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter(mapelements_holder,
+1);
+/* 048 */     serializefromobject_result = new UnsafeRow(2);
+/* 049 */     this.serializefromobject_holder = new
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder(serializefromobject_result,
+64);
+/* 050 */     this.serializefromobject_rowWriter = new
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter(serializefromobject_holder,
+2);
+/* 051 */     project_result1 = new UnsafeRow(2);
+/* 052 */     this.project_holder1 = new
+org.apache.spark.sql.catalyst.expressions.codegen.BufferHolder(project_result1,
+64);
+/* 053 */     this.project_rowWriter1 = new
+org.apache.spark.sql.catalyst.expressions.codegen.UnsafeRowWriter(project_holder1,
+2);
+/* 054 */   }
+/* 055 */
+/* 056 */   protected void processNext() throws java.io.IOException {
+/* 057 */     /*** PRODUCE: Project [b#11,a#10] */
+/* 058 */
+/* 059 */     /*** PRODUCE: SerializeFromObject [if (input[0,
+org.apache.spark.sql.Row].isNullAt) null else staticinvoke(class
+org.apache.spark.unsafe.types... */
+/* 060 */
+/* 061 */     /*** PRODUCE: MapElements , obj#9:
+org.apache.spark.sql.Row */
+/* 062 */
+/* 063 */     /*** PRODUCE: DeserializeToObject createexternalrow(if
+(isnull(a#5)) null else a#5.toString, if (isnull(b#6)) null else
+b#6.toString, StructFi... */
+/* 064 */
+/* 065 */     /*** PRODUCE: Project [_1#2 AS a#5,_2#3 AS b#6] */
+/* 066 */
+/* 067 */     /*** PRODUCE: INPUT */
+/* 068 */
+/* 069 */     while (inputadapter_input.hasNext()) {
+/* 070 */       InternalRow inputadapter_row = (InternalRow)
+inputadapter_input.next();
+/* 071 */       /*** CONSUME: Project [_1#2 AS a#5,_2#3 AS b#6] */
+/* 072 */
+/* 073 */       /*** CONSUME: DeserializeToObject createexternalrow(if
+(isnull(a#5)) null else a#5.toString, if (isnull(b#6)) null else
+b#6.toString, StructFi... */
+/* 074 */       /* input[0, string] */
+/* 075 */       /* input[0, string] */
+/* 076 */       boolean inputadapter_isNull = inputadapter_row.isNullAt(0);
+/* 077 */       UTF8String inputadapter_value = inputadapter_isNull ? null
+: (inputadapter_row.getUTF8String(0));
+/* 078 */       /* input[1, string] */
+/* 079 */       /* input[1, string] */
+/* 080 */       boolean inputadapter_isNull1 = inputadapter_row.isNullAt(1);
+/* 081 */       UTF8String inputadapter_value1 = inputadapter_isNull1 ?
+null : (inputadapter_row.getUTF8String(1));
+/* 082 */
+/* 083 */       /*** CONSUME: MapElements , obj#9:
+org.apache.spark.sql.Row */
+/* 084 */
+/* 085 */       /*** CONSUME: SerializeFromObject [if (input[0,
+org.apache.spark.sql.Row].isNullAt) null else staticinvoke(class
+org.apache.spark.unsafe.types... */
+/* 086 */
+/* 087 */       /*** CONSUME: Project [b#11,a#10] */
+/* 088 */
+/* 089 */       /*** CONSUME: WholeStageCodegen */
+/* 090 */
+/* 091 */       /* input[1, string] */
+/* 092 */       /* if (input[0, org.apache.spark.sql.Row].isNullAt) null
+else staticinvoke(class org.apache.spark.unsafe.types.UTF8String,
+StringTy... */
+/* 093 */       /* input[0, org.apache.spark.sql.Row].isNullAt */
+/* 094 */       boolean serializefromobject_isNull9 = mapelements_isNull ||
+false;
+/* 095 */       final boolean serializefromobject_value9 =
+serializefromobject_isNull9 ? false : mapelements_value.isNullAt(1);
+/* 096 */       boolean serializefromobject_isNull8 = false;
+/* 097 */       UTF8String serializefromobject_value8 = null;
+/* 098 */       if (!serializefromobject_isNull9 &&
+serializefromobject_value9) {
+/* 099 */         /* null */
+/* 100 */         final UTF8String serializefromobject_value12 = null;
+/* 101 */         serializefromobject_isNull8 = true;
+/* 102 */         serializefromobject_value8 = serializefromobject_value12;
+/* 103 */       } else {
+/* 104 */         /* staticinvoke(class
+org.apache.spark.unsafe.types.UTF8String, StringType, fromString,
+getexternalrowfield(input[0, org.apache.spa... */
+/* 105 */         /* getexternalrowfield(input[0,
+org.apache.spark.sql.Row], 1, ObjectType(class java.lang.String)) */
+/* 106 */         if (mapelements_isNull) {
+/* 107 */           throw new RuntimeException("The input external row
+cannot be null.");
+/* 108 */         }
+/* 109 */
+/* 110 */         if (mapelements_value.isNullAt(1)) {
+/* 111 */           throw new RuntimeException("The 1th field of input row
+cannot be null.");
+/* 112 */         }
+/* 113 */
+/* 114 */         final java.lang.String serializefromobject_value14 =
+(java.lang.String) mapelements_value.get(1);
+/* 115 */         boolean serializefromobject_isNull13 = false;
+/* 116 */         final UTF8String serializefromobject_value13 =
+serializefromobject_isNull13 ? null :
+org.apache.spark.unsafe.types.UTF8String.fromString(serializefromobject_value14);
+/* 117 */         serializefromobject_isNull13 =
+serializefromobject_value13 == null;
+/* 118 */         serializefromobject_isNull8 =
+serializefromobject_isNull13;
+/* 119 */         serializefromobject_value8 = serializefromobject_value13;
+/* 120 */       }
+/* 121 */       /* input[0, string] */
+/* 122 */       /* if (input[0, org.apache.spark.sql.Row].isNullAt) null
+else staticinvoke(class org.apache.spark.unsafe.types.UTF8String,
+StringTy... */
+/* 123 */       /* input[0, org.apache.spark.sql.Row].isNullAt */
+/* 124 */       /* input[0, org.apache.spark.sql.Row] */
+/* 125 */       /* .apply */
+/* 126 */       /*  */
+/* 127 */       /* expression:  */
+/* 128 */       Object mapelements_obj = ((Expression)
+references[1]).eval(null);
+/* 129 */       scala.Function1 mapelements_value1 = (scala.Function1)
+mapelements_obj;
+/* 130 */       /* input[0, org.apache.spark.sql.Row] */
+/* 131 */       /* createexternalrow(if (isnull(input[0, string])) null
+else input[0, string].toString, if (isnull(input[1, string])) null else
+inp... */
+/* 132 */       deserializetoobject_values = new Object[2];
+/* 133 */       /* if (isnull(input[0, string])) null else input[0,
+string].toString */
+/* 134 */       boolean deserializetoobject_isNull1 = false;
+/* 135 */       java.lang.String deserializetoobject_value1 = null;
+/* 136 */       if (!false && inputadapter_isNull) {
+/* 137 */         /* null */
+/* 138 */         final java.lang.String deserializetoobject_value4 = null;
+/* 139 */         deserializetoobject_isNull1 = true;
+/* 140 */         deserializetoobject_value1 = deserializetoobject_value4;
+/* 141 */       } else {
+/* 142 */         /* input[0, string].toString */
+/* 143 */         boolean deserializetoobject_isNull5 = inputadapter_isNull;
+/* 144 */         final java.lang.String deserializetoobject_value5 =
+deserializetoobject_isNull5 ? null : (java.lang.String)
+inputadapter_value.toString();
+/* 145 */         deserializetoobject_isNull5 = deserializetoobject_value5
+== null;
+/* 146 */         deserializetoobject_isNull1 = deserializetoobject_isNull5;
+/* 147 */         deserializetoobject_value1 = deserializetoobject_value5;
+/* 148 */       }
+/* 149 */       if (deserializetoobject_isNull1) {
+/* 150 */         deserializetoobject_values[0] = null;
+/* 151 */       } else {
+/* 152 */         deserializetoobject_values[0] =
+deserializetoobject_value1;
+/* 153 */       }
+/* 154 */       /* if (isnull(input[1, string])) null else input[1,
+string].toString */
+/* 155 */       boolean deserializetoobject_isNull7 = false;
+/* 156 */       java.lang.String deserializetoobject_value7 = null;
+/* 157 */       if (!false && inputadapter_isNull1) {
+/* 158 */         /* null */
+/* 159 */         final java.lang.String deserializetoobject_value10 = null;
+/* 160 */         deserializetoobject_isNull7 = true;
+/* 161 */         deserializetoobject_value7 = deserializetoobject_value10;
+/* 162 */       } else {
+/* 163 */         /* input[1, string].toString */
+/* 164 */         boolean deserializetoobject_isNull11 =
+inputadapter_isNull1;
+/* 165 */         final java.lang.String deserializetoobject_value11 =
+deserializetoobject_isNull11 ? null : (java.lang.String)
+inputadapter_value1.toString();
+/* 166 */         deserializetoobject_isNull11 =
+deserializetoobject_value11 == null;
+/* 167 */         deserializetoobject_isNull7 =
+deserializetoobject_isNull11;
+/* 168 */         deserializetoobject_value7 = deserializetoobject_value11;
+/* 169 */       }
+/* 170 */       if (deserializetoobject_isNull7) {
+/* 171 */         deserializetoobject_values[1] = null;
+/* 172 */       } else {
+/* 173 */         deserializetoobject_values[1] =
+deserializetoobject_value7;
+/* 174 */       }
+/* 175 */
+/* 176 */       final org.apache.spark.sql.Row deserializetoobject_value =
+new
+org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema(deserializetoobject_values,
+this.deserializetoobject_schema);
+/* 177 */       boolean mapelements_isNull = false || false;
+/* 178 */       final org.apache.spark.sql.Row mapelements_value =
+mapelements_isNull ? null : (org.apache.spark.sql.Row)
+mapelements_value1.apply(deserializetoobject_value);
+/* 179 */       mapelements_isNull = mapelements_value == null;
+/* 180 */
+/* 181 */       boolean serializefromobject_isNull1 = mapelements_isNull ||
+false;
+/* 182 */       final boolean serializefromobject_value1 =
+serializefromobject_isNull1 ? false : mapelements_value.isNullAt(0);
+/* 183 */       boolean serializefromobject_isNull = false;
+/* 184 */       UTF8String serializefromobject_value = null;
+/* 185 */       if (!serializefromobject_isNull1 &&
+serializefromobject_value1) {
+/* 186 */         /* null */
+/* 187 */         final UTF8String serializefromobject_value4 = null;
+/* 188 */         serializefromobject_isNull = true;
+/* 189 */         serializefromobject_value = serializefromobject_value4;
+/* 190 */       } else {
+/* 191 */         /* staticinvoke(class
+org.apache.spark.unsafe.types.UTF8String, StringType, fromString,
+getexternalrowfield(input[0, org.apache.spa... */
+/* 192 */         /* getexternalrowfield(input[0,
+org.apache.spark.sql.Row], 0, ObjectType(class java.lang.String)) */
+/* 193 */         if (mapelements_isNull) {
+/* 194 */           throw new RuntimeException("The input external row
+cannot be null.");
+/* 195 */         }
+/* 196 */
+/* 197 */         if (mapelements_value.isNullAt(0)) {
+/* 198 */           throw new RuntimeException("The 0th field of input row
+cannot be null.");
+/* 199 */         }
+/* 200 */
+/* 201 */         final java.lang.String serializefromobject_value6 =
+(java.lang.String) mapelements_value.get(0);
+/* 202 */         boolean serializefromobject_isNull5 = false;
+/* 203 */         final UTF8String serializefromobject_value5 =
+serializefromobject_isNull5 ? null :
+org.apache.spark.unsafe.types.UTF8String.fromString(serializefromobject_value6);
+/* 204 */         serializefromobject_isNull5 = serializefromobject_value5
+== null;
+/* 205 */         serializefromobject_isNull = serializefromobject_isNull5;
+/* 206 */         serializefromobject_value = serializefromobject_value5;
+/* 207 */       }
+/* 208 */       project_holder1.reset();
+/* 209 */
+/* 210 */       project_rowWriter1.zeroOutNullBytes();
+/* 211 */
+/* 212 */       if (serializefromobject_isNull8) {
+/* 213 */         project_rowWriter1.setNullAt(0);
+/* 214 */       } else {
+/* 215 */         project_rowWriter1.write(0, serializefromobject_value8);
+/* 216 */       }
+/* 217 */
+/* 218 */       if (serializefromobject_isNull) {
+/* 219 */         project_rowWriter1.setNullAt(1);
+/* 220 */       } else {
+/* 221 */         project_rowWriter1.write(1, serializefromobject_value);
+/* 222 */       }
+/* 223 */       project_result1.setTotalSize(project_holder1.totalSize());
+/* 224 */       append(project_result1);
+/* 225 */       if (shouldStop()) return;
+/* 226 */     }
+/* 227 */   }
+/* 228 */ }
+https://issues.apache.org/jira/browse/SPARK-15384
+got it, but i assume thats an internal implementation detail, and it should
+show null not -1?
+hello,
+as we continue to test spark 2.0 SNAPSHOT in-house we ran into the
+following trying to port an existing application from spark 1.6.1 to spark
+2.0.0-SNAPSHOT.
+given this code:
+case class Test(a: Int, b: String)
+val rdd = sc.parallelize(List(Row(List(Test(5, "ha"), Test(6, "ba")))))
+val schema = StructType(Seq(
+  StructField("x", ArrayType(
+    StructType(Seq(
+      StructField("a", IntegerType, false),
+      StructField("b", StringType, true)
+    )),
+    true)
+  , true)
+  ))
+val df = sqlc.createDataFrame(rdd, schema)
+df.show
+this works fine in spark 1.6.1 and gives:
++----------------+
+|               x|
++----------------+
+|[[5,ha], [6,ba]]|
++----------------+
+but in spark 2.0.0-SNAPSHOT i get:
+org.apache.spark.SparkException: Job aborted due to stage failure: Task 0
+in stage 0.0 failed 1 times, most recent failure: Lost task 0.0 in stage
+0.0 (TID 0, localhost): java.lang.RuntimeException: Error while encoding:
+java.lang.ClassCastException: Test cannot be cast to
+org.apache.spark.sql.Row
+[info] getexternalrowfield(input[0, org.apache.spark.sql.Row, false], 0, x,
+IntegerType) AS x#0
+[info] +- getexternalrowfield(input[0, org.apache.spark.sql.Row, false], 0,
+x, IntegerType)
+[info]    +- input[0, org.apache.spark.sql.Row, false]
+https://issues.apache.org/jira/browse/SPARK-15507
+oh yes, this was by accident, it should have gone to dev
+hello all,
+after getting our unit tests to pass on spark 2.0.0-SNAPSHOT we are now
+trying to run some algorithms at scale on our cluster.
+unfortunately this means that when i see errors i am having a harder time
+boiling it down to a small reproducible example.
+today we are running an iterative algo using the dataset api and we are
+seeing tasks fail with errors which seem to related to unsafe operations.
+the same tasks succeed without issues in our unit tests.
+i see either:
+16/05/27 12:54:46 ERROR executor.Executor: Exception in task 31.0 in stage
+21.0 (TID 1073)
+java.lang.NegativeArraySizeException
+        at
+org.apache.spark.unsafe.types.UTF8String.getBytes(UTF8String.java:229)
+        at
+org.apache.spark.unsafe.types.UTF8String.toString(UTF8String.java:821)
+        at
+org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificSafeProjection.apply(Unknown
+Source)
+        at scala.collection.Iterator$$anon$11.next(Iterator.scala:409)
+        at scala.collection.Iterator$$anon$11.next(Iterator.scala:409)
+        at scala.collection.Iterator$$anon$11.next(Iterator.scala:409)
+        at scala.collection.Iterator$$anon$12.nextCur(Iterator.scala:434)
+        at scala.collection.Iterator$$anon$12.hasNext(Iterator.scala:440)
+        at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:408)
+        at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:408)
+        at
+org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIterator.sort_addToSorter$(Unknown
+Source)
+        at
+org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIterator.processNext(Unknown
+Source)
+        at
+org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+        at
+org.apache.spark.sql.execution.WholeStageCodegenExec$$anonfun$7$$anon$1.hasNext(WholeStageCodegenExec.scala:359)
+        at
+org.apache.spark.sql.execution.aggregate.SortBasedAggregateExec$$anonfun$doExecute$1$$anonfun$3.apply(SortBasedAggregateExec.scala:74)
+        at
+org.apache.spark.sql.execution.aggregate.SortBasedAggregateExec$$anonfun$doExecute$1$$anonfun$3.apply(SortBasedAggregateExec.scala:71)
+        at
+org.apache.spark.rdd.RDD$$anonfun$mapPartitionsInternal$1$$anonfun$apply$24.apply(RDD.scala:775)
+        at
+org.apache.spark.rdd.RDD$$anonfun$mapPartitionsInternal$1$$anonfun$apply$24.apply(RDD.scala:775)
+        at
+org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:38)
+        at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:318)
+        at org.apache.spark.rdd.RDD.iterator(RDD.scala:282)
+        at
+org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:38)
+        at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:318)
+        at org.apache.spark.rdd.RDD.iterator(RDD.scala:282)
+        at
+org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:79)
+        at
+org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:47)
+        at org.apache.spark.scheduler.Task.run(Task.scala:85)
+        at
+org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:274)
+        at
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+        at
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+or alternatively:
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x00007fe571041cba, pid=2450, tid=140622965913344
+#
+# JRE version: Java(TM) SE Runtime Environment (7.0_75-b13) (build
+1.7.0_75-b13)
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (24.75-b04 mixed mode
+linux-amd64 compressed oops)
+# Problematic frame:
+# v  ~StubRoutines::jbyte_disjoint_arraycopy
+i assume the best thing would be to try to get it to print out the
+generated code that is causing this?
+what switch do i need to use again to do so?
+thanks,
+koert
+it seemed to be related to an Aggregator, so for tests we replaced it with
+an ordinary Dataset.reduce operation, and now we got:
+java.lang.NegativeArraySizeException
+        at
+org.apache.spark.unsafe.types.UTF8String.getBytes(UTF8String.java:229)
+        at
+org.apache.spark.unsafe.types.UTF8String.toString(UTF8String.java:821)
+        at
+org.apache.spark.sql.catalyst.expressions.GeneratedClass$SpecificSafeProjection.apply(Unknown
+Source)
+        at scala.collection.Iterator$$anon$11.next(Iterator.scala:409)
+        at scala.collection.Iterator$$anon$11.next(Iterator.scala:409)
+        at scala.collection.Iterator$$anon$11.next(Iterator.scala:409)
+        at scala.collection.Iterator$$anon$12.nextCur(Iterator.scala:434)
+        at scala.collection.Iterator$$anon$12.hasNext(Iterator.scala:440)
+        at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:408)
+        at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:408)
+        at scala.collection.Iterator$$anon$11.hasNext(Iterator.scala:408)
+        at
+org.apache.spark.shuffle.sort.BypassMergeSortShuffleWriter.write(BypassMergeSortShuffleWriter.java:147)
+        at
+org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:79)
+        at
+org.apache.spark.scheduler.ShuffleMapTask.runTask(ShuffleMapTask.scala:47)
+        at org.apache.spark.scheduler.Task.run(Task.scala:85)
+        at
+org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:274)
+        at
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+        at
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+        at java.lang.Thread.run(Thread.java:745)
+i did get the generated code, but its like 17 subtrees and its not a test
+but a company real program so i cannot just send it over.
+i will try to create a small test program to reproduce it.
+great!
+we weren't able to reproduce it because the unit tests use a broadcast-join
+while on the cluster it uses sort-merge-join. so the issue is in
+sort-merge-join.
+we are now able to reproduce it in tests using
+spark.sql.autoBroadcastJoinThreshold=-1
+it produces weird looking garbled results in the join.
+hoping to get a minimal reproducible example soon.
+hey,
+since SPARK-15982 was fixed (https://github.com/apache/spark/pull/13727) i
+believe all external DataSources that rely on using .load(path) without
+being a FileFormat themselves are broken.
+i noticed this because our unit tests for the elasticsearch datasource
+broke.
+i commented on the pullreq with the specific issue i am facing.
+best,
+koert
+is that correct?
+where do i get the latest 2.0.0-SNAPSHOT?
+thanks,
+koert
+You do, snapshots for spark 2.0.0-SNAPSHOT are updated daily on the apache
+snapshot repo. I use them in our own unit tests to find regressions etc. in
+spark and report them back
+that helps, now i know i simply need to look at master
+after working with the Dataset and Aggregator apis for a few weeks porting
+some fairly complex RDD algos (an overall pleasant experience) i wanted to
+summarize the pain points and some suggestions for improvement given my
+experience. all of these are already mentioned on mailing list or jira, but
+i figured its good to put them in one place.
+see below.
+best,
+koert
+*) a lot of practical aggregation functions do not have a zero. this can be
+dealt with correctly using null or None as the zero for Aggregator. in
+algebird for example this is expressed as converting an algebird.Aggregator
+(which does not have a zero) into a algebird.MonoidAggregator (which does
+have a zero, so similar to spark Aggregator) by lifting it. see:
+https://github.com/twitter/algebird/blob/develop/algebird-core/src/main/scala/com/twitter/algebird/Aggregator.scala#L420
+something similar should be possible in spark. however currently Aggregator
+does not like its zero to be null or an Option, making this approach
+difficult. see:
+https://www.mail-archive.com/user@spark.apache.org/msg53106.html
+https://issues.apache.org/jira/browse/SPARK-15810
+*) KeyValueGroupedDataset.reduceGroups needs to be efficient, probably
+using an Aggregator (with null or None as the zero) under the hood. the
+current implementation does a flatMapGroups which is suboptimal.
+*) KeyValueGroupedDataset needs mapValues. without this porting many algos
+from RDD to Dataset is difficult and clumsy. see:
+https://issues.apache.org/jira/browse/SPARK-15780
+*) Aggregators need to also work within DataFrames (so
+RelationalGroupedDataset) without having to fall back on using Row objects
+as input. otherwise all code ends up being written twice, once for
+Aggregator and once for UserDefinedAggregateFunction/UDAF. this doesn't
+make sense to me. my attempt at addressing this:
+https://issues.apache.org/jira/browse/SPARK-15769
+https://github.com/apache/spark/pull/13512
+best,
+koert
+oh you mean instead of:
+assert(ds3.select(NameAgg.toColumn).schema.head.nullable === true)
+just do:
+assert(ds3.select(NameAgg.toColumn).schema.head.nullable)
+i did mostly === true because i also had === false, and i liked the
+symmetry, but sure this can be fixed if its not the norm
+dropping java 7 support was considered for spark 2.0.x but we decided
+against it.
+ideally dropping support for a java version should be communicated far in
+advance to facilitate the transition.
+is this the right time to make that decision and start communicating it
+(mailing list, jira, etc.)? perhaps for spark 2.1.x or spark 2.2.x?
+my general sense is that most cluster admins have plans to migrate to java
+8 before end of year. so that could line up nicely with spark 2.2
+i care about signalling it in advance mostly. and given the performance
+differences we do have some interest in pushing towards java 8
+They don't require dropping it sooner rather than later. But signalling in
+some way that java 8 is (strongly) recommend would be good.
+i see this warning when running jobs on cluster:
+2016-10-12 14:46:47 WARN spark.SparkContext: Spark is not running in local
+mode, therefore the checkpoint directory must not be on the local
+filesystem. Directory '/tmp' appears to be on the local filesystem.
+however the checkpoint "directory" that it warns about is a hadoop path. i
+use an unqualified path, which means a path on the default filesystem by
+hadoop convention. when running on the cluster my default filesystem is
+hdfs (and it correctly uses hdfs).
+how about if we change the method that does this check
+(Utils.nonLocalPaths) to be aware of the default filesystem instead of
+incorrectly assuming its local if not specified?
+it will take time before all libraries that spark depends on are available
+for scala 2.12, so we are not talking spark 2.1.x and probably also not
+2.2.x for scala 2.12
+it technically makes sense to drop java 7 and scala 2.10 around the same
+time as scala 2.12 is introduced
+we are still heavily dependent on java 7 (and python 2.6 if we used python
+but we dont). i am surprised to see new clusters installed in last few
+months (CDH and HDP latest versions) to still be running on java 7. even
+getting java 8 installed on these clusters so we can use them in yarn is
+often not an option. it beats me as to why this is still happening.
+we do not use scala 2.10 at all anymore.
+i am trying to use encoders as a typeclass where if it fails to find an
+ExpressionEncoder it falls back to KryoEncoder.
+the issue seems to be that ExpressionEncoder claims a little more than it
+can handle here:
+  implicit def newProductEncoder[T <: Product : TypeTag]: Encoder[T] =
+Encoders.product[T]
+this "claims" to handle for example Option[Set[Int]], but it really cannot
+handle Set so it leads to a runtime exception.
+would it be useful to make this a little more specific? i guess the
+challenge is going to be case classes which unfortunately dont extend
+Product1, Product2, etc.
+yup, it doesnt really solve the underlying issue.
+we fixed it internally by having our own typeclass that produces encoders
+and that does check the contents of the products, but we did this by simply
+supporting Tuple1 - Tuple22 and Option explicitly, and not supporting
+Product, since we dont have a need for case classes
+if case classes extended ProductN (which they will i think in scala 2.12?)
+then we could drop Product and support Product1 - Product22 and Option
+explicitly while checking the classes they contain. that would be the
+cleanest.
+that sounds good to me
+why would generating implicits for ProductN where you also require the
+elements in the Product to have an expression encoder not work?
+we do this. and then we have a generic fallback where it produces a kryo
+encoder.
+for us the result is that say an implicit for Seq[(Int, Seq[(String,
+Int)])] will create a new ExpressionEncoder(), while an implicit for
+Seq[(Int, Set[(String, Int)])] produces a Encoders.kryoEncoder()
+for example (the log shows when it creates a kryo encoder):
+scala> implicitly[EncoderEvidence[Option[Seq[String]]]].encoder
+res5: org.apache.spark.sql.Encoder[Option[Seq[String]]] = class[value[0]:
+array implicitly[EncoderEvidence[Option[Set[String]]]].encoder
+dataframe.EncoderEvidence$: using kryo encoder for scala.Option[Set[String]]
+res6: org.apache.spark.sql.Encoder[Option[Set[String]]] = class[value[0]:
+binary]
+i use kryo for the whole thing currently
+it would be better to use it for the subtree
+if kryo could transparently be used for subtrees without narrowing the
+implicit that would be great
++1 non binding
+compiled and unit tested in-house libraries against 2.0.2-rc1 successfully
+was able to build, deploy and launch on cdh 5.7 yarn cluster
+on a side note... these artifacts on staging repo having version 2.0.2
+instead of 2.0.2-rc1 makes it somewhat dangerous to test against it in
+existing project. i can add a sbt resolver for staging repo and change my
+spark version to 2.0.2, but now it starts downloading and caching these
+artifacts as version 2.0.2 which means i am now hunting down local cache
+locations afterwards like ~/.ivy2/cache to make sure i wipe them or run the
+risk of in the future compiling against the rc instead of the actual
+release by accident. not sure if i should be doing something different?
+i have been pushing my luck a bit and started using ExpressionEncoder for
+more complex types like sequences of case classes etc. (where the case
+classes only had primitives and Strings).
+it all seems to work but i think the wheels come off in certain cases in
+the code generation. i guess this is not unexpected, after all what i am
+doing is not yet supported.
+is there a planned path forward to support more complex types with
+encoders? it would be nice if we can at least support all types that
+spark-sql supports in general for DataFrame.
+best, koert
+that makes sense. we have something like that inhouse as well, but not as
+nice and not using shapeless (we simply relied on sbt-boilerplate to handle
+all tuples and do not support case classes).
+however the frustrating part is that spark sql already has this more or
+less. look for example at ExpressionEncoder.fromRow and
+ExpressionEncoder.toRow. but these methods use InternalRow while the rows
+exposed to me as a user are not that.
+at this point i am more tempted to simply open up InternalRow at a few
+places strategically than to maintain another inhouse row marshalling
+class. once i have InternalRows looks of good stuff is available to me to
+use.
+sorry last line should be:
+once i have InternalRows lots of good stuff is available to me to use.
+agreed on your point that this can be done without macros
+just taking it for a quick spin it looks great, with correct support for
+nested rows and using option for nullability.
+scala> val format = implicitly[RowFormat[(String, Seq[(String,
+Option[Int])])]]
+format: com.github.upio.spark.sql.RowFormat[(String, Seq[(String,
+Option[Int])])] = com.github.upio.spark.sql.FamilyFormats$$anon$3@2c0961e2
+scala> format.schema
+res12: org.apache.spark.sql.types.StructType =
+StructType(StructField(_1,StringType,false),
+StructField(_2,ArrayType(StructType(StructField(_1,StringType,false),
+StructField(_2,IntegerType,true)),true),false))
+scala> val x = format.read(Row("a", Seq(Row("a", 5))))
+x: (String, Seq[(String, Option[Int])]) = (a,List((a,Some(5))))
+scala> format.write(x)
+res13: org.apache.spark.sql.Row = [a,List([a,5])]
+sorry this message by me was confusing. i was frustrated about how hard it
+is to use the Encoder machinery myself directly on Row objects, this is
+unrelated to the question if a shapeless based approach like sam suggest
+would be better way to do encoders in general
+you are creating a new hive context per microbatch? is that a good idea?
+running our inhouse unit-tests (that work with spark 2.0.2) against spark
+2.1.0-rc1 i see the following issues.
+any test that use avro (spark-avro 3.1.0) have this error:
+java.lang.AbstractMethodError
+    at
+org.apache.spark.sql.execution.datasources.FileFormatWriter$SingleDirectoryWriteTask.(FileFormatWriter.scala:232)
+    at
+org.apache.spark.sql.execution.datasources.FileFormatWriter$.org$apache$spark$sql$execution$datasources$FileFormatWriter$$executeTask(FileFormatWriter.scala:182)
+    at
+org.apache.spark.sql.execution.datasources.FileFormatWriter$$anonfun$write$1$$anonfun$3.apply(FileFormatWriter.scala:129)
+    at
+org.apache.spark.sql.execution.datasources.FileFormatWriter$$anonfun$write$1$$anonfun$3.apply(FileFormatWriter.scala:128)
+    at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:87)
+    at org.apache.spark.scheduler.Task.run(Task.scala:99)
+    at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:282)
+    at
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+    at
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)
+    at java.lang.Thread.run(Thread.java:745)
+so looks like some api got changed or broken. i dont know if this is an
+issue or if this is OK.
+also a bunch of unit test related to reading and writing csv files fail.
+the issue seems to be newlines inside quoted values. this worked before and
+now it doesnt work anymore. i dont know if this was an accidentally
+supported feature and its ok to be broken? i am not even sure it is a good
+idea to support newlines inside quoted values. anyhow they still get
+written out the same way as before, but now when reading it back in things
+break down.
+after seeing Hyukjin Kwon's comment in SPARK-17583 i think its safe to say
+that what i am seeing with csv is not bug or regression. it was unintended
+and/or unreliable behavior in spark 2.0.x
+somewhere between rc1 and the current head of branch-2.1 i started seeing
+an NPE in our in-house unit tests for Dataset + Aggregator. i created
+SPARK-18711  for this.
+with the current branch-2.1 after rc1 i am now also seeing this error in
+our unit tests:
+ java.lang.UnsupportedOperationException: Cannot create encoder for Option
+of Product type, because Product type is represented as a row, and the
+entire row can not be null in Spark SQL like normal databases. You can wrap
+your type with Tuple1 if you do want top level null Product objects, e.g.
+instead of creating `Dataset[Option[MyClass]]`, you can do something like
+`val ds: Dataset[Tuple1[MyClass]] = Seq(Tuple1(MyClass(...)),
+Tuple1(null)).toDS`
+the issue is that we have Aggregator[String, Option[SomeCaseClass], String]
+and it doesn't like creating the Encoder for that Option[SameCaseClass]
+anymore.
+this is related to SPARK-18251
+we have a workaround for this: we will wrap all buffer encoder types in
+Tuple1. a little inefficient but its okay with me.
+take a look at:
+https://issues.apache.org/jira/browse/SPARK-15798
+i think this works but it relies on groupBy and agg respecting the sorting.
+the api provides no such guarantee, so this could break in future versions.
+i would not rely on this i think...
+it can also be done with repartition + sortWithinPartitions + mapPartitions.
+perhaps not as convenient but it does not rely on undocumented behavior.
+i used this approach in spark-sorted. see here:
+https://github.com/tresata/spark-sorted/blob/master/src/main/scala/com/tresata/spark/sorted/sql/GroupSortedDataset.scala
+yes it's less optimal because an abstraction is missing and with
+mapPartitions it is done without optimizations. but aggregator is not the
+right abstraction to begin with, is assumes a monoid which means no
+ordering guarantees. you need a fold operation.
+i just noticed that spark 2.1.0 bring in a new transitive dependency on
+shapeless 2.0.0
+shapeless is a popular library for scala users, and shapeless 2.0.0 is old
+(2014) and not compatible with more current versions.
+so this means a spark user that uses shapeless in his own development
+cannot upgrade safely from 2.0.0 to 2.1.0, i think.
+wish i had noticed this sooner
+we also use spray for webservices that execute on spark, and spray depends
+on even older (and incompatible) shapeless 1.x
+to get rid of the old shapeless i would have to upgrade from spray to
+akka-http, which means going to java 8
+this might also affect spark-job-server, which it seems uses spray.
+could this be related to SPARK-18787?
+hello all,
+i am trying to add an Expression to catalyst.
+my Expression compiles fine and has:
+override def eval(input: InternalRow): Any = ...
+override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = ...
+it also seems to run fine. but i only ever see eval get called. how do i
+tell spark to use doGenCode instead of eval?
+thanks! koert
+so i have been looking for a while now at all the catalyst expressions, and
+all the relative complex codegen going on.
+so first off i get the benefit of codegen to turn a bunch of chained
+iterators transformations into a single codegen stage for spark. that makes
+sense to me, because it avoids a bunch of overhead.
+but what i am not so sure about is what the benefit is of converting the
+actual stuff that happens inside the iterator transformations into codegen.
+say if we have an expression that has 2 children and creates a struct for
+them. why would this be faster in codegen by re-creating the code to do
+this in a string (which is complex and error prone) compared to simply have
+the codegen call the normal method for this in my class?
+i see so much trivial code be re-created in codegen. stuff like this:
+  private[this] def castToDateCode(
+      from: DataType,
+      ctx: CodegenContext): CastFunction = from match {
+    case StringType =>
+      val intOpt = ctx.freshName("intOpt")
+      (c, evPrim, evNull) => s"""
+        scala.Option $intOpt =
+          org.apache.spark.sql.catalyst.util.DateTimeUtils.stringToDate($c);
+        if ($intOpt.isDefined()) {
+          $evPrim = ((Integer) $intOpt.get()).intValue();
+        } else {
+          $evNull = true;
+        }
+       """
+is this really faster than simply calling an equivalent functions from the
+codegen, and keeping the codegen logic restricted to the "unrolling" of
+chained iterators?
+based on that i take it that math functions would be primary beneficiaries
+since they work on primitives.
+so if i take UnaryMathExpression as an example, would i not get the same
+benefit if i change it to this?
+abstract class UnaryMathExpression(val f: Double => Double, name: String)
+  extends UnaryExpression with Serializable with ImplicitCastInputTypes {
+  override def inputTypes: Seq[AbstractDataType] = Seq(DoubleType)
+  override def dataType: DataType = DoubleType
+  override def nullable: Boolean = true
+  override def toString: String = s"$name($child)"
+  override def prettyName: String = name
+  protected override def nullSafeEval(input: Any): Any = {
+    f(input.asInstanceOf[Double])
+  }
+  // name of function in java.lang.Math
+  def funcName: String = name.toLowerCase
+  def function(d: Double): Double = f(d)
+  override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    val self = ctx.addReferenceObj(name, this, getClass.getName)
+    defineCodeGen(ctx, ev, c => s"$self.function($c)")
+  }
+}
+admittedly in this case the benefit in terms of removing complex codegen is
+not there (the codegen was only one line), but if i can remove codegen here
+i could also remove it in lots of other places where it does get very
+unwieldy simply by replacing it with calls to methods.
+Function1 is specialized, so i think (or hope) that my version does no
+extra boxes/unboxing.
+yes agreed. however i believe nullSafeEval is not used for codegen?
+thanks for that detailed response!
+what about the conversation about dropping scala 2.10?
+gonna end up with a stackoverflow on recursive votes here

@@ -1,0 +1,322 @@
+ASF Jenkins is always there to play with; committers/PMC members should just need to file a BUILD JIRA to get access.
+Its main limitation is more cultural than technical: you need to get people to care about intermittent test runs, otherwise you can end up with failures that nobody keeps on top of
+https://builds.apache.org/view/H-L/view/Hadoop/
+Someone really needs to own the "keep the builds working" problem -and have the ability to somehow kick others into fixing things. The latter is pretty hard cross-organisation
+Potentially an issue with the test runner, rather than the tests themselves.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I've been seeing (and remember, I've only recently started playing with funsuite), that the logs go to target/unit.log; edit log4j.properties to go to stdout and they go to stdout -but they don't go into the surefire logs. That is, the test runner isn't generating the classic  XML report with its sections of stdout and stderr. While that format has its limitations, and you can certainly do better (ideally every log level event should be captured; let you turn them on/off, pull in threads, correlate timestamps across machines, etc, etc), having Junit & jenkins reports which include all the output logs testcase-by-testcase is pretty foundational. Maybe there's some way to turn it on that I haven't seen. 
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I'm writing some functional tests for the SPARK-1537 JIRA, Yarn timeline service integration, for which I need to allocate some free ports.
+I don't want to hard code them in as that can lead to unreliable tests, especially on Jenkins. 
+Before I implement the logic myself -Is there a utility class/trait for finding ports for tests?
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+also: make sure that you have the full JCE and not the crippled crypto; every time you upgrade the JDK you are likely to have to re-install it. Java gives no useful error messages on this or any other Kerberos problem
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+There's some magic in the process that is worth knowing/being cautious of
+Those special HDFSConfiguration, YarnConfiguration, HiveConf objects are all doing work in their class initializer to call Configuration.addDefaultResource
+this puts their -default and -site XML files onto the list of default configuration. Hadoop then runs through the list of configuration instances it is tracking in a WeakHashmap, and, if created with the useDefaults=true option in their constructor, tells them to reload all their "default" config props (preserving anything set explicitly).
+This means you can use/abuse this feature to force in properties onto all Hadoop Configuration instances that asked for the default values -though this doesn't guarantee the changes will be picked up.
+It's generally considered best practice for apps to create an instance of the configuration classes whose defaults & site they want picked up as soon as they can. Even if you discard the instance itself. Your goal is to get those settings in, so that the defaults don't get picked up elsewhere.
+-steve
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I actually think the assignee JIRA issue is a minor detail; what really matters is do things get in and how.
+So far, in the bits I've worked on, I've not encountered any problems. And as I've stated in the hadoop-dev lists, my main concern there is long-standing patches that languish because nobody invests the time to look at other people's patches unless/until they are on the critical path or part of a late-night-emergency-patch event (e.g. HADOOP-11730).  I'm as guilty there as everyone else -and I know that a reason is that a lot of those external patches come without good test coverage; getting something in usually involves dealing with that.
+So far, so good -and I'd like to praise Sean Owen here, as not only has he put in effort, being in the same TZ means I get feedback faster. Sean, I owe you beer the next time you are in Bristol. 
+If some JIRA has someone say "I'm working on it" and then nothing happens, it's moot whether its in a drop-down list or a comment on the bottom. If someone else wants to take it up, unless they like duplicating effort, starting off other people's work -collaborating- is the best way to produce quality code.
+The only thing I would change is somehow get newly created JIRAs posted onto a list (dev?) that doesn't have the firehose of every other JIRA; issues@ is too noisy.
+-Steve
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+One thing to consider is that while docs as PDFs in JIRAs do document the original proposal, that's not the place to keep living specifications. That stuff needs to live in SCM, in a format which can be easily maintained, can generate readable documents, and, in an unrealistically ideal world, even be used by machines to validate compliance with the design. Test suites tend to be the implicit machine-readable part of the specification, though they aren't usually viewed as such.
+PDFs of word docs in JIRAs are not the place for ongoing work, even if the early drafts can contain them. Given it's just as easy to point to markdown docs in github by commit ID, that could be an alternative way to publish docs, with the document itself being viewed as one of the deliverables. When the time comes to update a document, then its there in the source tree to edit.
+If there's a flaw here, its that design docs are that: the design. The implementation may not match, ongoing work will certainly diverge. If the design docs aren't kept in sync, then they can mislead people. Accordingly, once the design docs are incorporated into the source tree, keeping them in sync with changes has be viewed as essential as keeping tests up to date
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+1. to use s3a you'll also need an amazon toolkit JAR on the cp
+2. I can add a hadoop-2.6 profile that sets things up for s3a, azure and openstack swift.
+3. TREAT S3A on HADOOP 2.6 AS BETA-RELEASE
+For anyone thinking putting that in all-caps seems excessive, consult
+https://issues.apache.org/jira/browse/HADOOP-11571
+in particular, anything that queries for the block size of a file before dividing work up is dead in the water due to 
+HADOOP-11584 : s3a file block size set to 0 in getFileStatus. There's also thread pooling problems if too many
+writes are going on in the same JVM; this may hit output operations
+Hadoop 2.7 fixes all the phase I issues, leaving those in HADOOP-11694 to look at
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Added: 
+https://issues.apache.org/jira/browse/SPARK-7481 
+One thing to consider here is testing; the s3x clients themselves have some tests that individuals/orgs can run against different S3 installations & private versions; people publish their results to see that there's been good coverage of the different S3 installations with their different consistency models & auth mechanisms. 
+There's also some scale tests that take time & don't get run so often but which throw up surprises (RAX UK throttling DELETE, intermittent ConnectionReset exceptions reading multi-GB s3 files). 
+Amazon have some public datasets that could be used to verify that spark can read files off S3, and maybe even find some of the scale problems.
+In particular, http://datasets.elasticmapreduce.s3.amazonaws.com/ publishes ngrams as a set of .gz files free for all to read
+Would there be a place in the code tree for some tests to run against things like this? They're cloud integration tests rather than unit tests and nobody would want them to be on by default, but it could be good for regression testing hadoop s3 support & spark integration
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+that's really nice.
+I like the publishing to google spreadsheets & the eating-your-own-dogfood analysis.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Is this backported to branch 1.3?
+thanks. All I'd need would be the base class, so that new tests can be written to work across branches.
+-steve
+Patching hadoop's build will fix this long term, but not until Hadoop-2.7.2
+I think just adding the openstack JAR to the spark classpath should be enough to pick this up, which the --jars command can do with ease
+On that topic, one thing I would like to see (knowing what it takes to get azure and s3a support in), would be the spark shell scripts to auto-add everything
+in SPARK_HOME/lib to the CP (or at least having the option to do this). Because spark-class doesn't do that, run-example has to have its own code to add
+the examples jar.
+Has this been discussed before? Even having an env var that spark-class, pyspark & others could pick up would be enough
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+One of my pull requests is failing in a test that I have gone nowhere near
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/37491/testReport/junit/org.apache.spark/DistributedSuite/_It_is_not_a_test_/
+This isn't the only pull request that's failing, and I've merged in the master branch to make sure its not something fixed in the source.
+is there some intermittent race condition or similar?
+-steve
+Looks like Jenkins is hitting some AWS limits
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/38396/testReport/org.apache.spark.streaming.kinesis/KinesisBackedBlockRDDSuite/_It_is_not_a_test_/
+you might also be interested to know that there's now a YARN JIRA on making GPU another resource you can ask for
+https://issues.apache.org/jira/browse/YARN-4122
+if implemented, it'd let you submit work into the cluster asking for GPUs, and get allocated containers on servers with the GPU capacity you need. This'd allow you to share GPUs with other code (including your own containers)
+good luck. And the fear is about my talk at apachecon on the Hadoop stack & Kerberos
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+hope things recover: once a rack has overheated you are in trouble.
+I know some clusters that keep the ToR switches in middle of the racks for this reason: its less exposed to the hot air near the ceiling, so the most valuable H/W on the rack gets more protection.
+As an added benefit: your ether cables are shorter, which, when you go to 4x1 bonded, makes a big difference in cost.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Having looked at the notice, I actually see a lot more thorough that most ASF projects.
+in contrast, here is the hadoop one: 
+---
+This product includes software developed by The Apache Software
+Foundation (http://www.apache.org/).
+---
+regarding the spark one, I don't see that you need to refer to transitive dependencies for the non-binary distros, and, for any binaries, to bother listing the licensing of all the ASF dependencies. Things pulled in from elsewhere & pasted in, that's slightly more complex. I've just been dealing with the issue of taking an openstack-applied patch to the hadoop swift object store code -and, because the licenses are compatible, we're just going to stick it in as-is.
+Uber-JARs, such as spark.jar, do contain lots of classes from everywhere. I don't know the status of them. You could probably get maven to work out the licensing if all the dependencies declare their license.
+On that topic, note that marcelo's proposal to break up that jar and add lib/*.jar to the CP would allow codahale's ganglia support to come in just by dropping in the relevant LGPL JAR, avoiding the need to build a custom spark JAR tainted by the transitive dependency.
+-Steve
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+not wierd if you are bypassing bin/spark
+well, spark-submit and spark-example shells do something close to this, though primarly as error checking against >1 artifact and classpath confusion
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+it should if you have built a local hadoop version and done the -Phadoop-2.6 -Dhadoop.version=2.8.0-SNAPSHOT
+if you are rebuilding hadoop with an existing version number (e.g. 2.6.0, 2.7.1) then maven may not actually be picking up your new code
+There's a hadoop-provided profile which you can build with; this should leave the hadoop artifacts (and other stuff expected to be in the far-end's classpath) out of the assembly
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+the problem here is that they aren't really filesystems (certainly s3 via the s3n & s3a clients), flush() is a no-op, and its's only on the close() that there's a bulk upload. For bonus fun, anything that does a rename() usually forces a download/re-upload of the source files.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+SBT/ivy pulls in the most recent version of a JAR in, whereas maven pulls in the "closest", where closest is lowest distance/depth from the root.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+It's not that ivy is bad per-se, only that it has a different policy, one which holds *provided all later versions of JARs are backwards compatible*
+Maven's closest-first policy has a different flaw, namely that its not always obvious why a guava 14.0 that is two hops of transitiveness should take priority over a 16.0 version three hops away. Especially when that 0.14 version should have come
+If you look at the the diffs for the hive 1.2.1 update patch, the final week was pretty much frittered away trying to get the two builds to have consistent versions of things.
+1. I should have historical commit rights to ivy, so, transitively to SBT's dependency logic. If someone writes a resolver with the same behaviour as maven2 I'll see about getting it in.
+2. Hadoop 2.6 is on curator 2.7.1; HADOOP-11492. To verify it worked against guava 11.02, I ended up compiling curator against that version to see what broke. curator-x-discovery is the only module which doesn't compile against older guava versions (HADOOP-11102)
+-Steve
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I agree, that's wrong
+I think if you have an indirect dependency, it picks one on the shortest path, so if you aren't explicit, you can still lose control of what's going on...
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Spark is currently on a fairly dated version of Kryo 2.x; it's trailing on the fixes in Hive and, as the APIs are incompatible, resulted in that mutant spark-project/hive JAR needed for the Hive 1.2.1 support
+But: updating it hasn't been an option, because Spark needs to be in sync with Twitter's Chill library.
+There's now an offer from Twitter to help coordinate a kryo update across Chill, Scalding and other things they use
+https://github.com/twitter/chill/pull/230
+Given kryo is "The guava jar of serialization", I doubt anyone is jumping up and down wanting this, but it is something to consider. Once hive moves to it, all the hive spark integration is probably going to break again; getting in sync with hive (see SPARK-10793) would reduce the traumaticness of hive updates
+mixing spark versions in a JAR cluster with compatible hadoop native libs isn't so hard: users just deploy them up separately. 
+But: 
+-mixing Scala version is going to be tricky unless the jobs people submit are configured with the different paths
+-the history server will need to be of the most latest spark version being executed in the cluster
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++ generally, unless you want to run all the hadoop tests, set the  -DskipTests on the mvn commands. The HDFS ones take a while and can use up all your file handles.
+mvn install -DskipTests
+here's the aliases I use
+export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m -Xms256m -Djava.awt.headless=true"
+alias mi="mvn install -DskipTests"
+alias mci="mvn clean install -DskipTests"
+alias mvt="mvn test"
+alias mvct="mvn clean test"
+alias mvp="mvn package -DskipTests"
+alias mvcp="mvn clean package -DskipTests"
+alias mvnsite="mvn site:site -Dmaven.javadoc.skip=true -DskipTests"
+alias mvndep="mvn dependency:tree -Dverbose"
+mvndep > target/dependencies.txt is my command of choice to start working out where some random dependency is coming in from
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+If you want a separate project, eg. SPARK-EXTRAS, then it *generally* needs to go through incubation. While normally its the incubator PMC which sponsors/oversees the incubating project, it doesn't have to be the case: the spark project can do it.
+Also Apache Arrow managed to make it straight to toplevel without that process. Given that the spark extras are already ASF source files, you could try the same thing, add all the existing committers, then look for volunteers to keep things.
+You'd get
+ -a JIRA entry of your own, easy to reassign bugs from SPARK to SPARK-EXTRAS
+ -a bit of git
+ -ability to set up builds on ASF Jenkins. Regression testing against spark nightlies would be invaluable here.
+ -the ability to stage and publish through ASF Nexus
+-Steve
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I don't know. there's generally a 1 project -> 1x issue, 1x JIRA.
+but: hadoop core has 3x JIRA, 1x repo, and one set of write permissions to that repo, with the special exception of branches (encryption, ipv6) that have their own committers.
+oh, and I know that hadoop site is on SVN, as are other projects, just to integrate with asf site publishing, so you can certainly have 1x git + 1 x svn
+ASF won't normally let you have 1 repo with different bits of the tree having different access rights, so you couldn't open up spark-extras to people with less permissions/rights than others.
+A separate repo will, separate issue tracking helps you isolate stuff
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I'd be supportive of a spark-extras project; it'd actually be  place to keep stuff I've worked on 
+ -the yarn ATS 1/1.5 integration
+ -that mutant hive JAR which has the consistent kryo dependency and different shadings
+... etc
+There's also the fact that the twitter streaming is a common example to play with, flume is popular in places too.
+If you want to set up a new incubator with a goal of graduating fast, I'd help. As a key metric of getting out of incubator is active development, you just need to "recruit" contributors and keep them engaged.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+you wouldn't want to dist it as an archive; it's not just the binaries, it's the install phase. And you'd better remember to put the JCE jar in on top of the JDK for kerberos to work.
+setting up environment vars to point to JDK8 in the launched app/container avoids that. Yes, the ops team do need to install java, but if you offer them the choice of "installing a centrally managed Java" and "having my code try and install it", they should go for the managed option.
+One thing to consider for 2.0 is to make it easier to set up those env vars for both python and java. And, as the techniques for mixing JDK versions is clearly not that well known, documenting it. 
+(FWIW I've done code which even uploads it's own hadoop-* JAR, but what gets you is changes in the hadoop-native libs; you do need to get the PATH var spot on)
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+while sonatype are utterly strict about the org.apache namespace (it guarantees that all such artifacts have come through the ASF release process, ideally including code-signing), nobody checks the org.apache internals, or worries too much about them. Note that spark itself has some bits of code in org.apache.hive so as to subclass the thriftserver.
+What are the costs of having a project's package used externally?
+1. interesting debugging sessions if JARs with conflicting classes are loaded.
+2. you can't sign the JARs in the metadata. Nobody does that with the maven artifacts anyway.
+3. whoever's package name it is often gets to see the stack traces in bug reports filed against them.
+Can I note that if Spark 2.0 is going to be Java 8+ only, then that means Hadoop 2.6.x should be the minimum Hadoop version.
+https://issues.apache.org/jira/browse/HADOOP-11090
+Where things get complicated, is that situation of: Hadoop services on Java 7, Spark on Java 8 in its own JVM
+I'm not sure that you could get away with having the newer version of the Hadoop classes in the spark assembly/lib dir, without coming up against incompatibilities with the Hadoop JNI libraries. These are currently backwards compatible, but trying to link up Hadoop 2.7 against a Hadoop 2.6 hadoop lib will generate an UnsatisfiedLinkException. Meaning: the whole cluster's hadoop libs have to be in sync, or at least the main cluster release in a version of hadoop 2.x >= the spark bundled edition.
+Ignoring that detail,
+Hadoop 2.6.1+
+Guava >= 15? 17?
+ I think the outcome of Hadoop < 2.6 and JDK >= 8 is "undefined"; all bug reports will be met with a "please upgrade, re-open if the problem is still there".
+Kerberos is  a particular troublespot here : You need Hadoop 2.6.1+ for Kerberos to work in Java 8 and recent versions of Java 7 (HADOOP-10786)
+Note also that HADOOP-11628 is in 2.8 only. SPNEGO + CNAMES. I'll see about pulling that into 2.7.x, though I'm reluctant to go near 2.6 just to keep that extra stable.
+Thomas: you've got the big clusters, what versions of Hadoop will they be on by the time you look at Spark 2.0?
+-Steve
+A WiP PR of mine is failing in mima: https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/54525/consoleFull
+[info] spark-examples: previous-artifact not set, not analyzing binary compatibility
+java.lang.RuntimeException: bad constant pool tag 50 at byte 12
+at com.typesafe.tools.mima.core.ClassfileParser$ConstantPool.errorBadTag(ClassfileParser.scala:204)
+at com.typesafe.tools.mima.core.ClassfileParser$ConstantPool.(ClassfileParser.scala:106)
+at com.typesafe.tools.mima.core.ClassfileParser.parseAll(ClassfileParser.scala:67)
+at com.typesafe.tools.mima.core.ClassfileParser.parse(ClassfileParser.scala:59)
+at com.typesafe.tools.mima.core.ClassInfo.ensureLoaded(ClassInfo.scala:86)
+at com.typesafe.tools.mima.core.ClassInfo.methods(ClassInfo.scala:101)
+at com.typesafe.tools.mima.core.ClassInfo$$anonfun$lookupClassMethods$2.apply(ClassInfo.scala:123)
+at com.typesafe.tools.mima.core.ClassInfo$$anonfun$lookupClassMethods$2.apply(ClassInfo.scala:123)
+...
+That's the kind of message which hints at some kind of JVM versioning mismatch, but, AFAIK, I'm (a) just pulling in java 6/7 libraries and (b) skipping the hadoop-2.6+ module anyway.
+Any suggestions to make the stack trace go away
++1
+you should know there's a bit of a "discussion" in Hadoop right now about what "LimitedPrivate" means, that is: things marked "LimitedPrivate(MapReduce)" are pretty much universally used in YARN apps, and other things tagged as private (UGI) are so universal that its meaningless. That is: even if you tag up something as Developer, it may end up being used so widely that it becomes public. The hard part then becomes recognising which classes and methods have such a use, which ends up needing an IDE with everything loaded in.
+Java 9 is going to open up a lot more in terms of modularization, though i don't know what that will mean for scala. For Java projects, it may allow isolation to be more explicit
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+labels are good in JIRA for things that span components, even transient tagging for events like "hackathon". Don't scale to personal/team use in the ASF; that's what google spreadsheets are better for
+Now, what would be nice there would be for some spreadsheet plugin to pull JIRA status into a spreadsheet
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+It's been voted on by the project, so can go up on central
+There's already some JIRAs being filed against it, this is a metric of success as pre-beta of the artifacts.
+The risk of exercising the m2 central option is that people may get expectations that they can point their code at the 2.0.0-preview and then, when a release comes out, simply
+update their dependency; this may/may not be the case. But is it harmful if people do start building and testing against the preview? If it finds problems early, it can only be a good thing
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+if you want to be able to build up CPs on windows to run on a Linux cluster, or vice-versa, you really need to be using the Environment.CLASS_PATH_SEPARATOR field, "". This is expanded in the cluster, not in the client
+Although tagged as @Public, @Unstable, it's been in there sinceYARN-1824 & Hadoop 2.4; things rely on it. If someone wants to fix that by submitting a patch to YARN-5247; I'll review it.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+yes; though I should warn that I have evidence that some people have been breaking things tagged a stable; 
+https://issues.apache.org/jira/browse/YARN-5130
+what that @Stable marker does do is give you ability to complain when things break
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+no reason; the key thing is : not in cluster mode, as there your work happens elsewhere
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+failfast generally means that you find problems sooner rather than later, and here, potentially, that your code runs but simply returns empty data without any obvious cue as to what is wrong.
+As is always good in OSS, follow those stack trace links to see what they say:
+        // Check whether the path exists if it is not a glob pattern.
+        // For glob pattern, we do not check it because the glob pattern might only make sense
+        // once the streaming job starts and some upstream source starts dropping data.
+If you specify a glob pattern, you'll get the late check at the expense of the risk of that empty data source if the pattern is wrong. Something like "/var/log\s" would suffice, as the presence of the backslash is enough for SparkHadoopUtil.isGlobPath() to conclude that its something for the globber.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Some people may have noticed I've been working on adding packaging, docs & testing for getting Spark to work with S3, Azure and openstack into a Spark distribution,
+https://github.com/apache/spark/pull/12004
+It's been a WiP, but now I've got tests for all three cloud infrastructures, tests covering: basic IO, output committing, dataframe IO and streaming, the core test coverage is done; the packaging working.
+Which means I'd really like some reviews by people who want to have spark work with S3, Azure or their local Swift endpoint to review that PR, ideally going through the documentation and validating that as well as the code.
+It's Hadoop 2.7+ only, with a new profile, "cloud", to pull in the new module of the same name.
+thanks
+-Steve
+PS: documentation (without templated code rendering):
+https://github.com/steveloughran/spark/blob/features/SPARK-7481-cloud/docs/cloud-integration.md
+What's the process for PR review for the Hive JAR?
+I ask as I've had a PR for fixing a kerberos problem outstanding for a while, without much response
+https://github.com/pwendell/hive/pull/2
+I'm now looking at the one line it would take for the JAR to consider Hadoop 3.x compatible at the API level with Hives 2.x, so that Dataframes work against Hadoop 3.x; without that ASF Spark is not going to work on Hadoop 3.
+Where should I be submitting those PRs, and what'st the review process?
+thx
+-steve
+jenkins uses SBT, so you need to do the test run there. They are different, and have different test runners in particular.
+I've had a PR outstanding on spark/object store integration, works for both maven and sbt builds
+https://issues.apache.org/jira/browse/SPARK-7481
+https://github.com/apache/spark/pull/12004
+Can I get someone to review this as it appears to be being overlooked amongst all the PRs
+thanks
+-steve
+Hadoop 2.5 doesnt work properly on Java 7, so support for it is kind of implicitly false. indeed, Hadoop 2.6 only works on Java 7 if you disable kerberos, which isn't something I'd recommend in a shared physical cluster, though you may be able to get away with in an ephemeral one where you lock down all the ports.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+You might want to look at Nephele: Efficient Parallel Data Processing in the Cloud, Warneke & Kao, 2009
+http://stratosphere.eu/assets/papers/Nephele_09.pdf
+This was some of the work done in the research project with gave birth to Flink, though this bit didn't surface as they chose to leave VM allocation to others.
+essentially: the query planner could track allocations and lifespans of work, know that if a VM were to be released, pick the one closest to its our being up, let you choose between fast but expensive vs slow but (maybe) less expensive, etc, etc.
+It's a complex problem, as to do it you need to think about more than just spot load, more "how to efficiently divide work amongst a pool of machines with different lifespans"
+what could be good to look at today would be rather than hard code the logic
+-provide metrics information which higher level tools could use to make decisions/send hints down
+-maybe schedule things to best support pre-emptible nodes in the cluster; the ones where you bid spot prices for from EC2, get 1 hour guaranteed, then after they can be killed without warning.
+preemption-aware scheduling might imply making sure that any critical information is kept out the preemptible nodes, or at least replicated onto a long-lived one, and have stuff in the controller ready to react to unannounced pre-emption. FWIW when YARN preempts you do get notified, and maybe even some very early warning. I don't know if spark uses that.
+There is some support in HDFS for declaring that some nodes have interdependent failures, "failure domains", so you could use that to have HDFS handle replication and only store 1 copy on preemptible VMs, leaving only the scheduling and recovery problem.
+Finally, YARN container resizing: lets you ask for more resources when busy, release them when idle. This may be good for CPU load, though memory management isn't something programs can ever handle

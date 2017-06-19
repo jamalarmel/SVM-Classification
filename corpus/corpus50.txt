@@ -1,0 +1,169 @@
+Hi everyone,
+let's assume I'm stuck in 1.3.0, how can I benefit from the *fillna* API in
+PySpark, is there any efficient alternative to mapping the records myself ?
+Regards,
+Olivier.
+Hi everyone,
+It seems the some of the Spark 1.2.2 prebuilt versions (I tested mainly for
+Hadoop 2.4 and later) didn't get deploy on all the mirrors and cloudfront.
+Both the direct download and apache mirrors fails with dead links, for
+example : http://d3kbcqa49mib13.cloudfront.net/spark-1.2.2-bin-hadoop2.4.tgz
+Regards,
+Olivier.
+Hi everyone,
+I was just wandering about the Spark full build time (including tests),
+1h48 seems to me quite... spacious. What's taking most of the time ? Is the
+build mainly integration tests ? Is there any roadmap or jiras dedicated to
+that we can chip in ?
+Regards,
+Olivier.
+Hi,
+Is there any plan to add the "shift" method from Pandas to Spark Dataframe,
+not that I think it's an easy task...
+c.f.
+http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.shift.html
+Regards,
+Olivier.
+Hi everyone,
+SQLContext.createDataFrame has different behaviour in Scala or Python :
+>>> l = [('Alice', 1)]
+>>> sqlContext.createDataFrame(l).collect()
+[Row(_1=u'Alice', _2=1)]
+>>> sqlContext.createDataFrame(l, ['name', 'age']).collect()
+[Row(name=u'Alice', age=1)]
+and in Scala :
+scala> val data = List(("Alice", 1), ("Wonderland", 0))
+scala> sqlContext.createDataFrame(data, List("name", "score"))
+:28: error: overloaded method value createDataFrame with
+alternatives: ... cannot be applied to ...
+What do you think about allowing in Scala too to have a Seq of column names
+for the sake of consistency ?
+Regards,
+Olivier.
+Hi everyone,
+Is there any way in Spark SQL to load multi-line JSON data efficiently, I
+think there was in the mailing list a reference to
+http://pivotal-field-engineering.github.io/pmr-common/ for its
+JSONInputFormat
+But it's rather inaccessible considering the dependency is not available in
+any public maven repo (If you know of one, I'd be glad to hear it).
+Is there any plan to address this or any public recommendation ?
+(considering the documentation clearly states that sqlContext.jsonFile will
+not work for multi-line json(s))
+Regards,
+Olivier.
+Hi everyone,
+there seems to be different implementations of the "distinct" feature in
+DataFrames and RDD and some performance issue with the DataFrame distinct
+API.
+In RDD.scala :
+def distinct(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] =
+withScope { map(x => (x, null)).reduceByKey((x, y) => x,
+numPartitions).map(_._1) }
+And in DataFrame :
+case class Distinct(partial: Boolean, child: SparkPlan) extends UnaryNode {
+override def output: Seq[Attribute] = child.output override def
+requiredChildDistribution: Seq[Distribution] = if (partial)
+UnspecifiedDistribution :: Nil else ClusteredDistribution(child.output) ::
+Nil *override def execute(): RDD[Row] = {** child.execute().mapPartitions {
+iter =>** val hashSet = new scala.collection.mutable.HashSet[Row]()* * var
+currentRow: Row = null** while (iter.hasNext) {** currentRow = iter.next()**
+if (!hashSet.contains(currentRow)) {** hashSet.add(currentRow.copy())** }**
+}* * hashSet.iterator** }** }*}
+I can try to reproduce more clearly the performance issue, but do you have
+any insights into why we can't have the same distinct strategy between
+DataFrame and RDD ?
+Regards,
+Olivier.
+Hi everyone,
+there seems to be different implementations of the "distinct" feature in
+DataFrames and RDD and some performance issue with the DataFrame distinct
+API.
+In RDD.scala :
+def distinct(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] =
+withScope { map(x => (x, null)).reduceByKey((x, y) => x,
+numPartitions).map(_._1) }
+And in DataFrame :
+case class Distinct(partial: Boolean, child: SparkPlan) extends UnaryNode {
+override def output: Seq[Attribute] = child.output override def
+requiredChildDistribution: Seq[Distribution] = if (partial)
+UnspecifiedDistribution :: Nil else ClusteredDistribution(child.output) ::
+Nil *override def execute(): RDD[Row] = {** child.execute().mapPartitions {
+iter =>** val hashSet = new scala.collection.mutable.HashSet[Row]()* * var
+currentRow: Row = null** while (iter.hasNext) {** currentRow = iter.next()**
+if (!hashSet.contains(currentRow)) {** hashSet.add(currentRow.copy())** }**
+}* * hashSet.iterator** }** }*}
+I can try to reproduce more clearly the performance issue, but do you have
+any insights into why we can't have the same distinct strategy between
+DataFrame and RDD ?
+Regards,
+Olivier.
+Hi everyone,
+there seems to be different implementations of the "distinct" feature in
+DataFrames and RDD and some performance issue with the DataFrame distinct
+API.
+In RDD.scala :
+def distinct(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] =
+withScope { map(x => (x, null)).reduceByKey((x, y) => x,
+numPartitions).map(_._1) }
+And in DataFrame :
+case class Distinct(partial: Boolean, child: SparkPlan) extends UnaryNode {
+override def output: Seq[Attribute] = child.output override def
+requiredChildDistribution: Seq[Distribution] = if (partial)
+UnspecifiedDistribution :: Nil else ClusteredDistribution(child.output) ::
+Nil *override def execute(): RDD[Row] = {** child.execute().mapPartitions {
+iter =>** val hashSet = new scala.collection.mutable.HashSet[Row]()* * var
+currentRow: Row = null** while (iter.hasNext) {** currentRow = iter.next()**
+if (!hashSet.contains(currentRow)) {** hashSet.add(currentRow.copy())** }**
+}* * hashSet.iterator** }** }*}
+I can try to reproduce more clearly the performance issue, but do you have
+any insights into why we can't have the same distinct strategy between
+DataFrame and RDD ?
+Regards,
+Olivier.
+Hi,
+Testing a bit more 1.4, it seems that the .drop() method in PySpark doesn't
+seem to accept a Column as input datatype :
+*    .join(only_the_best, only_the_best.pol_no == df.pol_no,
+"inner").drop(only_the_best.pol_no)\* File
+"/usr/local/lib/python2.7/site-packages/pyspark/sql/dataframe.py", line
+1225, in drop
+jdf = self._jdf.drop(colName)
+File "/usr/local/lib/python2.7/site-packages/py4j/java_gateway.py", line
+523, in __call__
+(new_args, temp_args) = self._get_args(args)
+File "/usr/local/lib/python2.7/site-packages/py4j/java_gateway.py", line
+510, in _get_args
+temp_arg = converter.convert(arg, self.gateway_client)
+File "/usr/local/lib/python2.7/site-packages/py4j/java_collections.py",
+line 490, in convert
+for key in object.keys():
+TypeError: 'Column' object is not callable
+It doesn't seem very consistent with rest of the APIs - and is especially
+annoying when executing joins - because drop("my_key") is not a qualified
+reference to the column.
+What do you think about changing that ? or what is the best practice as a
+workaround ?
+Regards,
+Olivier.
+Hi everyone,
+Considering the python API as just a front needing the SPARK_HOME defined
+anyway, I think it would be interesting to deploy the Python part of Spark
+on PyPi in order to handle the dependencies in a Python project needing
+PySpark via pip.
+For now I just symlink the python/pyspark in my python install dir
+site-packages/ in order for PyCharm or other lint tools to work properly.
+I can do the setup.py work or anything.
+What do you think ?
+Regards,
+Olivier.
+Hi everyone,
+Using spark-ml there seems to be only BinaryClassificationEvaluator and
+RegressionEvaluator, is there any way or plan to provide a ROC-based or
+PR-based or F-Measure based for multi-class, I would be interested
+especially in evaluating and doing a grid search for a RandomForest model.
+Regards,
+Olivier.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org

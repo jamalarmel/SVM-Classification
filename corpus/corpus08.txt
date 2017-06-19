@@ -1,0 +1,1834 @@
+You may have noticed that the counter of searchable items for last 7 days on search-Hadoop is 0 and the counter for last 30 days is declining quickly. 
+Cheers
+Hi,
+In test output, I saw:
+^[[32mTaskResultGetterSuite:^[[0m
+^[[32m- handling results smaller than Akka frame size^[[0m
+^[[32m- handling results larger than Akka frame size^[[0m
+Exception in thread "SparkListenerBus" java.lang.NullPointerException
+  at
+org.apache.spark.ui.jobs.JobProgressListener.onTaskEnd(JobProgressListener.scala:149)
+  at
+org.apache.spark.scheduler.SparkListenerBus$$anon$2$$anonfun$run$7.apply(SparkListenerBus.scala:55)
+  at
+org.apache.spark.scheduler.SparkListenerBus$$anon$2$$anonfun$run$7.apply(SparkListenerBus.scala:55)
+  at
+scala.collection.mutable.ResizableArray$class.foreach(ResizableArray.scala:59)
+  at scala.collection.mutable.ArrayBuffer.foreach(ArrayBuffer.scala:47)
+  at
+org.apache.spark.scheduler.SparkListenerBus$$anon$2.run(SparkListenerBus.scala:55)
+Has anyone else seen similar stack trace ?
+Cheers
+Hi,
+I used the following setting to run test suite:
+export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=812M
+-XX:ReservedCodeCacheSize=512m"
+I got:
+[ERROR] [12/28/2013 08:34:03.747]
+[sparkWorker1-akka.actor.default-dispatcher-14] [ActorSystem(sparkWorker1)]
+Uncaught fatal error from thread
+[sparkWorker1-akka.actor.default-dispatcher-14] shutting down ActorSystem
+[sparkWorker1]
+java.lang.OutOfMemoryError: PermGen space
+How do I run test suite on Mac ?
+Thanks
+Build Tools slide from Matei's slides, transition toward maven only is
+happening.
+That was why I used mvn.
+BTW I specified the following on the commandline:
+-Dtest=TaskResultGetterSuite
+Many other test suites were run.
+How can I run one suite ?
+Thanks
+Hi,
+I used the following command to compile against hadoop 2.2:
+mvn clean package -DskipTests -Pnew-yarn
+But I got a lot of compilation errors.
+Did I use the wrong command ?
+Cheers
+Specification of yarn.version can be inserted following this line (#762 in
+pom.xml), right ?
+         
+I think yarn.version should be specified in pom.xml along with
+hadoop.version
+Cheers
+Hi,
+There're two copies of classes w.r.t. YARN:
+-rw-r--r--  1 tyu  staff  9710 Jan  3 10:14
+/Users/tyu/spark//yarn/alpha/src/main/scala/org/apache/spark/deploy/yarn/WorkerLauncher.scala
+-rw-r--r--  1 tyu  staff  8189 Jan  3 10:14
+/Users/tyu/spark//yarn/stable/src/main/scala/org/apache/spark/deploy/yarn/WorkerLauncher.scala
+The class under yarn/stable is for YARN 2.2, right ?
+Cheers
+In yarn/stable/src/main/scala/org/apache/spark/deploy/yarn/ApplicationMaster.scala
+, at line 86:
+    // Workaround until hadoop moves to something which has
+    // https://issues.apache.org/jira/browse/HADOOP-8406 - fixed in
+(2.0.2-alpha but no 0.23 line)
+    //
+org.apache.hadoop.io.compress.CompressionCodecFactory.getCodecClasses(conf)
+Looks like the above comment can be removed since hadoop 2.2 has HADOOP-8406
+Cheers
+There is one proposal on Spark:
+http://events.linuxfoundation.org/cfp/cfp-list?&&&&page=1#overlay=cfp/proposals/1461
+bq. I have tried replace protobuf2.4.1 in shark with protobuf2.5.0
+Did you replace the jar file or did you change the following in pom.xml and
+rebuild ?
+    
+Cheers
+Yes.
+I used the same command on Linux and it passed:
+Linux k.net 2.6.32-220.23.1.el6.YAHOO.20120713.x86_64 #1 SMP Fri Jul 13
+11:40:51 CDT 2012 x86_64 x86_64 x86_64 GNU/Linux
+Cheers
+I didn't get that error on Mac either:
+java version "1.7.0_55"
+Java(TM) SE Runtime Environment (build 1.7.0_55-b13)
+Java HotSpot(TM) 64-Bit Server VM (build 24.55-b03, mixed mode)
+Darwin TYus-MacBook-Pro.local 12.5.0 Darwin Kernel Version 12.5.0: Sun Sep
+29 13:33:47 PDT 2013; root:xnu-2050.48.12~1/RELEASE_X86_64 x86_64
+See http://spark.apache.org/news/spark-mailing-lists-moving-to-apache.html
+Cheers
+This is the correct page: http://spark.apache.org/community.html
+Cheers
+HADOOP-10456 is fixed in hadoop 2.4.1
+Does this mean that synchronization
+on HadoopRDD.CONFIGURATION_INSTANTIATION_LOCK can be bypassed for hadoop
+2.4.1 ?
+Cheers
+Hi,
+Starting at line 203:
+      try {
+        /* bytesRead may not exactly equal the bytes read by a task: split
+boundaries aren't
+         * always at record boundaries, so tasks may need to read into
+other splits to complete
+         * a record. */
+        inputMetrics.bytesRead = split.inputSplit.value.getLength()
+      } catch {
+        case e: java.io.IOException =>
+          logWarning("Unable to get input size to set InputMetrics for
+task", e)
+      }
+      context.taskMetrics.inputMetrics = Some(inputMetrics)
+If there is IOException, context.taskMetrics.inputMetrics is set by
+wrapping inputMetrics - as if there wasn't any error.
+I wonder if the above code should distinguish the error condition.
+Cheers
+Thanks for replying, Patrick.
+The intention of my first email was for utilizing newer hadoop releases for
+their bug fixes. I am still looking for clean way of passing hadoop release
+version number to individual classes.
+Using newer hadoop releases would encourage pushing bug fixes / new
+features upstream. Ultimately Spark code would become cleaner.
+Cheers
+I found 0.13.1 artifacts in maven:
+http://search.maven.org/#artifactdetails%7Corg.apache.hive%7Chive-metastore%7C0.13.1%7Cjar
+However, Spark uses groupId of org.spark-project.hive, not org.apache.hive
+Can someone tell me how it is supposed to work ?
+Cheers
+hive-exec (as of 0.13.1) is published here:
+http://search.maven.org/#artifactdetails%7Corg.apache.hive%7Chive-exec%7C0.13.1%7Cjar
+Should a JIRA be opened so that dependency on hive-metastore can be
+replaced by dependency on hive-exec ?
+Cheers
+Talked with Owen offline. He confirmed that as of 0.13, hive-exec is still
+uber jar.
+Right now I am facing the following error building against Hive 0.13.1 :
+[ERROR] Failed to execute goal on project spark-hive_2.10: Could not
+resolve dependencies for project
+org.apache.spark:spark-hive_2.10:jar:1.1.0-SNAPSHOT: The following
+artifacts could not be resolved:
+org.spark-project.hive:hive-metastore:jar:0.13.1,
+org.spark-project.hive:hive-exec:jar:0.13.1,
+org.spark-project.hive:hive-serde:jar:0.13.1: Failure to find
+org.spark-project.hive:hive-metastore:jar:0.13.1 in
+http://repo.maven.apache.org/maven2 was cached in the local repository,
+resolution will not be reattempted until the update interval of maven-repo
+has elapsed or updates are forced -> [Help 1]
+Some hint would be appreciated.
+Cheers
+Owen helped me find this:
+https://issues.apache.org/jira/browse/HIVE-7423
+I guess this means that for Hive 0.14, Spark should be able to directly
+pull in hive-exec-core.jar
+Cheers
+See Mailing list section of:
+https://spark.apache.org/community.html
+The following command succeeded (on Linux) on Spark master checked out this
+morning:
+mvn -Pyarn -Phive -Phadoop-2.4 -DskipTests install
+FYI
+I refreshed my workspace.
+I got the following error with this command:
+mvn -Pyarn -Phive -Phadoop-2.4 -DskipTests install
+[ERROR] bad symbolic reference. A signature in package.class refers to term
+scalalogging
+in package com.typesafe which is not available.
+It may be completely missing from the current classpath, or the version on
+the classpath might be incompatible with the version used when compiling
+package.class.
+[ERROR]
+/homes/hortonzy/spark/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/trees/package.scala:36:
+bad symbolic reference. A signature in package.class refers to term slf4j
+in value com.typesafe.scalalogging which is not available.
+It may be completely missing from the current classpath, or the version on
+the classpath might be incompatible with the version used when compiling
+package.class.
+[ERROR] package object trees extends Logging {
+[ERROR]                              ^
+[ERROR] two errors found
+Has anyone else seen the above ?
+Thanks
+Forgot to do that step.
+Now compilation passes.
+How about using parallel execution feature of maven-surefire-plugin
+(assuming all the tests were made parallel friendly) ?
+http://maven.apache.org/surefire/maven-surefire-plugin/examples/fork-options-and-parallel-execution.html
+Cheers
+Hi,
+Using the following command on (refreshed) master branch:
+mvn clean package -DskipTests
+I got:
+constituent[36]: file:/homes/hortonzy/apache-maven-3.1.1/conf/logging/
+---------------------------------------------------
+java.lang.reflect.InvocationTargetException
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at
+sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+at
+sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+at java.lang.reflect.Method.invoke(Method.java:606)
+at
+org.codehaus.plexus.classworlds.launcher.Launcher.launchEnhanced(Launcher.java:289)
+at
+org.codehaus.plexus.classworlds.launcher.Launcher.launch(Launcher.java:229)
+at
+org.codehaus.plexus.classworlds.launcher.Launcher.mainWithExitCode(Launcher.java:415)
+at org.codehaus.plexus.classworlds.launcher.Launcher.main(Launcher.java:356)
+Caused by: scala.reflect.internal.Types$TypeError: bad symbolic reference.
+A signature in TestSuiteBase.class refers to term dstream
+in package org.apache.spark.streaming which is not available.
+It may be completely missing from the current classpath, or the version on
+the classpath might be incompatible with the version used when compiling
+TestSuiteBase.class.
+at
+scala.reflect.internal.pickling.UnPickler$Scan.toTypeError(UnPickler.scala:847)
+at
+scala.reflect.internal.pickling.UnPickler$Scan$LazyTypeRef.complete(UnPickler.scala:854)
+at scala.reflect.internal.Symbols$Symbol.info(Symbols.scala:1231)
+at
+scala.reflect.internal.Types$TypeMap$$anonfun$noChangeToSymbols$1.apply(Types.scala:4280)
+at
+scala.reflect.internal.Types$TypeMap$$anonfun$noChangeToSymbols$1.apply(Types.scala:4280)
+at
+scala.collection.LinearSeqOptimized$class.forall(LinearSeqOptimized.scala:70)
+at scala.collection.immutable.List.forall(List.scala:84)
+at scala.reflect.internal.Types$TypeMap.noChangeToSymbols(Types.scala:4280)
+at scala.reflect.internal.Types$TypeMap.mapOver(Types.scala:4293)
+at scala.reflect.internal.Types$TypeMap.mapOver(Types.scala:4196)
+at scala.reflect.internal.Types$AsSeenFromMap.apply(Types.scala:4638)
+at scala.reflect.internal.Types$TypeMap.mapOver(Types.scala:4202)
+at scala.reflect.internal.Types$AsSeenFromMap.apply(Types.scala:4638)
+at scala.reflect.internal.Types$Type.asSeenFrom(Types.scala:754)
+at scala.reflect.internal.Types$Type.memberInfo(Types.scala:773)
+at xsbt.ExtractAPI.defDef(ExtractAPI.scala:224)
+at xsbt.ExtractAPI.xsbt$ExtractAPI$$definition(ExtractAPI.scala:315)
+at
+xsbt.ExtractAPI$$anonfun$xsbt$ExtractAPI$$processDefinitions$1.apply(ExtractAPI.scala:296)
+at
+xsbt.ExtractAPI$$anonfun$xsbt$ExtractAPI$$processDefinitions$1.apply(ExtractAPI.scala:296)
+at
+scala.collection.TraversableLike$$anonfun$flatMap$1.apply(TraversableLike.scala:251)
+at
+scala.collection.TraversableLike$$anonfun$flatMap$1.apply(TraversableLike.scala:251)
+at
+scala.collection.IndexedSeqOptimized$class.foreach(IndexedSeqOptimized.scala:33)
+at scala.collection.mutable.ArrayOps$ofRef.foreach(ArrayOps.scala:108)
+at scala.collection.TraversableLike$class.flatMap(TraversableLike.scala:251)
+at scala.collection.mutable.ArrayOps$ofRef.flatMap(ArrayOps.scala:108)
+at xsbt.ExtractAPI.xsbt$ExtractAPI$$processDefinitions(ExtractAPI.scala:296)
+at xsbt.ExtractAPI$$anonfun$mkStructure$4.apply(ExtractAPI.scala:293)
+at xsbt.ExtractAPI$$anonfun$mkStructure$4.apply(ExtractAPI.scala:293)
+at xsbt.Message$$anon$1.apply(Message.scala:8)
+at xsbti.SafeLazy$$anonfun$apply$1.apply(SafeLazy.scala:8)
+at xsbti.SafeLazy$Impl._t$lzycompute(SafeLazy.scala:20)
+at xsbti.SafeLazy$Impl._t(SafeLazy.scala:18)
+at xsbti.SafeLazy$Impl.get(SafeLazy.scala:24)
+at xsbt.ExtractAPI$$anonfun$forceStructures$1.apply(ExtractAPI.scala:138)
+at xsbt.ExtractAPI$$anonfun$forceStructures$1.apply(ExtractAPI.scala:138)
+at scala.collection.immutable.List.foreach(List.scala:318)
+at xsbt.ExtractAPI.forceStructures(ExtractAPI.scala:138)
+at xsbt.ExtractAPI.forceStructures(ExtractAPI.scala:139)
+at xsbt.API$ApiPhase.processScalaUnit(API.scala:54)
+at xsbt.API$ApiPhase.processUnit(API.scala:38)
+at xsbt.API$ApiPhase$$anonfun$run$1.apply(API.scala:34)
+at xsbt.API$ApiPhase$$anonfun$run$1.apply(API.scala:34)
+at scala.collection.Iterator$class.foreach(Iterator.scala:727)
+at scala.collection.AbstractIterator.foreach(Iterator.scala:1157)
+at xsbt.API$ApiPhase.run(API.scala:34)
+at scala.tools.nsc.Global$Run.compileUnitsInternal(Global.scala:1583)
+at scala.tools.nsc.Global$Run.compileUnits(Global.scala:1557)
+at scala.tools.nsc.Global$Run.compileSources(Global.scala:1553)
+at scala.tools.nsc.Global$Run.compile(Global.scala:1662)
+at xsbt.CachedCompiler0.run(CompilerInterface.scala:123)
+at xsbt.CachedCompiler0.run(CompilerInterface.scala:99)
+at xsbt.CompilerInterface.run(CompilerInterface.scala:27)
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at
+sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+at
+sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+at java.lang.reflect.Method.invoke(Method.java:606)
+at sbt.compiler.AnalyzingCompiler.call(AnalyzingCompiler.scala:102)
+at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:48)
+at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:41)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply$mcV$sp(AggressiveCompile.scala:99)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:99)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:99)
+at
+sbt.compiler.AggressiveCompile.sbt$compiler$AggressiveCompile$$timed(AggressiveCompile.scala:166)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3.compileScala$1(AggressiveCompile.scala:98)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3.apply(AggressiveCompile.scala:143)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3.apply(AggressiveCompile.scala:87)
+at sbt.inc.IncrementalCompile$$anonfun$doCompile$1.apply(Compile.scala:39)
+at sbt.inc.IncrementalCompile$$anonfun$doCompile$1.apply(Compile.scala:37)
+at sbt.inc.IncrementalCommon.cycle(Incremental.scala:99)
+at sbt.inc.Incremental$$anonfun$1.apply(Incremental.scala:38)
+at sbt.inc.Incremental$$anonfun$1.apply(Incremental.scala:37)
+at sbt.inc.Incremental$.manageClassfiles(Incremental.scala:65)
+at sbt.inc.Incremental$.compile(Incremental.scala:37)
+at sbt.inc.IncrementalCompile$.apply(Compile.scala:27)
+at sbt.compiler.AggressiveCompile.compile2(AggressiveCompile.scala:157)
+at sbt.compiler.AggressiveCompile.compile1(AggressiveCompile.scala:71)
+at com.typesafe.zinc.Compiler.compile(Compiler.scala:184)
+at com.typesafe.zinc.Compiler.compile(Compiler.scala:164)
+at sbt_inc.SbtIncrementalCompiler.compile(SbtIncrementalCompiler.java:92)
+at
+scala_maven.ScalaCompilerSupport.incrementalCompile(ScalaCompilerSupport.java:303)
+at scala_maven.ScalaCompilerSupport.compile(ScalaCompilerSupport.java:119)
+at scala_maven.ScalaCompilerSupport.doExecute(ScalaCompilerSupport.java:99)
+at scala_maven.ScalaMojoSupport.execute(ScalaMojoSupport.java:482)
+at scala_maven.ScalaTestCompileMojo.execute(ScalaTestCompileMojo.java:48)
+at
+org.apache.maven.plugin.DefaultBuildPluginManager.executeMojo(DefaultBuildPluginManager.java:106)
+at
+org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:208)
+at
+org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:153)
+at
+org.apache.maven.lifecycle.internal.MojoExecutor.execute(MojoExecutor.java:145)
+at
+org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject(LifecycleModuleBuilder.java:84)
+at
+org.apache.maven.lifecycle.internal.LifecycleModuleBuilder.buildProject(LifecycleModuleBuilder.java:59)
+at
+org.apache.maven.lifecycle.internal.LifecycleStarter.singleThreadedBuild(LifecycleStarter.java:183)
+at
+org.apache.maven.lifecycle.internal.LifecycleStarter.execute(LifecycleStarter.java:161)
+at org.apache.maven.DefaultMaven.doExecute(DefaultMaven.java:317)
+at org.apache.maven.DefaultMaven.execute(DefaultMaven.java:152)
+at org.apache.maven.cli.MavenCli.execute(MavenCli.java:555)
+at org.apache.maven.cli.MavenCli.doMain(MavenCli.java:214)
+at org.apache.maven.cli.MavenCli.main(MavenCli.java:158)
+... 8 more
+Has anyone seen similar error ?
+Cheers
+[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @
+spark-streaming_2.10 ---
+[INFO] org.apache.spark:spark-streaming_2.10:jar:1.1.0-SNAPSHOT
+INFO] +- org.apache.spark:spark-core_2.10:jar:1.1.0-SNAPSHOT:compile
+[INFO] |  +- org.apache.hadoop:hadoop-client:jar:2.4.0:compile
+...
+[INFO] |  +- net.java.dev.jets3t:jets3t:jar:0.9.0:compile
+[INFO] |  |  +- commons-codec:commons-codec:jar:1.5:compile
+[INFO] |  |  +- org.apache.httpcomponents:httpclient:jar:4.1.2:compile
+[INFO] |  |  +- org.apache.httpcomponents:httpcore:jar:4.1.2:compile
+bq. excluding httpclient from spark-streaming dependency in your sbt/maven
+project
+This should work.
+Hi,
+Running test suite in trunk, I got:
+^[[32mBasicOperationsSuite:^[[0m
+^[[32m- map^[[0m
+^[[32m- flatMap^[[0m
+^[[32m- filter^[[0m
+^[[32m- glom^[[0m
+^[[32m- mapPartitions^[[0m
+^[[32m- repartition (more partitions)^[[0m
+^[[32m- repartition (fewer partitions)^[[0m
+^[[32m- groupByKey^[[0m
+^[[32m- reduceByKey^[[0m
+^[[32m- reduce^[[0m
+^[[32m- count^[[0m
+^[[32m- countByValue^[[0m
+^[[32m- mapValues^[[0m
+^[[32m- flatMapValues^[[0m
+^[[32m- union^[[0m
+^[[32m- StreamingContext.union^[[0m
+^[[32m- transform^[[0m
+^[[32m- transformWith^[[0m
+^[[32m- StreamingContext.transform^[[0m
+^[[32m- cogroup^[[0m
+^[[32m- join^[[0m
+^[[32m- leftOuterJoin^[[0m
+^[[32m- rightOuterJoin^[[0m
+^[[32m- fullOuterJoin^[[0m
+^[[32m- updateStateByKey^[[0m
+^[[32m- updateStateByKey - object lifecycle^[[0m
+^[[32m- slice^[[0m
+^[[32m- slice - has not been initialized^[[0m
+^[[32m- rdd cleanup - map and window^[[0m
+^[[32m- rdd cleanup - updateStateByKey^[[0m
+^[[31m- rdd cleanup - input blocks and persisted RDDs *** FAILED ***^[[0m
+^[[31m  org.scalatest.exceptions.TestFailedException was thrown.
+(BasicOperationsSuite.scala:528)^[[0m
+However, using sbt for this testsuite, it seemed to pass:
+[info] - slice - has not been initialized
+[info] - rdd cleanup - map and window
+[info] - rdd cleanup - updateStateByKey
+Exception in thread "Thread-561" org.apache.spark.SparkException: Job
+cancelled because SparkContext was shut down
+at
+org.apache.spark.scheduler.DAGScheduler$$anonfun$cleanUpAfterSchedulerStop$1.apply(DAGScheduler.scala:701)
+at
+org.apache.spark.scheduler.DAGScheduler$$anonfun$cleanUpAfterSchedulerStop$1.apply(DAGScheduler.scala:700)
+at scala.collection.mutable.HashSet.foreach(HashSet.scala:79)
+at
+org.apache.spark.scheduler.DAGScheduler.cleanUpAfterSchedulerStop(DAGScheduler.scala:700)
+at
+org.apache.spark.scheduler.DAGSchedulerEventProcessActor.postStop(DAGScheduler.scala:1406)
+at
+akka.actor.dungeon.FaultHandling$class.akka$actor$dungeon$FaultHandling$$finishTerminate(FaultHandling.scala:201)
+at akka.actor.dungeon.FaultHandling$class.terminate(FaultHandling.scala:163)
+at akka.actor.ActorCell.terminate(ActorCell.scala:338)
+at akka.actor.ActorCell.invokeAll$1(ActorCell.scala:431)
+at akka.actor.ActorCell.systemInvoke(ActorCell.scala:447)
+at akka.dispatch.Mailbox.processAllSystemMessages(Mailbox.scala:262)
+at akka.dispatch.Mailbox.run(Mailbox.scala:218)
+at
+akka.dispatch.ForkJoinExecutorConfigurator$AkkaForkJoinTask.exec(AbstractDispatcher.scala:386)
+at scala.concurrent.forkjoin.ForkJoinTask.doExec(ForkJoinTask.java:260)
+at
+scala.concurrent.forkjoin.ForkJoinPool$WorkQueue.runTask(ForkJoinPool.java:1339)
+at scala.concurrent.forkjoin.ForkJoinPool.runWorker(ForkJoinPool.java:1979)
+at
+scala.concurrent.forkjoin.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:107)
+[info] - rdd cleanup - input blocks and persisted RDDs
+[info] ScalaTest
+[info] Run completed in 1 minute, 1 second.
+[info] Total number of tests run: 31
+[info] Suites: completed 1, aborted 0
+[info] Tests: succeeded 31, failed 0, canceled 0, ignored 0, pending 0
+[info] All tests passed.
+[info] Passed: Total 31, Failed 0, Errors 0, Passed 31
+java.lang.AssertionError: assertion failed: List(object package$DebugNode,
+object package$DebugNode)
+at scala.reflect.internal.Symbols$Symbol.suchThat(Symbols.scala:1678)
+at
+scala.reflect.internal.Symbols$ClassSymbol.companionModule0(Symbols.scala:2988)
+at
+scala.reflect.internal.Symbols$ClassSymbol.companionModule(Symbols.scala:2991)
+at
+scala.tools.nsc.backend.jvm.GenASM$JPlainBuilder.genClass(GenASM.scala:1371)
+at scala.tools.nsc.backend.jvm.GenASM$AsmPhase.run(GenASM.scala:120)
+at scala.tools.nsc.Global$Run.compileUnitsInternal(Global.scala:1583)
+at scala.tools.nsc.Global$Run.compileUnits(Global.scala:1557)
+at scala.tools.nsc.Global$Run.compileSources(Global.scala:1553)
+at scala.tools.nsc.Global$Run.compile(Global.scala:1662)
+at xsbt.CachedCompiler0.run(CompilerInterface.scala:123)
+at xsbt.CachedCompiler0.run(CompilerInterface.scala:99)
+at xsbt.CompilerInterface.run(CompilerInterface.scala:27)
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+at
+sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+at
+sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+at java.lang.reflect.Method.invoke(Method.java:606)
+at sbt.compiler.AnalyzingCompiler.call(AnalyzingCompiler.scala:102)
+at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:48)
+at sbt.compiler.AnalyzingCompiler.compile(AnalyzingCompiler.scala:41)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply$mcV$sp(AggressiveCompile.scala:99)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:99)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3$$anonfun$compileScala$1$1.apply(AggressiveCompile.scala:99)
+at
+sbt.compiler.AggressiveCompile.sbt$compiler$AggressiveCompile$$timed(AggressiveCompile.scala:166)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3.compileScala$1(AggressiveCompile.scala:98)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3.apply(AggressiveCompile.scala:143)
+at
+sbt.compiler.AggressiveCompile$$anonfun$3.apply(AggressiveCompile.scala:87)
+at sbt.inc.IncrementalCompile$$anonfun$doCompile$1.apply(Compile.scala:39)
+Any comment ?
+Thanks
+Please take a look at WhitespaceEndOfLineChecker under:
+http://www.scalastyle.org/rules-0.1.0.html
+Cheers
+I performed build on latest master branch but didn't get compilation error.
+FYI
+Koert:
+Have you tried adding the following on your commandline ?
+-Dscalastyle.failOnViolation=false
+Cheers
+Koert:
+If you have time, you can try this diff - with which you would be able to
+specify the following on the command line:
+-Dscalastyle.failonviolation=false
+diff --git a/pom.xml b/pom.xml
+index 687cc63..108585e 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -123,6 +123,7 @@
+     
+     
+     
++    
+     
+     
+     
+@@ -1071,7 +1072,7 @@
+         
+         
+           
+-          
++          
+           
+           
+           
+Created SPARK-4066 and attached patch there.
+I built based on this commit today and the build was successful.
+What command did you use ?
+Cheers
+On my MacBook with 2.6 GHz Intel i7 CPU, I run zinc.
+Here is the tail of mvn build output:
+[INFO] Spark Project External Flume ...................... SUCCESS [7.368s]
+[INFO] Spark Project External ZeroMQ ..................... SUCCESS [9.153s]
+[INFO] Spark Project External MQTT ....................... SUCCESS [5.233s]
+[INFO] Spark Project Examples ............................ SUCCESS [49.011s]
+[INFO]
+------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO]
+------------------------------------------------------------------------
+[INFO] Total time: 7:42.208s
+[INFO] Finished at: Tue Nov 04 18:10:44 PST 2014
+[INFO] Final Memory: 48M/500M
+FYI
+Sorry for the late reply.
+I tested my patch on Mac with the following JDK:
+java version "1.7.0_60"
+Java(TM) SE Runtime Environment (build 1.7.0_60-b19)
+Java HotSpot(TM) 64-Bit Server VM (build 24.60-b09, mixed mode)
+Let me see if the problem can be solved upstream in HBase hbase-annotations
+module.
+Cheers
+I couldn't reproduce the problem using:
+java version "1.6.0_65"
+Java(TM) SE Runtime Environment (build 1.6.0_65-b14-462-11M4609)
+Java HotSpot(TM) 64-Bit Server VM (build 20.65-b04-462, mixed mode)
+Since hbase-annotations is a transitive dependency, I created the following
+pull request to exclude it from various hbase modules:
+https://github.com/apache/spark/pull/3286
+Cheers
+https://github.com/apache/spark/pull/3286
+bq. spark-0.12 also has some nice feature added
+Minor correction: you meant Spark 1.2.0 I guess
+Cheers
+I tried the same command on MacBook and didn't experience the same error.
+Which OS are you using ?
+Cheers
+I use zinc 0.2.0 and started zinc with the same command shown below.
+I don't observe such error.
+How did you install zinc-0.3.5.3 ?
+Cheers
+I used the following for brew:
+http://repo.typesafe.com/typesafe/zinc/com/typesafe/zinc/dist/0.3.0/zinc-0.3.0.tgz
+After starting zinc, I issued the same mvn command but didn't encounter the
+error you saw.
+FYI
+bq. I may move on to trying Maven.
+Maven is my favorite :-)
+Andy:
+I saw two emails from you from yesterday.
+See this thread: http://search-hadoop.com/m/JW1q5opRsY1
+Cheers
+Can you try this command ?
+sbt/sbt -Pyarn -Phadoop-2.4 -Dhadoop.version=2.6.0 -Phive assembly
+I extracted org/apache/hadoop/hive/common/CompressionUtils.class from the
+jar and used hexdump to view the class file.
+Bytes 6 and 7 are 00 and 33, respectively.
+According to http://en.wikipedia.org/wiki/Java_class_file, the jar was
+produced using Java 7.
+FYI
+In my opinion this would be useful - there was another thread where returning
+only the value of first column in the result was mentioned.
+Please create a SPARK JIRA and a pull request.
+Cheers
+Please take a look at https://amplab.cs.berkeley.edu/jenkins/view/Spark/
+Please tale a look at SPARK-4048 and SPARK-5108
+Cheers
+How many profiles (hadoop / hive /scala) would this development environment
+support ?
+Cheers
+Have you read / followed this ?
+https://cwiki.apache.org/confluence/display/SPARK
+/Useful+Developer+Tools#UsefulDeveloperTools-BuildingSparkinIntelliJIDEA
+Cheers
+Congratulations, Cheng, Joseph and Sean.
+bq. to be able to run my tests in sbt, though, it makes the development
+iterations much faster.
+Was the preference for sbt due to long maven build time ?
+Have you started Zinc on your machine ?
+Cheers
+bq. I have to keep cd'ing into network/common, run mvn install, then go
+back to network/shuffle and run some other mvn command over there.
+Yeah - been through this.
+Having continuous testing for maven would be nice.
+Looks like github is functioning again (I no longer encounter this problem
+when pushing to hbase repo).
+Do you want to give it a try ?
+Cheers
+When I enter  http://spark.apache.org/docs/latest/ into Chrome address bar,
+I saw 1.3.0
+Cheers
+Looking at KafkaCluster#getLeaderOffsets():
+          respMap.get(tp).foreach { por: PartitionOffsetsResponse =>
+            if (por.error == ErrorMapping.NoError) {
+...
+            } else {
+              errs.append(ErrorMapping.exceptionFor(por.error))
+            }
+There should be some error other than "Couldn't find leader offsets for
+Set()"
+Can you check again ?
+Thanks
+Please take a look
+at core/src/main/scala/org/apache/spark/SparkStatusTracker.scala, around
+line 58:
+  def getActiveStageIds(): Array[Int] = {
+Cheers
+Please take a look at:
+./sql/core/src/main/scala/org/apache/spark/sql/DataFrameHolder.scala
+./sql/core/src/main/scala/org/apache/spark/sql/GroupedData.scala
+Cheers
+Issues are tracked on Apache JIRA:
+https://issues.apache.org/jira/browse/SPARK/?selectedTab=com.atlassian.jira.jira-projects-plugin:summary-panel
+Cheers
+bq. writing the output (to Amazon S3) failed
+What's the value of "fs.s3.maxRetries" ?
+Increasing the value should help.
+Cheers
+Take a look at the maven-shade-plugin in pom.xml.
+Here is the snippet for org.spark-project.jetty :
+            
+              
+              
+              
+                
+              
+            
+S3n is governed by the same config parameter. 
+Cheers
+You can get some idea by looking at the builds here:
+https://amplab.cs.berkeley.edu/jenkins/view/Spark/job/Spark-1.2-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.4,label=centos/
+Cheers
+You can find the command at the beginning of the console output:
+[centos] $ /home/jenkins/tools/hudson.tasks.Maven_MavenInstallation/Maven_3.0.5/bin/mvn
+-DHADOOP_PROFILE=hadoop-2.4 -Dlabel=centos -DskipTests -Phadoop-2.4
+-Pyarn -Phive clean package
+bq. get newly created JIRAs posted onto a list (dev?)
++1
+IMHO I would go with choice #1
+Cheers
+But it is hard to know how long customers stay with their most recent
+download.
+Cheers
+Looks like this has been taken care of:
+commit beeafcfd6ee1e460c4d564cd1515d8781989b422
+Author: Patrick Wendell 
+Date:   Thu Apr 30 20:33:36 2015 -0700
+    Revert "[SPARK-5213] [SQL] Pluggable SQL Parser Support"
+Pramod:
+Please remember to run Zinc so that the build is faster.
+Cheers
++1
+Looks like mismatch of jackson version.
+Spark uses:
+    
+FYI
+Which package type did you choose (pre-built for which distro) ?
+Thanks
+Andrew:
+Do you think the -M and -A options described here can be used in test runs ?
+http://scalatest.org/user_guide/using_the_runner
+Cheers
+Looks like you're right:
+https://amplab.cs.berkeley.edu/jenkins/view/Spark/job/Spark-1.3-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.4,label=centos/427/console
+[error] /home/jenkins/workspace/Spark-1.3-Maven-with-YARN/HADOOP_PROFILE/hadoop-2.4/label/centos/core/src/main/scala/org/apache/spark/MapOutputTracker.scala:370:
+value tryWithSafeFinally is not a member of object
+org.apache.spark.util.Utils
+[error]     Utils.tryWithSafeFinally {
+[error]           ^
+FYI
+Makes sense.
+Having high determinism in these tests would make Jenkins build stable.
+Subproject tag should follow SPARK JIRA number.
+e.g.
+[SPARK-5277][SQL] ...
+Cheers
+Jenkins build against hadoop 2.4 has been unstable recently:
+https://amplab.cs.berkeley.edu/jenkins/view/Spark/job/Spark-Master-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.4,label=centos/
+I haven't found the test which hung / failed in recent Jenkins builds.
+But PR builder has several green builds lately:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/
+Maybe PR builder doesn't build against hadoop 2.4 ?
+Cheers
+From
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/32831/consoleFull
+:
+[info] Building Spark with these arguments: -Pyarn -Phadoop-2.3
+-Dhadoop.version=2.3.0 -Pkinesis-asl -Phive -Phive-thriftserver
+Should PR builder cover hadoop 2.4 as well ?
+Thanks
+bq. would be prohibitive to build all configurations for every push
+Agreed.
+Can PR builder rotate testing against hadoop 2.3, 2.4, 2.6 and 2.7 (each
+test run still uses one hadoop profile) ?
+This way we would have some coverage for each of the major hadoop releases.
+Cheers
+What version of Java do you use ?
+Can you run this command first ?
+build/sbt clean
+BTW please see [SPARK-7498] [MLLIB] add varargs back to setDefault
+Cheers
+INFRA-9646 has been resolved.
+FYI
+bq. it shuld be "8mb"
+Please use the above syntax.
+Cheers
+Pardon me.
+Please use '8192k'
+Cheers
+Please update to the following:
+commit c2f0821aad3b82dcd327e914c9b297e92526649d
+Author: Zhang, Liye 
+Date:   Fri May 8 09:10:58 2015 +0100
+    [SPARK-7392] [CORE] bugfix: Kryo buffer size cannot be larger than 2M
+The original PR from Liye didn't include test which exercises Kryo buffer
+size configured in mb which is below 2GB.
+In my PR, I added such a test and it passed on Jenkins:
+https://github.com/apache/spark/pull/6390
+FYI
+Can you try your query using Spark 1.4.0 RC2 ?
+There have been some fixes since 1.2.0
+e.g.
+SPARK-7233 ClosureCleaner#clean blocks concurrent job submitter threads
+Cheers
+Hi,
+I ran the following command on 1.4.0 RC3:
+mvn -Phadoop-2.4 -Dhadoop.version=2.7.0 -Pyarn -Phive package
+I saw the following failure:
+^[[32mStreamingContextSuite:^[[0m
+^[[32m- from no conf constructor^[[0m
+^[[32m- from no conf + spark home^[[0m
+^[[32m- from no conf + spark home + env^[[0m
+^[[32m- from conf with settings^[[0m
+^[[32m- from existing SparkContext^[[0m
+^[[32m- from existing SparkContext with settings^[[0m
+^[[31m*** RUN ABORTED ***^[[0m
+^[[31m  java.lang.NoSuchMethodError:
+org.apache.spark.ui.JettyUtils$.createStaticHandler(Ljava/lang/String;Ljava/lang/String;)Lorg/eclipse/jetty/servlet/ServletContextHandler;^[[0m
+^[[31m  at
+org.apache.spark.streaming.ui.StreamingTab.attach(StreamingTab.scala:49)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContext$$anonfun$start$2.apply(StreamingContext.scala:585)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContext$$anonfun$start$2.apply(StreamingContext.scala:585)^[[0m
+^[[31m  at scala.Option.foreach(Option.scala:236)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContext.start(StreamingContext.scala:585)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContextSuite$$anonfun$8.apply$mcV$sp(StreamingContextSuite.scala:101)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContextSuite$$anonfun$8.apply(StreamingContextSuite.scala:96)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContextSuite$$anonfun$8.apply(StreamingContextSuite.scala:96)^[[0m
+^[[31m  at
+org.scalatest.Transformer$$anonfun$apply$1.apply$mcV$sp(Transformer.scala:22)^[[0m
+^[[31m  at org.scalatest.OutcomeOf$class.outcomeOf(OutcomeOf.scala:85)^[[0m
+Did anyone else encounter similar error ?
+Cheers
+I downloaded source tar ball and ran command similar to following with:
+clean package -DskipTests
+Then I ran the following command. 
+Fyi 
+bq.     val result = fDB.mappartitions(testMP).collect
+Not sure if you pasted the above code - there was a typo: method name
+should be mapPartitions
+Cheers
+I got the following when running test suite:
+[INFO] compiler plugin:
+BasicArtifact(org.scalamacros,paradise_2.10.4,2.0.1,null)
+^[[0m[^[[0minfo^[[0m] ^[[0mCompiling 2 Scala sources and 1 Java source to
+/home/hbase/spark-1.4.1/streaming/target/scala-2.10/test-classes...^[[0m
+^[[0m[^[[31merror^[[0m]
+^[[0m/home/hbase/spark-1.4.1/streaming/src/test/scala/org/apache/spark/streaming/DStreamClosureSuite.scala:82:
+not found: type TestException^[[0m
+^[[0m[^[[31merror^[[0m] ^[[0m        throw new TestException(^[[0m
+^[[0m[^[[31merror^[[0m] ^[[0m                  ^^[[0m
+^[[0m[^[[31merror^[[0m]
+^[[0m/home/hbase/spark-1.4.1/streaming/src/test/scala/org/apache/spark/streaming/scheduler/JobGeneratorSuite.scala:73:
+not found: type TestReceiver^[[0m
+^[[0m[^[[31merror^[[0m] ^[[0m      val inputStream = ssc.receiverStream(new
+TestReceiver)^[[0m
+^[[0m[^[[31merror^[[0m] ^[[0m
+^^[[0m
+^[[0m[^[[31merror^[[0m] ^[[0mtwo errors found^[[0m
+^[[0m[^[[31merror^[[0m] ^[[0mCompile failed at Jun 25, 2015 5:12:24 PM
+[1.492s]^[[0m
+Has anyone else seen similar error ?
+Thanks
+Pardon.
+During earlier test run, I got:
+^[[32mStreamingContextSuite:^[[0m
+^[[32m- from no conf constructor^[[0m
+^[[32m- from no conf + spark home^[[0m
+^[[32m- from no conf + spark home + env^[[0m
+^[[32m- from conf with settings^[[0m
+^[[32m- from existing SparkContext^[[0m
+^[[32m- from existing SparkContext with settings^[[0m
+^[[31m*** RUN ABORTED ***^[[0m
+^[[31m  java.lang.NoSuchMethodError:
+org.apache.spark.ui.JettyUtils$.createStaticHandler(Ljava/lang/String;Ljava/lang/String;)Lorg/eclipse/jetty/servlet/ServletContextHandler;^[[0m
+^[[31m  at
+org.apache.spark.streaming.ui.StreamingTab.attach(StreamingTab.scala:49)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContext$$anonfun$start$2.apply(StreamingContext.scala:601)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContext$$anonfun$start$2.apply(StreamingContext.scala:601)^[[0m
+^[[31m  at scala.Option.foreach(Option.scala:236)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContext.start(StreamingContext.scala:601)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContextSuite$$anonfun$8.apply$mcV$sp(StreamingContextSuite.scala:101)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContextSuite$$anonfun$8.apply(StreamingContextSuite.scala:96)^[[0m
+^[[31m  at
+org.apache.spark.streaming.StreamingContextSuite$$anonfun$8.apply(StreamingContextSuite.scala:96)^[[0m
+^[[31m  at
+org.scalatest.Transformer$$anonfun$apply$1.apply$mcV$sp(Transformer.scala:22)^[[0m
+^[[31m  at org.scalatest.OutcomeOf$class.outcomeOf(OutcomeOf.scala:85)^[[0m
+The error from previous email was due to absence
+of StreamingContextSuite.scala
+Spark-Master-Scala211-Compile build is green.
+However it is not clear what the actual command is:
+[EnvInject] - Variables injected successfully.
+[Spark-Master-Scala211-Compile] $ /bin/bash /tmp/hudson8945334776362889961.sh
+FYI
+Here is the command I used:
+mvn -Phadoop-2.4 -Dhadoop.version=2.7.0 -Pyarn -Phive package
+Java: 1.8.0_45
+OS:
+Linux x.com 2.6.32-504.el6.x86_64 #1 SMP Wed Oct 15 04:27:16 UTC 2014
+x86_64 x86_64 x86_64 GNU/Linux
+Cheers
+The test passes when run alone on my machine as well.
+Please run test suite.
+Thanks
+Andrew:
+I agree with your assessment.
+Cheers
+This is what I got (the last line was repeated non-stop):
+[INFO] Replacing original artifact with shaded artifact.
+[INFO] Replacing
+/home/hbase/spark/bagel/target/spark-bagel_2.10-1.5.0-SNAPSHOT.jar with
+/home/hbase/spark/bagel/target/spark-bagel_2.10-1.5.0-SNAPSHOT-shaded.jar
+[INFO] Dependency-reduced POM written at:
+/home/hbase/spark/bagel/dependency-reduced-pom.xml
+[INFO] Dependency-reduced POM written at:
+/home/hbase/spark/bagel/dependency-reduced-pom.xml
+Patrick:
+I used the following command:
+~/apache-maven-3.3.1/bin/mvn -DskipTests -Phadoop-2.4 -Pyarn -Phive clean
+package
+The build doesn't seem to stop.
+Here is tail of build output:
+[INFO] Dependency-reduced POM written at:
+/home/hbase/spark-1.4.1/bagel/dependency-reduced-pom.xml
+[INFO] Dependency-reduced POM written at:
+/home/hbase/spark-1.4.1/bagel/dependency-reduced-pom.xml
+Here is part of the stack trace for the build process:
+http://pastebin.com/xL2Y0QMU
+FYI
+Please take a look at SPARK-8781 (https://github.com/apache/spark/pull/7193)
+Cheers
+Here is mine:
+Apache Maven 3.3.1 (cab6659f9874fa96462afef40fcf6bc033d58c1c;
+2015-03-13T13:10:27-07:00)
+Maven home: /home/hbase/apache-maven-3.3.1
+Java version: 1.8.0_45, vendor: Oracle Corporation
+Java home: /home/hbase/jdk1.8.0_45/jre
+Default locale: en_US, platform encoding: UTF-8
+OS name: "linux", version: "2.6.32-504.el6.x86_64", arch: "amd64", family:
+"unix"
+Looking at Jenkins, master branch compiles.
+Can you try the following command ?
+mvn -Phive -Phadoop-2.6 -DskipTests clean package
+What version of Java are you using ?
+Cheers
+I attached a patch for HADOOP-12235
+BTW openstack was not mentioned in the first email from Gil.
+My email and Gil's second email were sent around the same moment.
+Cheers
+If I understand correctly, hadoop-openstack is not currently dependence in Spark. 
+Can you provide a bit more information such as:
+release of Spark you use
+snippet of your SparkSQL query
+Thanks
++1 to removing commit messages. 
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+What if you move your addition to before line 64 (in master branch there is
+case for if e.checkInputDataTypes().isFailure):
+          case c: Cast if !c.resolved =>
+Cheers
+Interesting read. 
+I did find a lot of Spark mails in Spam folder. 
+Thanks Mridul 
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi,
+I noticed that KinesisStreamSuite fails for both hadoop profiles in master
+Jenkins builds.
+From
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.4,label=centos/3011/console
+:
+KinesisStreamSuite:*** RUN ABORTED ***  java.lang.AssertionError:
+assertion failed: Kinesis test not enabled, should not attempt to get
+AWS credentials  at scala.Predef$.assert(Predef.scala:179)  at
+org.apache.spark.streaming.kinesis.KinesisTestUtils$.getAWSCredentials(KinesisTestUtils.scala:189)
+ at org.apache.spark.streaming.kinesis.KinesisTestUtils.org$apache$spark$streaming$kinesis$KinesisTestUtils$$kinesisClient$lzycompute(KinesisTestUtils.scala:59)
+ at org.apache.spark.streaming.kinesis.KinesisTestUtils.org$apache$spark$streaming$kinesis$KinesisTestUtils$$kinesisClient(KinesisTestUtils.scala:58)
+ at org.apache.spark.streaming.kinesis.KinesisTestUtils.describeStream(KinesisTestUtils.scala:121)
+ at org.apache.spark.streaming.kinesis.KinesisTestUtils.findNonExistentStreamName(KinesisTestUtils.scala:157)
+ at org.apache.spark.streaming.kinesis.KinesisTestUtils.createStream(KinesisTestUtils.scala:78)
+ at org.apache.spark.streaming.kinesis.KinesisStreamSuite.beforeAll(KinesisStreamSuite.scala:45)
+ at org.scalatest.BeforeAndAfterAll$class.beforeAll(BeforeAndAfterAll.scala:187)
+ at org.apache.spark.streaming.kinesis.KinesisStreamSuite.beforeAll(KinesisStreamSuite.scala:33)
+FYI
+TD:
+Thanks for getting the builds back to green.
+Hi,
+I noticed that ReceiverTrackerSuite is failing in master Jenkins build for
+both hadoop profiles.
+The failure seems to start with:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/3104/
+FYI
+I got a compilation error:
+[INFO] /home/hbase/s-on-hbase/src/main/scala:-1: info: compiling
+[INFO] Compiling 18 source files to /home/hbase/s-on-hbase/target/classes
+at 1438099569598
+[ERROR]
+/home/hbase/s-on-hbase/src/main/scala/org/apache/spark/hbase/examples/simple/HBaseTableSimple.scala:36:
+error: type mismatch;
+[INFO]  found   : Int
+[INFO]  required: Short
+[INFO]       while (scanner.advance) numCells += 1
+[INFO]                                        ^
+[ERROR] one error found
+FYI
+zookeeper is not a direct dependency of Spark.
+Can you give a bit more detail on how the election / discovery of master
+works ?
+Cheers
+Please take a look at the first section of:
+https://spark.apache.org/community
+Have you looked at
+https://github.com/pwendell/hive/tree/0.13.1-shaded-protobuf ?
+Cheers
+See first section on https://spark.apache.org/community
+Thanks Josh for the initiative.
+I think reducing the redundancy in QA bot posts would make discussion on GitHub
+UI more focused.
+Cheers
+I tried accessing just now.
+It took several seconds before the page showed up.
+FYI
+See this thread:
+http://search-hadoop.com/m/q3RTtdZv0d1btRHl/Spark+build+module&subj=Building+Spark+Building+just+one+module+
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I pointed hbase-spark module (in HBase project) to 1.5.0-rc1 and was able
+to build the module (with proper maven repo).
+FYI
+The connection failure was to zookeeper. 
+Have you verified that localhost:2181 can serve requests ?
+What version of hbase was Gora built against ?
+Cheers
+Jerry:
+I just tried building hbase-spark module with 1.5.0 and I see:
+ls -l ~/.m2/repository/org/apache/spark/spark-core_2.10/1.5.0
+total 21712
+-rw-r--r--  1 tyu  staff       196 Sep  9 09:37 _maven.repositories
+-rw-r--r--  1 tyu  staff  11081542 Sep  9 09:37 spark-core_2.10-1.5.0.jar
+-rw-r--r--  1 tyu  staff        41 Sep  9 09:37
+spark-core_2.10-1.5.0.jar.sha1
+-rw-r--r--  1 tyu  staff     19816 Sep  9 09:37 spark-core_2.10-1.5.0.pom
+-rw-r--r--  1 tyu  staff        41 Sep  9 09:37
+spark-core_2.10-1.5.0.pom.sha1
+FYI
+Here is the example from Reynold (
+http://search-hadoop.com/m/q3RTtfvs1P1YDK8d) :
+scala> val data = sc.parallelize(1 to size, 5).map(x =>
+(util.Random.nextInt(size /
+repetitions),util.Random.nextDouble)).toDF("key", "value")
+data: org.apache.spark.sql.DataFrame = [key: int, value: double]
+scala> data.explain
+== Physical Plan ==
+TungstenProject [_1#0 AS key#2,_2#1 AS value#3]
+ Scan PhysicalRDD[_1#0,_2#1]
+...
+scala> val res = df.groupBy("key").agg(sum("value"))
+res: org.apache.spark.sql.DataFrame = [key: int, sum(value): double]
+scala> res.explain
+15/09/09 14:17:26 INFO MemoryStore: ensureFreeSpace(88456) called with
+curMem=84037, maxMem=556038881
+15/09/09 14:17:26 INFO MemoryStore: Block broadcast_2 stored as values in
+memory (estimated size 86.4 KB, free 530.1 MB)
+15/09/09 14:17:26 INFO MemoryStore: ensureFreeSpace(19788) called with
+curMem=172493, maxMem=556038881
+15/09/09 14:17:26 INFO MemoryStore: Block broadcast_2_piece0 stored as
+bytes in memory (estimated size 19.3 KB, free 530.1 MB)
+15/09/09 14:17:26 INFO BlockManagerInfo: Added broadcast_2_piece0 in memory
+on localhost:42098 (size: 19.3 KB, free: 530.2 MB)
+15/09/09 14:17:26 INFO SparkContext: Created broadcast 2 from explain at
+:27
+== Physical Plan ==
+TungstenAggregate(key=[key#19],
+functions=[(sum(value#20),mode=Final,isDistinct=false)],
+output=[key#19,sum(value)#21])
+ TungstenExchange hashpartitioning(key#19)
+  TungstenAggregate(key=[key#19],
+functions=[(sum(value#20),mode=Partial,isDistinct=false)],
+output=[key#19,currentSum#25])
+   Scan ParquetRelation[file:/tmp/data][key#19,value#20]
+FYI
+This is related:
+https://issues.apache.org/jira/browse/SPARK-10557
+Is it possible that Canonical_URL occurs more than once in your json ?
+Can you check your json input ?
+Thanks
+Can you take a look at SPARK-5278 where ambiguity is shown between field
+names which differ only by case ?
+Cheers
+Looks like you didn't specify sparkr profile when building.
+Cheers
+Maybe the following can be used for changing Scala version:
+http://maven.apache.org/archetype/maven-archetype-plugin/
+I played with it a little bit but didn't get far.
+FYI
+You can use broadcast variable for passing connection information. 
+Cheers
+Can you clarify what you want to do:
+If you modify existing hadoop InputFormat, etc, it would be a matter of
+rebuilding hadoop and build Spark using the custom built hadoop as
+dependency.
+Do you introduce new InputFormat ?
+Cheers
+Which Spark release are you building ?
+For master branch, I get the following:
+lib_managed/jars/datanucleus-api-jdo-3.2.6.jar
+ lib_managed/jars/datanucleus-core-3.2.10.jar
+ lib_managed/jars/datanucleus-rdbms-3.2.9.jar
+FYI
+I see.
+I use maven to build so I observe different contents under lib_managed
+directory.
+Here is snippet of dependency tree:
+[INFO] |  +- org.spark-project.hive:hive-metastore:jar:1.2.1.spark:compile
+[INFO] |  |  +- com.jolbox:bonecp:jar:0.8.0.RELEASE:compile
+[INFO] |  |  +- org.apache.derby:derby:jar:10.10.1.1:compile
+I cloned Hive 1.2 code base and saw:
+    
+So the version used by Spark is quite close to what Hive uses.
+What version of hadoop are you using ?
+Is that version consistent with the one which was used to build Spark 1.4.0
+?
+Cheers
+I tried to access
+https://repo1.maven.org/maven2/org/apache/spark/spark-streaming_2.10/1.5.0/spark-streaming_2.10-1.5.0.pom
+on
+Chrome and Firefox (on Mac)
+I got 404
+FYI
+Andy:
+1.5.1 has been released.
+Maybe you can use this:
+https://repo1.maven.org/maven2/org/apache/spark/spark-streaming_2.10/1.5.1/spark-streaming_2.10-1.5.1.pom
+I can access the above.
+As a workaround, can you set the number of partitions higher in the
+sc.textFile method ?
+Cheers
+In root pom.xml :
+    
+You can override the version of hadoop with command similar to:
+-Phadoop-2.4 -Dhadoop.version=2.7.0
+Cheers
+http://stackoverflow.com/questions/542979/using-heapdumponoutofmemoryerror-parameter-for-heap-dump-for-jboss
+You can go to:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN
+and see if the test failure(s) you encountered appeared there.
+FYI
+Can you re-submit your PR to trigger a new build - assuming the tests are
+flaky ?
+If any test fails again, consider contacting the owner of the module for
+expert opinion.
+Cheers
+Josh:
+We're on the same page.
+I used the term 're-submit your PR' which was different from opening new PR.
+Please see
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+bq. Access is denied
+Please check permission of the path mentioned.
+From
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.4,label=spark-test/3846/console
+:
+SparkListenerSuite:- basic creation and shutdown of LiveListenerBus-
+bus.stop() waits for the event queue to completely drain- basic
+creation of StageInfo- basic creation of StageInfo with shuffle-
+StageInfo with fewer tasks than partitions- local metrics-
+onTaskGettingResult() called when result fetched remotely *** FAILED
+***  org.apache.spark.SparkException: Job aborted due to stage
+failure: Task 0 in stage 0.0 failed 1 times, most recent failure: Lost
+task 0.0 in stage 0.0 (TID 0, localhost): java.lang.OutOfMemoryError:
+Java heap space	at java.util.Arrays.copyOf(Arrays.java:2271)	at
+java.io.ByteArrayOutputStream.grow(ByteArrayOutputStream.java:113)	at
+java.io.ByteArrayOutputStream.ensureCapacity(ByteArrayOutputStream.java:93)	at
+java.io.ByteArrayOutputStream.write(ByteArrayOutputStream.java:140)	at
+java.io.ObjectOutputStream$BlockDataOutputStream.write(ObjectOutputStream.java:1852)	at
+java.io.ObjectOutputStream.write(ObjectOutputStream.java:708)	at
+org.apache.spark.util.Utils$.writeByteBuffer(Utils.scala:182)	at
+org.apache.spark.scheduler.DirectTaskResult$$anonfun$writeExternal$1.apply$mcV$sp(TaskResult.scala:52)	at
+org.apache.spark.util.Utils$.tryOrIOException(Utils.scala:1160)	at
+org.apache.spark.scheduler.DirectTaskResult.writeExternal(TaskResult.scala:49)	at
+java.io.ObjectOutputStream.writeExternalData(ObjectOutputStream.java:1458)	at
+java.io.ObjectOutputStream.writeOrdinaryObject(ObjectOutputStream.java:1429)	at
+java.io.ObjectOutputStream.writeObject0(ObjectOutputStream.java:1177)	at
+java.io.ObjectOutputStream.writeObject(ObjectOutputStream.java:347)	at
+org.apache.spark.serializer.JavaSerializationStream.writeObject(JavaSerializer.scala:44)	at
+org.apache.spark.serializer.JavaSerializerInstance.serialize(JavaSerializer.scala:101)	at
+org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:256)	at
+java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)	at
+java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:615)	at
+java.lang.Thread.run(Thread.java:745)
+Should more heap be given to test suite ?
+Cheers
+When I ran the following command on Linux with latest master branch:
+~/apache-maven-3.3.3/bin/mvn clean -Phive -Phive-thriftserver -Pyarn
+-Phadoop-2.4 -Dhadoop.version=2.7.0 package
+I saw some test failures:
+http://pastebin.com/1VYZYy5K
+Has anyone seen similar test failure before ?
+Thanks
+You can use the following link:
+https://issues.apache.org/jira/secure/CreateIssue!default.jspa
+Remember to select Spark as the project.
+Have you seen the following ?
+[SPARK-3907][SQL] Add truncate table support
+Cheers
+When I ran the following command:
+~/apache-maven-3.3.3/bin/mvn -Phive -Phive-thriftserver -Pyarn -Phadoop-2.4
+-Dhadoop.version=2.6.0 package
+I got:
+testChildProcLauncher(org.apache.spark.launcher.SparkLauncherSuite)  Time
+elapsed: 0.031 sec  <<< FAILURE!
+java.lang.AssertionError: expected: but was:
+        at org.junit.Assert.fail(Assert.java:93)
+        at org.junit.Assert.failNotEquals(Assert.java:647)
+        at org.junit.Assert.assertEquals(Assert.java:128)
+        at org.junit.Assert.assertEquals(Assert.java:472)
+        at org.junit.Assert.assertEquals(Assert.java:456)
+        at
+org.apache.spark.launcher.SparkLauncherSuite.testChildProcLauncher(SparkLauncherSuite.java:105)
+java version "1.7.0_67"
+Java(TM) SE Runtime Environment (build 1.7.0_67-b01)
+Java HotSpot(TM) 64-Bit Server VM (build 24.65-b04, mixed mode)
+I
+checked ./launcher/target/surefire-reports/TEST-org.apache.spark.launcher.SparkLauncherSuite.xml
+but didn't get much clue.
+FYI
+Have you tried using avg in place of mean ?
+(1 to 5).foreach { i => val df = (1 to 1000).map(j => (j,
+s"str$j")).toDF("a", "b").save(s"/tmp/partitioned/i=$i") }
+    sqlContext.sql("""
+    CREATE TEMPORARY TABLE partitionedParquet
+    USING org.apache.spark.sql.parquet
+    OPTIONS (
+      path '/tmp/partitioned'
+    )""")
+sqlContext.sql("""select avg(a) from partitionedParquet""").show()
+Cheers
+Since there is already Average, the simplest change is the following:
+$ git diff
+sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/FunctionRegistry.scala
+diff --git
+a/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/FunctionRegistry.scala
+b/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/Functi
+index 3dce6c1..920f95b 100644
+---
+a/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/FunctionRegistry.scala
++++
+b/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/FunctionRegistry.scala
+@@ -184,6 +184,7 @@ object FunctionRegistry {
+     expression[Last]("last"),
+     expression[Last]("last_value"),
+     expression[Max]("max"),
++    expression[Average]("mean"),
+     expression[Min]("min"),
+     expression[Stddev]("stddev"),
+     expression[StddevPop]("stddev_pop"),
+FYI
+Created SPARK-11371 with a patch.
+Will create PR soon.
+This happened recently on Jenkins:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.3,label=spark-test/3964/console
+I noticed that the SparkContext created in each sub-test is not stopped
+upon finishing sub-test.
+Would stopping each SparkContext make a difference in terms of heap memory
+consumption ?
+Cheers
+On Linux, I got the following test failure (with or without suggested
+change):
+testChildProcLauncher(org.apache.spark.launcher.SparkLauncherSuite)  Time
+elapsed: 0.036 sec  <<< FAILURE!
+java.lang.AssertionError: expected: but was:
+at org.junit.Assert.fail(Assert.java:88)
+at org.junit.Assert.failNotEquals(Assert.java:743)
+at org.junit.Assert.assertEquals(Assert.java:118)
+at org.junit.Assert.assertEquals(Assert.java:555)
+at org.junit.Assert.assertEquals(Assert.java:542)
+at
+org.apache.spark.launcher.SparkLauncherSuite.testChildProcLauncher(SparkLauncherSuite.java:113)
+Has anyone seen the above before ?
+Cheers
+Please take a look at first section of spark.apache.org/community
+FYI
+Looks like SparkListenerSuite doesn't OOM on QA runs compared to Jenkins
+builds.
+I wonder if this is due to difference between machines running QA tests vs
+machines running Jenkins builds.
+I have a PR which tries to address this issue:
+https://github.com/apache/spark/pull/9384
+Comment is welcome.
+My experience is that going through tests in each module takes some time before reaching the test specified by the wildcard. 
+Some test, such as SparkLauncherSuite, would run even if not in wildcard. 
+FYI 
+Opening JIRA is fine.
+Thanks
+Please take a look at
+https://issues.apache.org/jira/browse/SPARK-10883
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+See previous discussion:
+http://search-hadoop.com/m/q3RTtPnPnzwOhBr
+FYI
+Since maven is the preferred build vehicle, ivy style dependencies policy
+would produce surprising results compared to today's behavior.
+I would suggest staying with current dependencies policy.
+My two cents.
+bq. include an sbt jar in the source repo
+Can you clarify which sbt jar (by path) ?
+I tried 'git log' on the following files but didn't see commit history:
+./build/sbt-launch-0.13.7.jar
+./build/zinc-0.3.5.3/lib/sbt-interface.jar
+./sbt/sbt-launch-0.13.2.jar
+./sbt/sbt-launch-0.13.5.jar
+Would the following change work for you ?
+diff --git
+a/core/src/main/scala/org/apache/spark/util/AsynchronousListenerBus.scala
+b/core/src/main/scala/org/apache/spark/util/AsynchronousListenerBus.scala
+index 61b5a4c..c330d25 100644
+---
+a/core/src/main/scala/org/apache/spark/util/AsynchronousListenerBus.scala
++++
+b/core/src/main/scala/org/apache/spark/util/AsynchronousListenerBus.scala
+@@ -66,6 +66,7 @@ private[spark] abstract class AsynchronousListenerBus[L
+<: AnyRef, E](name: Stri
+         self.synchronized {
+           processingEvent = true
+         }
++        if (stopped.get()) return
+         try {
+           val event = eventQueue.poll
+           if (event == null) {
++1
+I was able to access the following where response was fast:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/45806/
+Cheers
+Hi,
+I noticed that SparkPullRequestBuilder completes much faster than maven
+Jenkins build.
+From
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/45871/consoleFull
+, I couldn't get exact time the builder started but looks like the duration
+was around 20 minutes.
+From
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.4,label=spark-test/4099/console
+:
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 01:42 h
+Can someone enlighten me on the sets of tests executed by
+SparkPullRequestBuilder ?
+BTW I noticed that recent Jenkins builds were not in good shape:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/HADOOP_PROFILE=hadoop-2.4,label=spark-test/
+Comments are welcome.
+Can I assume that for any particular test, if it passes reliably on
+SparkPullRequestBuilder,
+it should pass on maven Jenkins ?
+If so, should flaky test(s) be disabled, strengthened and enabled again ?
+Cheers
+Please take a look at http://www.infoq.com/articles/tuning-tips-G1-GC
+Cheers
+See this thread:
+http://search-hadoop.com/m/q3RTtLKc2ctNPcq&subj=Re+Spark+1+4+2+release+and+votes+conversation+
+If I am not mistaken, the binaries for Scala 2.11 were generated against
+hadoop 1.
+What about binaries for Scala 2.11 against hadoop 2.x ?
+Cheers
+I tried to run test suite and encountered the following:
+http://pastebin.com/DPnwMGrm
+FYI
++1
+Ran through test suite (minus docker-integration-tests) which passed.
+Overall experience was much better compared with some of the prior RC's.
+[INFO] Spark Project External Kafka ....................... SUCCESS [
+53.956 s]
+[INFO] Spark Project Examples ............................. SUCCESS [02:05
+min]
+[INFO] Spark Project External Kafka Assembly .............. SUCCESS [
+11.298 s]
+[INFO]
+------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO]
+------------------------------------------------------------------------
+[INFO] Total time: 01:42 h
+[INFO] Finished at: 2015-12-02T17:19:02-08:00
+Hi,
+You may have noticed that maven build against Hadoop 2.4 times out on Jenkins. 
+The last module is spark-hive-thriftserver
+This seemed to start with build #4440
+FYI 
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Thanks for checking, Yin.
+Looks like the cause might be in one of the commits for build #4438
+Cheers
+Attached was the tail of test suite output from local run.
+I got test failure.
+FYI
+Please see related JIRA:
+https://issues.apache.org/jira/browse/SPARK-8013
+This question is better suited for user mailing list.
+Thanks
+In Jerry's example, the first SparkContext, sc, has been stopped.
+So there would be only one SparkContext running at any given moment.
+Cheers
+Running test suite, there was timeout in hive-thriftserver module.
+This has been fixed by SPARK-11823. So I assume this is test issue.
+lgtm
+getMissingParentStages(stage) would be called for the stage (being
+re-submitted)
+If there is no missing parents, submitMissingTasks() would be called.
+If there is missing parent(s), the parent would go through the same flow.
+I don't see issue in this part of the code.
+Cheers
+Hi,
+You may have noticed the following test failures:
+org.apache.spark.sql.hive.execution.HiveUDFSuite.UDFIntegerToString
+org.apache.spark.sql.hive.execution.SQLQuerySuite.udf_java_method
+Tracing backwards, they started failing since this build:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/4521/
+There were several commits in the above build. So it is not immediately
+obvious which commit caused the failures.
+FYI
+I found that SBT build for Scala 2.11 has been failing (
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-branch-1.6-COMPILE-SBT-SCALA-2.11/3/consoleFull
+)
+I logged SPARK-12527 and sent a PR.
+FYI
+Do you mind sharing your use case ?
+It may be possible to use a different approach than Akka.
+Cheers
+Disha:
+Please consider these resources:
+https://groups.google.com/forum/#!forum/akka-user
+https://groups.google.com/forum/#!forum/akka-dev
+For #1, 9 minutes seem to be normal. Here was duration for recent build on
+master branch:
+[INFO]
+------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO]
+------------------------------------------------------------------------
+[INFO] Total time: 10:44 min
+[INFO] Finished at: 2015-12-25T09:53:28-08:00
+For #2, please take a look at
+https://spark.apache.org/docs/latest/submitting-applications.html
+Look for 'Run application locally;'
+Cheers
+Hi,
+I noticed that there are a lot of checkstyle warnings in the following form:
+<error line="1784" severity="error" message="&apos;block&apos; child have
+incorrect indentation level 8, expected level should be 10."
+source="com.puppycrawl.tools.checkstyle.
+checks.indentation.IndentationCheck"/>
+To my knowledge, we use two spaces for each tab. Not sure why all of a
+sudden we have so many IndentationCheck warnings:
+grep 'hild have incorrect indentati' trunkCheckstyle.xml | wc
+    3133   52645  678294
+If there is no objection, I would create a JIRA and relax IndentationCheck
+warning.
+Cheers
+Oops, wrong list :-)
+Right. 
+Pardon my carelessness. 
+I went through StateMap.scala a few times but didn't find any logic error
+yet.
+According to the call stack, the following was executed in get(key):
+    } else {
+      parentStateMap.get(key)
+    }
+This implies that parentStateMap was null.
+But it seems parentStateMap is properly assigned in readObject().
+Jan:
+Which serializer did you use ?
+Thanks
+I logged SPARK-12778 where endian awareness in Platform.java should
+help in mixed
+endian set up.
+There could be other parts of the code base which are related.
+Cheers
+There is no annotation in TestingUtils class indicating whether it is
+suitable for consumption by external projects.
+You should assume the class is not public since its methods may change in
+future Spark releases.
+Cheers
+Cycling past bits:
+http://search-hadoop.com/m/q3RTtU5CRU1KKVA42&subj=RE+shuffle+FetchFailedException+in+spark+on+YARN+job
+Strangely both Jenkins jobs showed green status:
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-master-COMPILE-sbt-SCALA-2.11/
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-master-COMPILE-MAVEN-SCALA-2.11/
+Does this mean the following Jenkins builds can be disabled ?
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-master-COMPILE-MAVEN-SCALA-2.11/
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-master-COMPILE-sbt-SCALA-2.11/
+Cheers
+w.r.t. protobuf-java version mismatch, I wonder if you can rebuild Spark
+with the following change (using maven):
+http://pastebin.com/fVQAYWHM
+Cheers
+The following jobs have been established for build against Scala 2.10:
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-master-COMPILE-MAVEN-SCALA-2.10/
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-master-COMPILE-sbt-SCALA-2.10/
+FYI
+SPARK-12624 has been resolved.
+According to Wenchen, SPARK-12783 is fixed in 1.6.0 release.
+Are there other blockers for Spark 1.6.1 ?
+Thanks
+w.r.t. running Spark on YARN, there are a few outstanding issues. e.g.
+SPARK-11182 HDFS Delegation Token
+See also the comments under SPARK-12279
+FYI
+For #1, a brief search landed the following:
+core/src/main/scala/org/apache/spark/SparkConf.scala:
+ DeprecatedConfig("spark.rpc", "2.0", "Not used any more.")
+core/src/main/scala/org/apache/spark/SparkConf.scala:
+ "spark.rpc.numRetries" -> Seq(
+core/src/main/scala/org/apache/spark/SparkConf.scala:
+ "spark.rpc.retry.wait" -> Seq(
+core/src/main/scala/org/apache/spark/SparkConf.scala:
+ "spark.rpc.askTimeout" -> Seq(
+core/src/main/scala/org/apache/spark/SparkConf.scala:
+ "spark.rpc.lookupTimeout" -> Seq(
+core/src/main/scala/org/apache/spark/SparkConf.scala:
+ "spark.rpc.message.maxSize" -> Seq(
+core/src/main/scala/org/apache/spark/SparkConf.scala:
+ name.startsWith("spark.rpc") ||
+There doesn't seem to be RPC protection for stand alone mode.
+Assuming your change is based on hadoop-2 branch, you can use 'mvn install'
+command which would put artifacts under 2.8.0-SNAPSHOT subdir in your local
+maven repo.
+Here is an example:
+~/.m2/repository/org/apache/hadoop/hadoop-hdfs/2.8.0-SNAPSHOT
+Then you can use the following command to build Spark:
+-Pyarn -Phadoop-2.4 -Dhadoop.version=2.8.0-SNAPSHOT
+FYI
+Congratulations, Herman and Wenchen.
+Do you mind pastebin'ning code snippet and exception one more time - I
+couldn't see them in your original email.
+Which Spark release are you using ?
+How about changing the last line to:
+scala> val df2 = df.select(functions.array(df("a"),
+df("b")).alias("arrayCol"))
+df2: org.apache.spark.sql.DataFrame = [arrayCol: array df2.show()
++--------+
+|arrayCol|
++--------+
+|  [0, 1]|
+|  [1, 2]|
+|  [2, 3]|
+|  [3, 4]|
+|  [4, 5]|
+|  [5, 6]|
+|  [6, 7]|
+|  [7, 8]|
+|  [8, 9]|
+| [9, 10]|
++--------+
+FYI
+What's your plan of using the arrayCol ?
+It would be part of some query, right ?
+Hdfs class is in hadoop-hdfs-XX.jar
+Can you check the classpath to see if the above jar is there ?
+Please describe the command lines you used for building hadoop / Spark.
+Cheers
+Have you seen this thread ?
+http://stackoverflow.com/questions/24402737/how-to-read-gz-files-in-spark-using-wholetextfiles
+When you click on Create, you're brought to 'Create Issue' dialog where you
+choose Project Spark.
+Component should be MLlib.
+Please see also:
+http://search-hadoop.com/m/q3RTtmsshe1W6cH22/spark+pull+template&subj=pull+request+template
+In hbase, there is hbase-spark module which supports bulk load.
+This module is to be backported in the upcoming 1.3.0 release.
+There is some pending work, such as HBASE-15271 .
+FYI
+Looking at
+https://logging.apache.org/log4j/1.2/apidocs/org/apache/log4j/PatternLayout.html
+*WARNING* Generating the caller class information is slow. Thus, use should
+be avoided unless execution speed is not an issue.
+Since majority of code is written in Scala which is not analyzed by Coverity, the efficacy of the tool seems limited. 
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Last time I checked there wasn't high impact defects.
+Mind pointing out the defects you think should be fixed ?
+Thanks
+Is there JIRA for fixing the resource leaks w.r.t. unclosed SparkContext ?
+I wonder if such defects are really high priority.
+Cheers
+Please stack trace, code snippet, etc in the JIRA you created so that
+people can reproduce what you saw.
+Josh:
+SerializerInstance and SerializationStream would also become private[spark],
+right ?
+Thanks
+around.
+FYI maven 3.3.9 is required for master branch.
+The warning was added by:
+SPARK-12757 Add block-level read/write locks to BlockManager
+I guess you have looked at MemoryManager#pageSizeBytes where
+the "spark.buffer.pageSize" config can override default page size.
+FYI
+Hi,
+Based on master branch refreshed today, I issued 'git clean -fdx' first.
+Then this command:
+build/mvn clean -Phive -Phive-thriftserver -Pyarn -Phadoop-2.6
+-Dhadoop.version=2.7.0 package -DskipTests
+I got the following error:
+scala>  sql("explain codegen select 'a' as a group by 1").head
+org.apache.spark.sql.catalyst.parser.ParseException:
+extraneous input 'codegen' expecting {'(', 'SELECT', 'FROM', 'ADD', 'DESC',
+'WITH', 'VALUES', 'CREATE', 'TABLE', 'INSERT', 'DELETE', 'DESCRIBE',
+'EXPLAIN', 'LOGICAL', 'SHOW', 'USE', 'DROP', 'ALTER', 'MAP', 'SET',
+'START', 'COMMIT', 'ROLLBACK', 'REDUCE', 'EXTENDED', 'REFRESH', 'CLEAR',
+'CACHE', 'UNCACHE', 'FORMATTED', 'DFS', 'TRUNCATE', 'ANALYZE', 'REVOKE',
+'GRANT', 'LOCK', 'UNLOCK', 'MSCK', 'EXPORT', 'IMPORT', 'LOAD'}(line 1, pos
+8)
+== SQL ==
+explain codegen select 'a' as a group by 1
+--------^^^
+Can someone shed light ?
+Thanks
+bq. the modifications do not touch the scheduler
+If the changes can be ported over to 1.6.1, do you mind reproducing the
+issue there ?
+I ask because master branch changes very fast. It would be good to narrow
+the scope where the behavior you observed started showing.
+Looks like the import comes from
+repl/scala-2.11/src/main/scala/org/apache/spark/repl/SparkILoop.scala :
+      processLine("import sqlContext.sql")
+The next line should give some clue:
+    expectCorrectException { ssc.transform(Seq(ds), transformF) }
+Closure shouldn't include return.
+Josh:
+You may have noticed the following error (
+https://amplab.cs.berkeley.edu/jenkins/job/spark-master-test-maven-hadoop-2.7/566/console
+):
+[error] javac: invalid source release: 1.8
+[error] Usage: javac  <source files>
+[error] use -help for a list of possible options
+Looking at recent
+https://amplab.cs.berkeley.edu/jenkins/job/spark-master-test-maven-hadoop-2.7
+builds, there was no such error.
+I don't see anything wrong with the code:
+  usage = "_FUNC_(str) - " +
+    "Returns str, with the first letter of each word in uppercase, all
+other letters in " +
+Mind refresh and build again ?
+If it still fails, please share the build command.
+The broken build was caused by the following:
+[SPARK-14462][ML][MLLIB] add the mllib-local build to maven pom
+See
+https://amplab.cs.berkeley.edu/jenkins/job/spark-master-test-maven-hadoop-2.7/607/
+FYI
+Sent PR:
+https://github.com/apache/spark/pull/12276
+I was able to get build going past mllib-local module.
+FYI
+I assume you tested 2.0 with SPARK-12181 .
+Related code from Platform.java if java.nio.Bits#unaligned() throws
+exception:
+      // We at least know x86 and x64 support unaligned access.
+      String arch = System.getProperty("os.arch", "");
+      //noinspection DynamicRegexReplaceableByCompiledPattern
+      _unaligned = arch.matches("^(i[3-6]86|x86(_64)?|x64|amd64)$");
+Can you give us some detail on how the code runs for JDKs on zSystems ?
+Thanks
+Can you clarify whether BytesToBytesMapOffHeapSuite passed or failed with
+the forced true value for unaligned ?
+If the test failed, please pastebin the failure(s).
+Thanks
+I am curious if all Spark unit tests pass with the forced true value for
+unaligned.
+If that is the case, it seems we can add s390x to the known architectures.
+It would also give us some more background if you can describe how
+java.nio.Bits#unaligned()
+is implemented on s390x.
+Josh / Andrew / Davies / Ryan are more familiar with related code. It would
+be good to hear what they think.
+Thanks
+bq. run the tests claiming to require unaligned memory access on a platform
+where unaligned memory access is definitely not supported for
+shorts/ints/longs.
+That would help us understand interactions on s390x platform better.
+I had one PR which got merged after 3 months.
+If the inactivity was due to contributor, I think it can be closed after 30
+days.
+But if the inactivity was due to lack of review, the PR should be kept open.
+bq. close the ones where they don't respond for a week
+Does this imply that the script understands response from human ?
+Meaning, would the script use some regex which signifies that the
+contributor is willing to close the PR ?
+If the contributor is willing to close, why wouldn't he / she do it
+him/herself ?
+If not, the cost is not close to zero.
+Meaning, some potentially useful PRs would never see the light of day.
+My two cents.
+During the months of November / December, the 30 day period should be
+relaxed.
+Some people(at least in US) may take extended vacation during that time.
+For Chinese developers, Spring Festival would bear similar circumstance.
+Corrected typo in subject.
+I want to note that the hbase-spark module in HBase is incomplete. Zhan has
+several patches pending review.
+hbase-spark module is currently only in master branch which would be
+released as 2.0
+However the release date for 2.0 is unclear - probably half a year from now.
+If we remove the examples now, there would be no release from either
+project which can show users how to access hbase.
+bq. I wouldn't call it "incomplete".
+I would call it incomplete.
+Please see HBASE-15333 'Enhance the filter to handle short, integer, long,
+float and double' which is a bug fix.
+Please exclude presence of related of module in vendor distro from this
+discussion.
+Thanks
+bq. create a separate tarball for them
+Probably another thread can be started for the above.
+I am fine with it.
+bq. it's actually in use right now in spite of not being in any upstream
+HBase release
+If it is not in upstream, then it is not relevant for discussion on Apache
+mailing list.
+'bq.' is used in JIRA to quote what other people have said.
+There is an Open JIRA for fixing the documentation: HBASE-15473
+I would say the refguide link you provided should not be considered as
+complete.
+Note it is marked as Blocker by Sean B.
+bq. HBase's current support, even if there are bugs or things that still
+need to be done, is much better than the Spark example
+In my opinion, a simple example that works is better than a buggy package.
+I hope before long the hbase-spark module in HBase can arrive at a state
+which we can advertise as mature - but we're not there yet.
+The same question can be asked w.r.t. examples for other projects,
+such as flume
+and kafka.
+Clarification: in my previous email, I was not talking
+about spark-streaming-flume artifact or spark-streaming-kafka artifact.
+I was talking about examples for these projects, such
+as examples//src/main/python/streaming/flume_wordcount.py
+Interesting.
+For #3:
+bq. reading data from,
+I guess you meant reading from disk.
+Zhan:
+I have mentioned the JIRA numbers in the thread starting with (note the
+typo in subject of this thread):
+RFC: Remove ...
+Are you able to pastebin a unit test which can reproduce the following ?
+Thanks
+I tried the same statement using Spark 1.6.1
+There was no error with default memory setting. 
+Suggest logging a bug. 
+I plan to.
+I am not that familiar with all the parts involved though :-)
+Have you tried the following ?
+scala> import spark.implicits._
+import spark.implicits._
+scala> spark
+res0: org.apache.spark.sql.SparkSession =
+org.apache.spark.sql.SparkSession@323d1fa2
+Cheers
+PR #10572 was listed twice.
+In the future, is it possible to include the contributor's handle beside
+the PR number so that people can easily recognize their own PR ?
+Thanks
+Please see this thread:
+http://search-hadoop.com/m/q3RTt9XAz651PiG/Adhoc+queries+spark+streaming&subj=Re+Adhoc+queries+on+Spark+2+0+with+Structured+Streaming
+In master branch, behavior is the same.
+Suggest opening a JIRA if you haven't done so.
+Which release of Spark / Hive are you using ?
+Cheers
+Yash:
+Can you share the JVM parameters you used ?
+How many partitions are there in your data set ?
+Thanks
+The following line was repeated twice:
+- For Oracle JDK7, mvn -DskipTests install and run `dev/lint-java`.
+Did you intend to cover JDK 8 ?
+Cheers
+Without Zinc, 'mvn -DskipTests clean install' takes ~30 minutes.
+Maybe not everyone is willing to wait that long.
+Do you know if more than one PR would be verified on the same machine ?
+I wonder whether the 'mvn install' from two simultaneous PR builds may have
+conflict.
+Can you tell us the commit hash using which the test was run ?
+For #2, if you can give full stack trace, that would be nice.
+Thanks
+For #1 below, currently Jenkins uses Java 8:
+JAVA_HOME=/usr/java/jdk1.8.0_60
+How about switching to Java 7 ?
+My two cents.
+Please log a JIRA.
+Thanks
+Congratulations, Yanbo.
+See the following from
+https://amplab.cs.berkeley.edu/jenkins/view/Spark%20QA%20Compile/job/SPARK-master-COMPILE-sbt-SCALA-2.10/1642/consoleFull
+:
++ SBT_FLAGS+=('-Dscala-2.10')
++ ./dev/change-scala-version.sh 2.10
+FYI
+With commit 200f01c8fb15680b5630fbd122d44f9b1d096e02 using Scala 2.11:
+Using Python version 2.7.9 (default, Apr 29 2016 10:48:06)
+SparkSession available as 'spark'.
+DF').getOrCreate()
+[Row(incremented=2), Row(incremented=3)]
+Let me build with Scala 2.10 and try again.
+Have you tried the following ?
+Seq(1->2, 1->5, 3->6).toDS("a", "b")
+then you can refer to columns by name.
+FYI
+I built with Scala 2.10
+The above just hung.
+Please go ahead.
+I think the second group (3 classOf's) should be used.
+Cheers
+You can use a JIRA filter to find JIRAs of the component(s) you're
+interested in.
+Then sort by Priority.
+Maybe comment on the JIRA if you want to work on it.
+Running the following command:
+build/mvn clean -Phive -Phive-thriftserver -Pyarn -Phadoop-2.6 -Psparkr
+-Dhadoop.version=2.7.0 package
+The build stopped with this test failure:
+^[[31m- SPARK-9757 Persist Parquet relation with decimal column *** FAILED
+***^[[0m
+bq. we turned it off when fixing a bug
+Adam:
+Can you refer to the bug JIRA ?
+Thanks
+Found a few issues:
+[SPARK-6810] Performance benchmarks for SparkR
+[SPARK-2833] performance tests for linear regression
+[SPARK-15447] Performance test for ALS in Spark 2.0
+Haven't found one for Spark core.
+Congratulations, Felix.
+'Spark 1.x and Scala 2.10 & 2.11' was repeated.
+I guess your second line should read:
+org.bdgenomics.adam:adam-{core,apis,cli}-spark2_2.1[0,1]  for Spark 2.x and
+Scala 2.10 & 2.11
+Hi,
+In hbase-spark module of hbase, we previously had this code:
+  def hbaseFieldToScalaType(
+      f: Field,
+      src: Array[Byte],
+      offset: Int,
+      length: Int): Any = {
+...
+        case BinaryType =>
+          val newArray = new Array[Byte](length)
+          System.arraycopy(src, offset, newArray, 0, length)
+          newArray
+        // TODO: add more data type support
+        case _ => SparkSqlSerializer.deserialize[Any](src)
+SparkSqlSerializer is no longer accessible as of spark 2.0.
+Is there replacement for it ?
+Thanks
+Was there any error prior to 'LifecycleExecutionException' ?
+I think only committers should resolve JIRAs which were not created by himself / herself. 
+Makes sense. 
+I trust Hyukjin, Holden and Cody's judgement in respective areas. 
+I just wish to see more participation from the committers. 
+Thanks 
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+I haven't used Gobblin.
+You can consider asking Gobblin mailing list of the first option.
+The second option would work.
+Incremental load traditionally means generating hfiles and
+using org.apache.hadoop.hbase.mapreduce.LoadIncrementalHFiles to load the
+data into hbase.
+For your use case, the producer needs to find rows where the flag is 0 or 1.
+After such rows are obtained, it is up to you how the result of processing
+is delivered to hbase.
+Cheers
+Though no hbase release has the hbase-spark module, you can find the
+backport patch on HBASE-14160 (for Spark 1.6)
+You can build the hbase-spark module yourself.
+Cheers
+The references are vendor specific.
+Suggest contacting vendor's mailing list for your PR.
+My initial interpretation of HBase repository is that of Apache.
+Cheers
+Does the storage handler provide bulk load capability ?
+Cheers

@@ -1,0 +1,959 @@
+While going through the try to get the hang of things, I've noticed
+several different styles of logging. They all have some downside
+(readability being one of them in certain cases), but all of the
+suffer from the fact that the log message needs to be built even
+though it might not be used.
+I spent some time trying to add varargs support to Logging.scala (also
+to learn more about Scala itself), and came up with this:
+https://github.com/vanzin/spark/commit/a15c284d4aac3d645b13c0ef157787ba014840e4
+The change may look large, but the only interesting changes are in
+Logging.scala, I promise.
+What do you guys think of this approach?
+It should, at worst, be just as fast (or slow) as before for the
+majority of cases (i.e., any case where variables were used in the log
+message). Personally, I think it reads better.
+It might be possible to have something similar using string
+interpolation, but I'm not familiar enough with Scala yet to try my
+hand at that. Also, I believe that would still require some kind of
+formatting when you want to do calculations (e.g. turn a variable
+holding milliseconds into seconds in the log message).
+If people like it, I'll submit a proper pull request. I've run a few
+things using this code, and also the tests (which caught a few type
+mismatches in the format strings), and everything looks ok so far.
+-- 
+Marcelo
+Hello all,
+I'm currently taking a look at how to hook Spark with the Application
+Timeline Server (ATS) work going on in Yarn (YARN-1530). I've got a
+reasonable idea of how the Yarn part works, and the basic idea of what
+needs to be done in Spark, but I've run into a couple of issues with
+the current listener framework and I'd like to ask for some guidance.
+(i) SparkContext.addSparkListener() may miss events
+Notably, it's not possible to add a listener to catch the initial
+SparkListenerEnvironmentUpdate and SparkListenerApplicationStart
+events; the second one is particularly important for something like an
+event logger. The current EventLoggingListener gets around that by
+being initialized by SparkContext itself, but for other listeners,
+that option isn't available (and that doesn't seem like a scalable
+solution either).
+My initial idea was to add a "listeners" argument to the "big"
+SparkContext constructor, but I'm open to different suggestions, since
+I kinda dislike when constructors start growing too much. (It current
+has 6 arguments, some of which have default values.) A builder-like
+pattern could be an option (e.g.
+SparkContext.newBuilder().setConf(...).addJars(...).addListener(...).build()).
+(ii) Posting things to the ATS requires an ID.
+If you look at the TimelineEntity class in Yarn, it requires both a
+type (which would be something like "SparkApplication" for Spark) and
+an ID. A SparkContext currently has no concept of an application ID (I
+don't count name as an ID).
+Using a random UUID is possible, but I think is ugly.
+EventLoggingListener uses app name + System.currentTimeMillis, which
+is better from a user-friendliness p.o.v. (if you ignore the
+possibility of clashes).
+But really my preferred solution here would be to use the Yarn
+application id. That would make it easy to correlate this data with
+more generic data kept by Yarn (see YARN-321).
+The problem here is that we don't know this ID until way after the
+SparkContext is created. I can see two different ways to solve this
+issue.
+A more hackish way would be expose the listeners to the Yarn code, so
+that it can then find the Yarn-specific listener and trigger some
+action to update the application id.
+A more generic way would be to allow arbitrary events to be posted to
+the bus, not just the ones declared in SparkListener.scala. This way,
+the Yarn code could publish a "SparkYarnApplicationStarted" event that
+has the information the listener wants, and other listeners could
+potentially use that information too.
+How do you guys feel about the latter?
+Feedback here is greatly appreciated! :-)
+-- 
+Marcelo
+Hi Patrick,
+What are the expectations / guarantees on binary compatibility between
+0.9 and 1.0?
+You mention some API changes, which kinda hint that binary
+compatibility has already been broken, but just wanted to point out
+there are other cases. e.g.:
+Exception in thread "main" java.lang.reflect.InvocationTargetException
+        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+        at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)
+        at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)
+        at java.lang.reflect.Method.invoke(Method.java:597)
+        at org.apache.spark.deploy.SparkSubmit$.launch(SparkSubmit.scala:236)
+        at org.apache.spark.deploy.SparkSubmit$.main(SparkSubmit.scala:47)
+        at org.apache.spark.deploy.SparkSubmit.main(SparkSubmit.scala)
+Caused by: java.lang.NoSuchMethodError:
+org.apache.spark.SparkContext$.rddToOrderedRDDFunctions(Lorg/apache/spark/rdd/RDD;Lscala/Function1;Lscala/reflect/ClassTag;Lscala/reflect/ClassTag;)Lorg/apache/spark/rdd/OrderedRDDFunctions;
+(Compiled against 0.9, run against 1.0.)
+Offending code:
+      val top10 = counts.sortByKey(false).take(10)
+Recompiling fixes the problem.
+Hello all,
+Maybe my brain is not evolved enough to be able to trace through what
+happens with command-line arguments as they're parsed through all the
+shell scripts... but I really can't figure out how to pass more than a
+single JVM option on the command line.
+Unless someone has an obvious workaround that I'm missing, I'd like to
+propose something that is actually pretty standard in JVM tools: using
+-J. From javac:
+  -J                   Pass  directly to the runtime system
+So "javac -J-Xmx1g" would pass "-Xmx1g" to the underlying JVM. You can
+use several of those to pass multiple options (unlike
+--driver-java-options), so it helps that it's a short syntax.
+Unless someone has some issue with that I'll work on a patch for it...
+(well, I'm going to do it locally for me anyway because I really can't
+figure out how to do what I want to otherwise.)
+-- 
+Marcelo
+Just pulled again just in case. Verified your fix is there.
+$ ./bin/spark-submit --master yarn --deploy-mode client
+--driver-java-options "-Dfoo -Dbar" blah blah blah
+error: Unrecognized option '-Dbar'.
+run with --help for more information or --verbose for debugging output
+Cool, that seems to work. Thanks!
++1 (non-binding)
+I have:
+- checked signatures and checksums of the files
+- built the code from the git repo using both sbt and mvn (against hadoop 2.3.0)
+- ran a few simple jobs in local, yarn-client and yarn-cluster mode
+Haven't explicitly tested any of the recent fixes, streaming nor sql.
+Hi Kevin,
+Hi Patrick,
+Hi Patrick,
+Thanks for all the explanations, that makes sense. @DeveloperApi
+worries me a little bit especially because of the things Colin
+mentions - it's sort of hard to make people move off of APIs, or
+support different versions of the same API. But maybe if expectations
+(or lack thereof) are set up front, there will be less issues.
+You mentioned something in your shading argument that kinda reminded
+me of something. Spark currently depends on slf4j implementations and
+log4j with "compile" scope. I'd argue that's the wrong approach if
+we're talking about Spark being used embedded inside applications;
+Spark should only depend on the slf4j API package, and let the
+application provide the underlying implementation.
+The assembly jars could include an implementation (since I assume
+those are currently targeted at cluster deployment and not embedding).
+That way there is less sources of conflict at runtime (i.e. the
+"multiple implementation jars" messages you can see when running some
+Spark programs).
+I started with some code to implement an idea I had for SPARK-529, and
+before going much further (since it's a large and kinda boring change)
+I'd like to get some feedback from people.
+Current code it at:
+https://github.com/vanzin/spark/tree/SPARK-529
+There are still some parts I haven't fully fleshed out yet (see TODO
+list in the commit message), but that's the basic idea. Let me know if
+you have any feedback or different ideas.
+Thanks!
+-- 
+Marcelo
+Hi Cody,
+Could you file a bug for this if there isn't one already?
+For system properties SparkSubmit should be able to read those
+settings and do the right thing, but that obviously won't work for
+other JVM options... the current code should work fine in cluster mode
+though, since the driver is a different process. :-)
+Hi all,
+While working on some seemingly unrelated code, I ran into this issue
+where "spark.hadoop.*" configs were not making it to the Configuration
+objects in some parts of the code. I was trying to do that to avoid
+having to do dirty ticks with the classpath while running tests, but
+that's a little besides the point.
+Since I don't know the history of that code in SparkContext, does
+anybody see any issue with moving it up a layer so that all code that
+uses SparkHadoopUtil.newConfiguration() does the same thing?
+This would also include some code (e.g. in the yarn module) that does
+"new Configuration()" directly instead of going through the wrapper.
+-- 
+Marcelo
+Andrew has been working on a fix:
+https://github.com/apache/spark/pull/1770
++1 (non-binding)
+- checked checksums of a few packages
+- ran few jobs against yarn client/cluster using hadoop2.3 package
+- played with spark-shell in yarn-client mode
+Hmm, looks like the hack to maintain backwards compatibility in the
+Java API didn't work that well. I'll take a closer look at this when I
+get to work on Monday.
+Hi Cody,
+I'm still writing a test to make sure I understood exactly what's
+going on here, but from looking at the stack trace, it seems like the
+newer Guava library is picking up the "Optional" class from the Spark
+assembly.
+Could you try one of the options that put the user's classpath before
+the Spark assembly? (spark.files.userClassPathFirst or
+spark.yarn.user.classpath.first depending on which master you're
+running)
+People seem to have run into issues with those options in the past,
+but if they work for you, then Guava should pick its own Optional
+class (instead of the one shipped with Spark) and things should then
+work.
+I'll investigate a way to fix it in Spark in the meantime.
+Hmmm, a quick look at the code indicates this should work for
+executors, but not for the driver... (maybe this deserves a bug being
+filed, if there isn't one already?)
+If it's feasible for you, you could remove the Optional.class file
+from the Spark assembly you're using.
+FYI I filed SPARK-3647 to track the fix (some people internally have
+bumped into this also).
+BTW I removed it from the yarn pom since it was not used (and actually
+interfered with a test I was writing).
+I did not touch the core pom, but I wouldn't be surprised if it's not
+needed there either.
+Hadoop, for better or worse, depends on an ancient version of Jetty
+(6), that is even on a different package. So Spark (or anyone trying
+to use a newer Jetty) is lucky on that front...
+IIRC Hadoop is planning to move to Java 7-only starting with 2.7. Java
+7 is also supposed to be EOL some time next year, so a plan to move to
+Java 7 and, eventually, Java 8 would be nice.
+Hi Ashwin,
+Let me try to answer to the best of my knowledge.
+You may want to take a look at https://issues.apache.org/jira/browse/SPARK-3174.
+I know this is all very subjective, but I find long lines difficult to read.
+I also like how 100 characters fit in my editor setup fine (split wide
+screen), while a longer line length would mean I can't have two
+buffers side-by-side without horizontal scrollbars.
+I think it's fine to add a switch to skip the style tests, but then,
+you'll still have to fix the issues at some point...
+Hey guys,
+I've been using the "HiveFromSpark" example to test some changes and I
+ran into an issue that manifests itself as an NPE inside Hive code
+because some configuration object is null.
+Tracing back, it seems that `sessionState` being a lazy val in
+HiveContext is causing it. That variably is only evaluated in [1],
+while the call in [2] causes a Driver to be initialized by [3], which
+the tries to use the thread-local session state ([4]) which hasn't
+been set yet.
+This could be seen as a Hive bug ([3] should probably be calling the
+constructor that takes a conf object), but is there a reason why these
+fields are lazy in HiveContext? I explicitly called
+SessionState.setCurrentSessionState() before the
+CommandProcessorFactory call and that seems to fix the issue too.
+[1] https://github.com/apache/spark/blob/master/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveContext.scala#L305
+[2] https://github.com/apache/spark/blob/master/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveContext.scala#L289
+[3] https://github.com/apache/hive/blob/9c63b2fdc35387d735f4c9d08761203711d4974b/ql/src/java/org/apache/hadoop/hive/ql/processors/CommandProcessorFactory.java#L104
+[4] https://github.com/apache/hive/blob/9c63b2fdc35387d735f4c9d08761203711d4974b/ql/src/java/org/apache/hadoop/hive/ql/Driver.java#L286
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Well, looks like a huge coincidence, but this was just sent to github:
+https://github.com/apache/spark/pull/2967
+Yeah, the code looks for the file in the source location, not in the
+packaged location. It's in the root of the examples jar; you can
+extract it to "src/main/resources/
+kv1.txt" in the local directory (creating the subdirs) and then you
+can run the example.
+Probably should be fixed though (bonus if both styles work after the fix).
+Hello there,
+So I just took a quick look at the pom and I see two problems with it.
+- "activatedByDefault" does not work like you think it does. It only
+"activates by default" if you do not explicitly activate other
+profiles. So if you do "mvn package", scala-2.10 will be activated;
+but if you do "mvn -Pyarn package", it will not.
+- you need to duplicate the "activation" stuff everywhere where the
+profile is declared, not just in the root pom. (I spent quite some
+time yesterday fighting a similar issue...)
+My suggestion here is to change the activation of scala-2.10 to look like this:
+  
+    
+  
+And change the scala-2.11 profile to do this:
+  
+I haven't tested, but in my experience this will activate the
+scala-2.10 profile by default, unless you explicitly activate the 2.11
+profile, in which case that property will be set and scala-2.10 will
+not activate. If you look at examples/pom.xml, that's the same
+strategy used to choose which hbase profile to activate.
+Ah, and just to reinforce, the activation logic needs to be copied to
+other places (e.g. examples/pom.xml, repl/pom.xml, and any other place
+that has scala-2.x profiles).
+Hey Patrick,
++1 (non-binding)
+. ran simple things on spark-shell
+. ran jobs in yarn client & cluster modes, and standalone cluster mode
+When building against Hadoop 2.x, you need to enable the appropriate
+profile, aside from just specifying the version. e.g. "-Phadoop-2.3"
+for Hadoop 2.3.
+https://github.com/apache/spark/pull/3705
+Hi RJ,
+I think I remember noticing in the past that some Guava metadata ends
+up overwriting maven-generated metadata in the assembly's manifest.
+That's probably something we should fix if that still affects the
+build.
+That being said, this is probably happening because you're using
+"install-file" instead of "install". If you want a workaround that
+doesn't require unshading things, you can change assembly.pom to (i)
+not skip the install plugin and (ii) have "jar" as the packaging,
+instead of pom.
++1 (non-binding)
+Ran spark-shell and Scala jobs on top of yarn (using the hadoop-2.4 tarball).
+There's a very slight behavioral change in the API. This code now throws an NPE:
+  new SparkConf().setIfMissing("foo", null)
+It worked before. It's probably fine, though, since `SparkConf.set`
+would throw an NPE before for the same arguments, so it's unlikely
+anyone was relying on that behavior.
+Hi Jay,
+Hey Patrick,
+Do you have a link to the bug related to Python and Yarn? I looked at
+the blockers in Jira but couldn't find it.
+Hi Tom, are you using an sbt-built assembly by any chance? If so, take
+a look at SPARK-5808.
+I haven't had any problems with the maven-built assembly. Setting
+SPARK_HOME on the executors is a workaround if you want to use the sbt
+assembly.
+I haven't tested the rc2 bits yet, but I'd consider
+https://issues.apache.org/jira/browse/SPARK-6144 a serious regression
+from 1.2 (since it affects existing "addFile()" functionality if the
+URL is "hdfs:...").
+Will test other parts separately.
+-1 (non-binding) because of SPARK-6144.
+But aside from that I ran a set of tests on top of standalone and yarn
+and things look good.
++1 (non-binding, doc issues aside)
+Ran batch of tests against yarn and standalone, including tests for
+rc2 blockers, all looks fine.
+Hey Patrick,
+The only issue I've seen so far has been the YARN container ID issue.
+That can be technically be described as a breakage in forwards
+compatibility in YARN. The APIs didn't break, but the data transferred
+through YARN's protocol has, and the old library cannot understand the
+data sent by a new service (the new container ID).
+The main issue with publishing BYOH is what Matei already mentioned.
+It would be worth it to take a look at what projects that depend on
+Hadoop do, though.
+Speaking with the Cloudera hat on, Spark in CDH is already "BYOH",
+except Hadoop is already there with the rest of CDH.
+Hey all,
+Is there a way to access unit test logs in jenkins builds? e.g.,
+core/target/unit-tests.log
+That would be really helpful to debug build failures. The scalatest
+output isn't all that helpful.
+If that's currently not available, would it be possible to add those
+logs as build artifacts?
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+When was the last time you pulled? That should have been fixed as part
+of SPARK-6473.
+Notice latest master suffers from SPARK-6673 on Windows.
+That looks like another bug on top of 6673; can you point that out in
+the PR to make sure it's covered?
+In the meantime, could you try running the command from $SPARK_HOME
+instead of from inside the mllib directory?
+SPARK-2356
+I ran into this recently and I had to upgrade my version of zinc to fix it...
++1 (non-binding)
+Ran standalone and yarn tests on the hadoop-2.6 tarball, with and
+without the external shuffle service in yarn mode.
++1 (non-binding)
+Tested 2.6 build with standalone and yarn (no external shuffle service
+this time, although it does come up).
+That's a lot more complicated than you might think.
+We've done some basic work to get HiveContext to compile against Hive
+1.1.0. Here's the code:
+https://github.com/cloudera/spark/commit/00e2c7e35d4ac236bcfbcd3d2805b483060255ec
+We didn't sent that upstream because that only solves half of the
+problem; the hive-thriftserver is disabled in our CDH build because it
+uses a lot of Hive APIs that have been removed in 1.1.0, so even
+getting it to compile is really complicated.
+If there's interest in getting the HiveContext part fixed up I can
+send a PR for that code. But at this time I don't really have plans to
+look at the thrift server.
+As for the idea, I'm +1. Spark is the only reason I still have jdk6
+around - exactly because I don't want to cause the issue that started
+this discussion (inadvertently using JDK7 APIs). And as has been
+pointed out, even J7 is about to go EOL real soon.
+Even Hadoop is moving away (I think 2.7 will be j7-only). Hive 1.1 is
+already j7-only. And when Hadoop moves away from something, it's an
+event worthy of headlines. They're still on Jetty 6!
+As for pyspark, https://github.com/apache/spark/pull/5580 should get
+rid of the last incompatibility with large assemblies, by keeping the
+python files in separate archives. If we remove support for Java 6,
+then we don't need to worry about the size of the assembly anymore.
+Hey all,
+We ran into some test failures in our internal branch (which builds
+against Hive 1.1), and I narrowed it down to the fix below. I'm not
+super familiar with the Hive integration code, but does this look like
+a bug for other versions of Hive too?
+This caused an error where some internal Hive configuration that is
+initialized by the session were not available.
+diff --git a/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveContext.scala
+b/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveContext.scala
+index dd06b26..6242745 100644
+--- a/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveContext.scala
++++ b/sql/hive/src/main/scala/org/apache/spark/sql/hive/HiveContext.scala
+@@ -93,6 +93,10 @@ class HiveContext(sc: SparkContext) extends SQLContext(sc) {
+     if (conf.dialect == "sql") {
+       super.sql(substituted)
+     } else if (conf.dialect == "hiveql") {
++      // Make sure Hive session state is initialized.
++      if (SessionState.get() != sessionState) {
++        SessionState.start(sessionState)
++      }
+       val ddlPlan = ddlParserWithHiveQL.parse(sqlText,
+exceptionOnError = false)
+       DataFrame(this, ddlPlan.getOrElse(HiveQl.parseSql(substituted)))
+     }  else {
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Michael,
+It would be great to see changes to make hive integration less
+painful, and I can test them in our environment once you have a patch.
+But I guess my question is a little more geared towards the current
+code; doesn't the issue I ran into affect 1.4 and potentially earlier
+versions too?
+Hi Chester,
+Thanks for the feedback. A few of those are great candidates for
+improvements to the launcher library.
+Hi Chester,
+Writing a design / requirements doc sounds great. One comment though:
+Funny thing, since I asked this question in a PR a few minutes ago...
+Ignoring the rotation suggestion for a second, can the PR builder at least
+cover hadoop 2.2? That's the actual version used to create the official
+Spark artifacts for maven, and the oldest version Spark supports for YARN..
+Kinda the same argument as the "why do we build with java 7 when we support
+java 6" discussion we had recently.
+Hmm... this seems to be particular to logging (KafkaRDD.scala:89 in my tree
+is a log statement). I'd expect KafkaRDD to be loaded from the system class
+loader - or are you repackaging it in your app?
+I'd have to investigate more to come with an accurate explanation here...
+but it seems that the initialization of the logging system, which happens
+after SparkSubmit runs and sets the context class loader to be an instance
+of ChildFirstURLClassLoader, is causing things to blow up. I'll see if I
+can spend some cycles coming up with a proper explanation (and hopefully a
+fix or workaround).
+For now, you could probably avoid this by not repackaging the logging
+dependencies in your app.
+Hi Nathan,
+Hi Kevin,
+One thing that might help you in the meantime, while we work on a better
+interface for all this...
+Hey all,
+I've been bit by something really weird lately and I'm starting to think
+it's related to the ivy support we have in Spark, and running unit tests
+that use that code.
+The first thing that happens is that after running unit tests, sometimes my
+sbt builds start failing with error saying something about "dependency path
+must be relative" (sorry, don't have the exact error around). The
+dependency path it prints is a "file:" URL.
+I have a feeling that this is because Spark uses Ivy 2.4 while sbt uses Ivy
+2.3, and those might be incompatible. So if they get mixed up, things can
+break.
+The second is that sometimes unit tests fail with some weird error
+downloading dependencies. When checking the ivy metadata in ~/.ivy2/cache,
+the offending dependencies are pointing to my local maven repo (I have
+"maven-local" as one of the entries in my ~/.sbt/repositories).
+My feeling in this case is that Spark's version of Ivy somehow doesn't
+handle that case.
+So, long story short:
+- Has anyone run into either of these problems?
+- Is it possible to set some env variable or something during tests to
+force them to use their own directory instead of messing up and breaking my
+~/.ivy2?
+-- 
+Marcelo
+They're my local builds, so I wouldn't be able to send you any links... and
+the error is generally from sbt, not the unit tests. But if there's any
+info I can collect when I see the error, let me know.
+I'll try "spark.jars.ivy". I wonder if we should just set that to the
+system properties in Spark's root pom.
+Here's one of the types of exceptions I get (this one when running
+VersionsSuite from sql/hive):
+[info] - 13: create client *** FAILED *** (1 second, 946 milliseconds)
+[info]   java.lang.RuntimeException: [download failed:
+org.apache.httpcomponents#httpclient;4.2.5!httpclient.jar, download failed:
+commons-codec#commons-codec;1.4!commons-codec.jar]
+[info]   at
+org.apache.spark.deploy.SparkSubmitUtils$.resolveMavenCoordinates(SparkSubmit.scala:978)
+This is the content of the ivy metadata file for that component:
+#ivy cached data file for org.apache.httpcomponents#httpclient;4.2.5
+#Thu Jun 04 13:26:10 PDT 2015
+artifact\:ivy\#ivy\#xml\#1855381640.is-local=true
+artifact\:ivy\#ivy\#xml\#1855381640.location=file\:/home/vanzin/.m2/repository/org/apache/httpcomponents/httpclient/4.2.5/httpclient-4.2.5.pom
+artifact\:ivy\#ivy\#xml\#1855381640.exists=true
+resolver=local-m2-cache
+artifact\:httpclient\#pom.original\#pom\#-365933676.original=artifact\:httpclient\#pom.original\#pom\#-365933676
+artifact\:ivy\#ivy\#xml\#1855381640.original=artifact\:httpclient\#pom.original\#pom\#-365933676
+artifact.resolver=local-m2-cache
+artifact\:httpclient\#pom.original\#pom\#-365933676.is-local=true
+artifact\:httpclient\#pom.original\#pom\#-365933676.location=file\:/home/vanzin/.m2/repository/org/apache/httpcomponents/httpclient/4.2.5/httpclient-4.2.5.pom
+artifact\:httpclient\#pom.original\#pom\#-365933676.exists=true
+If I delete that file *and* the maven copy of those artifacts, then the
+tests pass. But that's really annoying, since I have to use sbt and maven
+for different things and I really like the fact that sbt can read the maven
+cache directly.
++1 (non-binding)
+Ran some of our internal test suite (yarn + standalone) against the
+hadoop-2.6 and without-hadoop binaries.
+Hello, welcome, and please start by going through the web site (
+http://spark.apache.org/), especially the "Contributors" section at the
+bottom.
+Hey all,
+Just noticed this when some of our tests started to fail. SPARK-4072 added
+a new method to the "SparkListener" trait, and even though it has a default
+implementation, it doesn't seem like that applies retroactively.
+Namely, if you have an existing, compiled app that has an implementation of
+SparkListener, that app won't work on 1.5 without a recompile. You'll get
+something like this:
+java.lang.AbstractMethodError
+	at org.apache.spark.scheduler.SparkListenerBus$class.onPostEvent(SparkListenerBus.scala:62)
+	at org.apache.spark.scheduler.LiveListenerBus.onPostEvent(LiveListenerBus.scala:31)
+	at org.apache.spark.scheduler.LiveListenerBus.onPostEvent(LiveListenerBus.scala:31)
+	at org.apache.spark.util.ListenerBus$class.postToAll(ListenerBus.scala:56)
+	at org.apache.spark.util.AsynchronousListenerBus.postToAll(AsynchronousListenerBus.scala:37)
+	at org.apache.spark.util.AsynchronousListenerBus$$anon$1$$anonfun$run$1.apply$mcV$sp(AsynchronousListenerBus.scala:79)
+	at org.apache.spark.util.Utils$.tryOrStopSparkContext(Utils.scala:1235)
+	at org.apache.spark.util.AsynchronousListenerBus$$anon$1.run(AsynchronousListenerBus.scala:63)
+Now I know that "SparkListener" is marked as @DeveloperApi, but is this
+something we should care about? Seems like adding methods to traits is just
+as backwards-incompatible as adding new methods to Java interfaces.
+-- 
+Marcelo
+Hmm, the Java listener was added in 1.3, so I think it will work for my
+needs.
+Might be worth it to make it clear in the SparkListener documentation that
+people should avoid using it directly. Or follow Reynold's suggestion.
+Or, alternatively, the bus could catch that error and ignore / log it,
+instead of stopping the context...
+Just note that if you have "mvn" in your path, you need to use "build/mvn
+--force".
+That's not a program, it's just a class in the Java library. Spark looks at
+the call stack and uses it to describe the job in the UI. If you look at
+the whole stack trace you'll see more things that might tell you what's
+really going on in that job.
+Why do you need to use Spark or Flume for this?
+You can just use curl and hdfs:
+  curl ftp://blah | hdfs dfs -put - /blah
+The pom files look correct, but this file is not:
+https://github.com/apache/spark/blob/4c56ad772637615cc1f4f88d619fac6c372c8552/core/src/main/scala/org/apache/spark/package.scala
+So, I guess, -1?
+This probably means your app is failing and the second attempt is
+hitting that issue. You may fix the "directory already exists" error
+by setting
+spark.eventLog.overwrite=true in your conf, but most probably that
+will just expose the actual error in your app.
+Hello y'all,
+So I've been getting kinda annoyed with how many PR tests have been
+timing out. I took one of the logs from one of my PRs and started to
+do some crunching on the data from the output, and here's a list of
+the 5 slowest suites:
+307.14s HiveSparkSubmitSuite
+382.641s VersionsSuite
+398s CliSuite
+410.52s HashJoinCompatibilitySuite
+2508.61s HiveCompatibilitySuite
+Looking at those, I'm not surprised at all that we see so many
+timeouts. Is there any ongoing effort to trim down those tests
+(especially HiveCompatibilitySuite) or somehow restrict when they're
+run?
+Almost 1 hour to run a single test suite that affects a rather
+isolated part of the code base looks a little excessive to me.
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I chatted with Patrick briefly offline. It would be interesting to
+know whether the scripts have some way of saying "run a smaller
+version of certain tests" (e.g. by setting a system property that the
+tests look at to decide what to run). That way, if there are no
+changes under sql/, we could still run a small part of
+HiveCompatibilitySuite, just not all of it. The reasoning being that
+if a core change breaks something in Hive, it will probably break many
+tests, not a specific one.
+I ran into the same error (different dependency) earlier today. In my
+case, the maven pom files and the sbt dependencies had a conflict
+(different versions of the same artifact) and ivy got confused. Not
+sure whether that will help in your case or not...
+Are you just submitting from Windows or are you also running YARN on Windows?
+If the former, I think the only fix that would be needed is this line
+(from that same patch):
+https://github.com/apache/spark/blob/master/yarn/src/main/scala/org/apache/spark/deploy/yarn/Client.scala#L434
+I don't believe YARN running on Windows worked at all before that
+patch (regardless of that individual issue). I'll leave it to Reynold
+whether Windows support is critical enough to warrant a new rc.
++1. I tested the "without hadoop" binary package and ran our internal
+tests on it with dynamic allocation both on and off.
+The Windows issue Sen raised could be considered a regression /
+blocker, though, and it's a one line fix. If we feel that's important,
+let me know and I'll put up a PR against branch-1.5.
+Hi Jonathan,
+Can you be more specific about what problem you're running into?
+SPARK-6869 fixed the issue of pyspark vs. assembly jar by shipping the
+pyspark archives separately to YARN. With that fix in place, pyspark
+doesn't need to get anything from the Spark assembly, so it has no
+problems running on YARN. I just downloaded
+spark-1.5.0-bin-hadoop2.6.tgz and tried that out, and pyspark works
+fine on YARN for me.
+That test explicitly sets the number of executor cores to 32.
+object TestHive
+  extends TestHiveContext(
+    new SparkContext(
+      System.getProperty("spark.sql.test.master", "local[32]"),
+Hey all,
+This is something that we've discussed several times internally, but
+never really had much time to look into; but as time passes by, it's
+increasingly becoming an issue for us and I'd like to throw some ideas
+around about how to fix it.
+So, without further ado:
+https://github.com/vanzin/spark/pull/2/files
+(You can comment there or click "View" to read the formatted document.
+I thought that would be easier than sharing on Google Drive or Box or
+something.)
+It would be great to get people's feedback, especially if there are
+strong reasons for the assemblies that I'm not aware of.
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Mostly for my education (I hope), but I was testing
+"spark-1.5.1-bin-without-hadoop.tgz" assuming it would contain
+everything (including HiveContext support), just without the Hadoop
+common jars in the assembly. But HiveContext is not there.
+Is this expected?
+Ignoring my previous question, +1. Tested several different jobs on
+YARN and standalone with dynamic allocation on.
+What is broken? Looks fine to me.
+Hmm, now I get that too (did not get it before). Maybe the servers are
+having issues.
+Hi Jeff,
+Seems like it's an sbt issue, not a maven one, so "dependency:tree"
+might not help. Still, the command line would be helpful. I use sbt
+and don't see this.
+The way I read Tom's report, it just affects a long-deprecated command
+line option (--num-workers). I wouldn't block the release for it.
+I've been running into this error when running Spark SQL recently; no
+matter what I try (completely clean build or anything else) doesn't
+seem to fix it. Anyone has some idea of what's wrong?
+[info] Exception encountered when attempting to run a suite with class
+name: org.apache.spark.sql.execution.ui.SQLListenerMemoryLeakSuite ***
+ABORTED *** (4 seconds, 111 milliseconds)
+[info]   java.lang.VerifyError: Bad  method call from inside of a branch
+[info] Exception Details:
+[info]   Location:
+[info]     org/apache/spark/sql/catalyst/expressions/aggregate/HyperLogLogPlusPlus.(Lorg/apache/spark/sql/catalyst/expressions/Expression;Lorg/apache/spark/sql/catalyst/expressions/Expression;)V
+@82: invokespecial
+Same happens with spark shell (when instantiating SQLContext), so not
+an issue with the test code...
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+$ java -version
+java version "1.7.0_67"
+Java(TM) SE Runtime Environment (build 1.7.0_67-b01)
+(On Linux.) It's not that particular suite, though, it's anything I do
+that touches Spark SQL...
+Seems to be some new thing with recent JDK updates according to the
+intertubes. This patch seems to work around it:
+--- a/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/aggregate/HyperLogLogPlusPlus.scala
++++ b/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/aggregate/HyperLogLogPlusPlus.scala
+@@ -63,11 +63,7 @@ case class HyperLogLogPlusPlus(
+  def this(child: Expression, relativeSD: Expression) = {
+    this(
+      child = child,
+-      relativeSD = relativeSD match {
+-        case Literal(d: Double, DoubleType) => d
+-        case _ =>
+-          throw new AnalysisException("The second argument should be
+a double literal.")
+-      },
++      relativeSD = HyperLogLogPlusPlus.validateRelativeSd(relativeSD),
+      mutableAggBufferOffset = 0,
+      inputAggBufferOffset = 0)
+  }
+@@ -448,4 +444,11 @@ object HyperLogLogPlusPlus {
+    Array(189083, 185696.913, 182348.774, 179035.946, 175762.762,
+172526.444, 169329.754, 166166.099, 163043.269, 159958.91, 156907.912,
+153906.845,
+150924.199, 147996.568, 145093.457, 142239.233, 139421.475, 136632.27,
+133889.588, 131174.2, 128511.619, 125868.621, 123265.385, 120721.061,
+118181.76
+9, 115709.456, 113252.446, 110840.198, 108465.099, 106126.164,
+103823.469, 101556.618, 99308.004, 97124.508, 94937.803, 92833.731,
+90745.061, 88677.62
+7, 86617.47, 84650.442, 82697.833, 80769.132, 78879.629, 77014.432,
+75215.626, 73384.587, 71652.482, 69895.93, 68209.301, 66553.669,
+64921.981, 63310.
+323, 61742.115, 60205.018, 58698.658, 57190.657, 55760.865, 54331.169,
+52908.167, 51550.273, 50225.254, 48922.421, 47614.533, 46362.049,
+45098.569, 43
+926.083, 42736.03, 41593.473, 40425.26, 39316.237, 38243.651,
+37170.617, 36114.609, 35084.19, 34117.233, 33206.509, 32231.505,
+31318.728, 30403.404, 2
+9540.0550000001, 28679.236, 27825.862, 26965.216, 26179.148, 25462.08,
+24645.952, 23922.523, 23198.144, 22529.128, 21762.4179999999,
+21134.779, 20459.
+117, 19840.818, 19187.04, 18636.3689999999, 17982.831,
+17439.7389999999, 16874.547, 16358.2169999999, 15835.684, 15352.914,
+14823.681, 14329.313, 1381
+6.897, 13342.874, 12880.882, 12491.648, 12021.254, 11625.392,
+11293.7610000001, 10813.697, 10456.209, 10099.074, 9755.39000000001,
+9393.18500000006, 9
+047.57900000003, 8657.98499999999, 8395.85900000005, 8033,
+7736.95900000003, 7430.59699999995, 7258.47699999996,
+6924.58200000005, 6691.29399999999, 6
+357.92500000005, 6202.05700000003, 5921.19700000004, 5628.28399999999,
+5404.96799999999, 5226.71100000001, 4990.75600000005,
+4799.77399999998, 4622.93
+099999998, 4472.478, 4171.78700000001, 3957.46299999999,
+3868.95200000005, 3691.14300000004, 3474.63100000005,
+3341.67200000002, 3109.14000000001, 307
+1.97400000005, 2796.40399999998, 2756.17799999996, 2611.46999999997,
+2471.93000000005, 2382.26399999997, 2209.22400000005,
+2142.28399999999, 2013.9610
+0000001, 1911.18999999994, 1818.27099999995, 1668.47900000005,
+1519.65800000005, 1469.67599999998, 1367.13800000004,
+1248.52899999998, 1181.2360000000
+3, 1022.71900000004, 1088.20700000005, 959.03600000008,
+876.095999999903, 791.183999999892, 703.337000000058,
+731.949999999953, 586.86400000006, 526.0
+24999999907, 323.004999999888, 320.448000000091, 340.672999999952,
+309.638999999966, 216.601999999955, 102.922999999952,
+19.2399999999907, -0.11400000
+0059605, -32.6240000000689, -89.3179999999702, -153.497999999905,
+-64.2970000000205, -143.695999999996, -259.497999999905,
+-253.017999999924, -213.948
+000000091, -397.590000000084, -434.006000000052, -403.475000000093,
+-297.958000000101, -404.317000000039, -528.898999999976,
+-506.621000000043, -513.2
+05000000075, -479.351000000024, -596.139999999898, -527.016999999993,
+-664.681000000099, -680.306000000099, -704.050000000047,
+-850.486000000034, -757
+.43200000003, -713.308999999892)
+  )
+  // scalastyle:on
++
++  private def validateRelativeSd(relativeSD: Expression): Double =
+relativeSD match {
++    case Literal(d: Double, DoubleType) => d
++    case _ =>
++      throw new AnalysisException("The second argument should be a
+double literal.")
++  }
++
+}
+I was going to say that spark.executor.port is not used anymore in
+1.6, but damn, there's still that akka backend hanging around there
+even when netty is being used... we should fix this, should be a
+simple one-liner.
++1 (non-binding)
+Tests the without-hadoop binaries (so didn't run Hive-related tests)
+with a test batch including standalone / client, yarn / client and
+cluster, including core, mllib and streaming (flume and kafka).
+You should be able to use spark.yarn.am.nodeLabelExpression if your
+version of YARN supports node labels (and you've added a label to the
+node where you want the AM to run).
+Well, did you do what the message instructed you to do and looked
+above the message you copied for more specific messages for why the
+build failed?
+The error is right there. Just read the output more carefully.
+Oh, my bad. I think I left that from a previous part of the patch and
+forgot to revert it. Will fix.
+Logging is a "private[spark]" class so binary compatibility is not
+important at all, because code outside of Spark isn't supposed to use
+it. Mixing Spark library versions is also not recommended, not just
+because of this reason.
+There have been other binary changes in the Logging class in the past too.
+Hello all,
+Recently a lot of the streaming backends were moved to a separate
+project on github and removed from the main Spark repo.
+While I think the idea is great, I'm a little worried about the
+execution. Some concerns were already raised on the bug mentioned
+above, but I'd like to have a more explicit discussion about this so
+things don't fall through the cracks.
+Mainly I have three concerns.
+i. Ownership
+That code used to be run by the ASF, but now it's hosted in a github
+repo owned not by the ASF. That sounds a little sub-optimal, if not
+problematic.
+ii. Governance
+Similar to the above; who has commit access to the above repos? Will
+all the Spark committers, present and future, have commit access to
+all of those repos? Are they still going to be considered part of
+Spark and have release management done through the Spark community?
+For both of the questions above, why are they not turned into
+sub-projects of Spark and hosted on the ASF repos? I believe there is
+a mechanism to do that, without the need to keep the code in the main
+Spark repo, right?
+iii. Usability
+This is another thing I don't see discussed. For Scala-based code
+things don't change much, I guess, if the artifact names don't change
+(another reason to keep things in the ASF?), but what about python?
+How are pyspark users expected to get that code going forward, since
+it's not in Spark's pyspark.zip anymore?
+Is there an easy way of keeping these things within the ASF Spark
+project? I think that would be better for everybody.
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Note the non-kafka bug was filed right before the change was pushed.
+So there really wasn't any discussion before the decision was made to
+remove that code.
+I'm just trying to merge both discussions here in the list where it's
+a little bit more dynamic than bug updates that end up getting lost in
+the noise.
+Hi Reynold, thanks for the info.
+Also, just wanted to point out something:
+Hi Steve, thanks for the write up.
++1 for getting flume back.
+Hi Jakob,
+Finally got some internal feedback on this, and we're ok with
+requiring people to deploy jdk8 for 2.0, so +1 too.
+Hey all,
+We merged  SPARK-13579 today, and if you're like me and have your
+hands automatically type "sbt assembly" anytime you're building Spark,
+that won't work anymore.
+You should now use "sbt package"; you'll still need "sbt assembly" if
+you require one of the remaining assemblies (streaming connectors,
+yarn shuffle service).
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+No, tests (except pyspark) should work without having to package anything first.
+Hey all,
+Two reasons why I think we should remove that from the examples:
+- HBase now has Spark integration in its own repo, so that really
+should be the template for how to use HBase from Spark, making that
+example less useful, even misleading.
+- It brings up a lot of extra dependencies that make the size of the
+Spark distribution grow.
+Any reason why we shouldn't drop that example?
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Alright, if you prefer, I'll say "it's actually in use right now in
+spite of not being in any upstream HBase release", and it's more
+useful than a single example file in the Spark repo for those who
+really want to integrate with HBase.
+Spark's example is really very trivial (just uses one of HBase's input
+formats), which makes it not very useful as a blueprint for developing
+HBase apps with Spark.
+You're entitled to your own opinions.
+While you're at it, here's some much better documentation, from the
+HBase project themselves, than what the Spark example provides:
+http://hbase.apache.org/book.html#spark
+You're completely missing my point. I'm saying that HBase's current
+support, even if there are bugs or things that still need to be done,
+is much better than the Spark example, which is basically a call to
+"SparkContext.hadoopRDD".
+Spark's example is not helpful in learning how to build an HBase
+application on Spark, and clashes head on with how the HBase
+developers think it should be done. That, and because it brings too
+many dependencies for something that is not really useful, is why I'm
+suggesting removing it.
+Hi Jesse,
+Perhaps you need to make the "compile" task of the appropriate module
+depend on the task that generates the resource file?
+Sorry but my knowledge of sbt doesn't really go too far.
+So are RCs, aren't they?
+Personally I'm fine with not releasing to maven central. Any extra
+effort needed by regular users to use a preview / RC is good with me.
+-1 (non-binding)
+SPARK-16017 shows a severe perf regression in YARN compared to 1.6.1.
+I just tried this locally and can see the wrong behavior you mention.
+I'm running a somewhat old build of 2.0, but I'll take a look.
+It doesn't hurt to have a bug tracking it, in case anyone else has
+time to look at it before I do.
+My guess would be https://github.com/pwendell/hive/tree/release-1.2.1-spark
+(Actually that's "spark" and not "spark2", so yeah, that doesn't
+really answer the question.)
++0
+Our internal test suites seem mostly happy, except for SPARK-16632.
+Since there's a somewhat easy workaround, I don't think it's a blocker
+for 2.0.0.
+Michael added the profile to the build scripts, but maybe some script
+or code path was missed...
+A quick look shows that maybe dev/sparktestsupport/modules.py needs to
+be modified, and a "build_profile_flags" added to the mesos section
+(similar to hive / hive-thriftserver).
+Note not all PR builds will trigger mesos currently, since it's listed
+as an independent module in the above file.
+Not after SPARK-14642, right?
+It should work fine. 2.0 dropped support for really old event logs
+(pre-Spark 1.3 I think), but 1.6 should work, and if it doesn't it
+should be considered a bug.
+There is no "mesos" profile in 2.0.1.
+The part I don't understand is: why do you care so much about the mesos profile?
+The same code exists in branch-2.0, it just doesn't need a separate
+profile to be enabled (it's part of core). As Sean said, the change in
+master was purely organizational, there's no added or lost
+functionality.
++1
+The root pom declares scalatest explicitly with test scope. It's added
+by default to all sub-modules, so every one should get it in test
+scope unless the module explicitly overrides that, like the tags
+module does.
+If you look at the "blessed" dependency list in dev/deps, there's no scalatest.
+That being said, there are two things:
+- sbt seems to get confused with that; if I look at the assembly jars
+dir created by sbt, it includes scalatest.
+- there's always a chance that the published pom did something wrong
+and promoted things when it shouldn't because of a bug. But that
+doesn't seem to be the case:
+http://repo1.maven.org/maven2/org/apache/spark/spark-core_2.11/2.0.1/spark-core_2.11-2.0.1.pom
+Has:
+Hmm. Yes, that makes sense. Spark's root pom does not affect your
+application's pom, in which case it will pick compile over test if
+there are conflicting dependencies.
+Perhaps spark-tags should override it to provided instead of compile...
+Hey all,
+Is there a reason why lint-java is not run during PR builds? I see it
+seems to be maven-only, is it really expensive to run after an sbt
+build?
+I see a lot of PRs coming in to fix Java style issues, and those all
+seem a little unnecessary. Either we're enforcing style checks or
+we're not, and right now it seems we aren't.
+-- 
+Marcelo
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+I'll send a -1 because of SPARK-18546. Haven't looked at anything else yet.
+I believe the latest one is actually in Josh's repository. Which kinda
+raises a more interesting question:
+Should we create a repository managed by the Spark project, using the
+Apache infrastructure, to handle that fork? It seems not very optimal
+to have this lie in some random person's github account. Given how
+often it changes, it shouldn't really be too much overhead to maintain
+it.
+Another failing test is "ReplSuite:should clone and clean line object
+in ClosureCleaner". It never passes for me, just keeps spinning until
+the JVM eventually starts throwing OOM errors. Anyone seeing that?
+You're right; we had a discussion here recently about this.
+I'll re-open that bug, if you want to send a PR. (I think it's just a
+matter of making the scalatest dependency "provided" in spark-tags, if
+I remember the discussion.)
+I posted a PR; the solution I suggested seems to work (and is simpler
+than breaking spark-tags into multiple artifacts).
+Seems like the OOM is coming from tests, which most probably means
+it's not an infrastructure issue. Maybe tests just need more memory
+these days and we need to update maven / sbt scripts.
+Are you actually seeing a problem or just questioning the code?
+I have never seen a situation where there's a failure because of that
+part of the current code.
+scala> org.apache.hadoop.fs.FileSystem.getLocal(sc.hadoopConfiguration)
+res0: org.apache.hadoop.fs.LocalFileSystem =
+org.apache.hadoop.fs.LocalFileSystem@3f84970b
+scala> res0.delete(new org.apache.hadoop.fs.Path("/tmp/does-not-exist"), true)
+res3: Boolean = false
+Does that explain your confusion?
+If you place core-site.xml in $SPARK_HOME/conf, I'm pretty sure Spark
+will pick it up. (Sounds like you're not running YARN, which would
+require HADOOP_CONF_DIR.)
+Also this is more of a user@ question.

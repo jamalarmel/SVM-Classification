@@ -1,0 +1,949 @@
+Just want to test whether this message will be forwarded to github. -Xiangrui
++1 If someone replies a github thread via spark-dev, it won't show up
+on github and it gets filtered by most people. -Xiangrui
+Hi DB,
+It is great to have the L-BFGS optimizer in MLlib and thank you for taking
+care of the license issue. I looked through your PR briefly. It contains a
+Java translation of the L-BFGS implementation, which is part of the RISO
+package. Is it possible that we ask its author to make a release on maven
+central and then we add it as a dependency instead of including the code
+directly?
+Best,
+Xiangrui
+Hi Deb,
+CPL 1.0 is compatible if the inclusion is appropriately labeled
+(https://www.apache.org/legal/3party.html). I think it is great to
+have an L-BFGS optimizer in mllib, but we need to investigate some
+time to figure out which one to use. I'm not sure whether jblas or
+netlib-java will make a big difference here, because L-BFGS doesn't
+have dense level-2 BLAS operations. But it would be great if someone
+can do the comparison and show some numbers. FYI, spark-mllib is
+published in maven central.
+Best,
+Xiangrui
+Hi Deb,
+CPL 1.0 is compatible if the inclusion is appropriately labeled
+(https://www.apache.org/legal/3party.html). I think it is great to
+have an L-BFGS optimizer in mllib, but we need to investigate some
+time to figure out which one to use. I'm not sure whether jblas or
+netlib-java will make a big difference here, because L-BFGS doesn't
+have dense level-2 BLAS operations. But it would be great if someone
+can do the comparison and show some numbers. FYI, spark-mllib is
+published in maven central.
+Best,
+Xiangrui
+Hi Deb,
+I've been working with David to add or enhance some features to breeze
+to make its performance comparable to bare-bone implementations. I'm
+going to update that PR this week with sparse support to KMeans. You
+are certainly welcome to update the GLM part. Make sure you are using
+the master branch (0.7-SNAPSHOT) of breeze and comparing the
+performance as you go. Let's make a separate thread if you want to
+discuss more. Thanks!
+Best,
+Xiangrui
+Hi DB,
+I saw you released the L-BFGS code under com.dbtsai.lbfgs on maven
+central, so I assume that Robert (the author of RISO) is not going to
+maintain it. Is it correct?
+For the breeze implementation, do you mind sharing more details about
+the issues you have?
+I saw the hack you did to get regGrad in the PR. Though well
+documented, it still increases the code complexity. I agree with Evan
+that we should make the current implementation more general for first
+order updates. Maybe we should spend some time on this direction.
+Best,
+Xiangrui
+Hi DB,
+Thanks for doing the comparison! What were the running times for
+fortran/breeze/riso?
+Best,
+Xiangrui
+Hi DB,
+Thanks for doing the comparison! What were the running times for
+fortran/breeze/riso?
+Best,
+Xiangrui
+If the matrix is very ill-conditioned, then A^T A becomes numerically
+rank deficient. However, if you use a reasonably large positive
+regularization constant (lambda), "A^T A + lambda I" should be still
+positive definite. What was the regularization constant (lambda) you
+set? Could you test whether the error still happens when you use a
+large lambda?
+Best,
+Xiangrui
+Choosing lambda = 0.1 shouldn't lead to the error you got. This is
+probably a bug. Do you mind sharing a small amount of data that can
+re-produce the error? -Xiangrui
+Hi all,
+I'm going to move all MLlib JIRA tickets
+(https://spark-project.atlassian.net/browse/MLLIB) to Spark because we
+can migrate only one project to Apache JIRA. Please create new MLlib
+JIRA tickets under Spark in the future and set the component to MLlib.
+Thanks,
+Xiangrui
+Done. The original urls should work as well, so you don't need to
+update the url in github. -Xiangrui
+Hi Michael,
+I can help check the current implementation. Would you please go to
+https://spark-project.atlassian.net/browse/SPARK and create a ticket
+about this issue with component "MLlib"? Thanks!
+Best,
+Xiangrui
+Hi Deb, did you use ALS with implicit feedback? -Xiangrui
+Line 376 should be correct as it is computing \sum_i (c_i - 1) x_i
+x_i^T, = \sum_i (alpha * r_i) x_i x_i^T. Are you computing some
+metrics to tell which recommendation is better? -Xiangrui
+Another question: do you have negative or out-of-range user or product
+ids or? -Xiangrui
+They have been merged into the master branch. However, the
+improvements are for implicit ALS computation. I don't think they can
+speed up normal ALS computation. Could you share more details about
+the variable projection?
+JIRAs:
+https://spark-project.atlassian.net/browse/SPARK-1266
+https://spark-project.atlassian.net/browse/SPARK-1238
+https://spark-project.atlassian.net/browse/MLLIB-25
+Best,
+Xiangrui
+Hi bearrito,
+This is a known issue
+(https://spark-project.atlassian.net/browse/SPARK-1281) and it should
+be easy to fix by switching to a hash partitioner.
+CC'ed dev list in case someone volunteers to work on it.
+Best,
+Xiangrui
+Hi Deb,
+Are you using the master branch or a particular commit? Do you have
+negative or out-of-integer-range user or product ids? There is an
+issue with ALS' partitioning
+(https://spark-project.atlassian.net/browse/SPARK-1281), but I'm not
+sure whether that is the reason. Could you try to see whether you can
+reproduce the error on a public data set, e.g., movielens? Thanks!
+Best,
+Xiangrui
+The persist used in implicit ALS doesn't help StackOverflow problem.
+Persist doesn't cut lineage. We need to call count() and then
+checkpoint() to cut the lineage. Did you try the workaround mentioned
+in https://issues.apache.org/jira/browse/SPARK-958:
+"I tune JVM thread stack size to 512k via option -Xss512k and it works."
+Best,
+Xiangrui
+The persist used in implicit ALS doesn't help StackOverflow problem.
+Persist doesn't cut lineage. We need to call count() and then
+checkpoint() to cut the lineage. Did you try the workaround mentioned
+in https://issues.apache.org/jira/browse/SPARK-958:
+"I tune JVM thread stack size to 512k via option -Xss512k and it works."
+Best,
+Xiangrui
+Btw, explicit ALS doesn't need persist because each intermediate
+factor is only used once. -Xiangrui
+Btw, explicit ALS doesn't need persist because each intermediate
+factor is only used once. -Xiangrui
+Hi Deb,
+This thread is for the out-of-bound error you described. I don't think
+the number of iterations has any effect here. My questions were:
+1) Are you using the master branch or a particular commit?
+2) Do you have negative or out-of-integer-range user or product ids?
+Try to print out the max/min value of user/product ids.
+Best,
+Xiangrui
+Hi Deb,
+It would be helpful if you can attached the logs. It is strange to see
+that you can make 4 iterations but not 10.
+Xiangrui
+Hi Ignacio,
+Please create a JIRA and send a PR for the information gain
+computation, so it is easy to track the progress.
+The sparse vector support for NaiveBayes is already implemented in
+branch-1.0 and master. You only need to provide an RDD of sparse
+vectors (created from Vectors.sparse).
+MLUtils.loadLibSVMData reads sparse features in LIBSVM format.
+Best,
+Xiangrui
++1 on Sean's comment. MLlib covers the basic algorithms but we
+definitely need to spend more time on how to make the design scalable.
+For example, think about current "ProblemWithAlgorithm" naming scheme.
+That being said, new algorithms are welcomed. I wish they are
+well-established and well-understood by users. They shouldn't be
+research algorithms tuned to work well with a particular dataset but
+not tested widely. You see the change log from Mahout:
+===
+The following algorithms that were marked deprecated in 0.8 have been
+removed in 0.9:
+  Switched LDA implementation from using Gibbs Sampling to Collapsed
+Variational Bayes (CVB)
+Meanshift
+MinHash - removed due to poor performance, lack of support and lack of usage
+Winnow - lack of actual usage and support
+Perceptron - lack of actual usage and support
+Collaborative Filtering
+    SlopeOne implementations in
+org.apache.mahout.cf.taste.hadoop.slopeone and
+org.apache.mahout.cf.taste.impl.recommender.slopeone
+    Distributed pseudo recommender in org.apache.mahout.cf.taste.hadoop.pseudo
+    TreeClusteringRecommender in org.apache.mahout.cf.taste.impl.recommender
+Mahout Math
+    Hadoop entropy stuff in org.apache.mahout.math.stats.entropy
+===
+In MLlib, we should include the algorithms users know how to use and
+we can provide support rather than letting algorithms come and go.
+My $0.02,
+Xiangrui
+Cannot agree more with your words. Could you add one section about
+"how and what to contribute" to MLlib's guide? -Xiangrui
+The markdown files are under spark/docs. You can submit a PR for
+changes. -Xiangrui
+Hi bearrito, this issue was fixed by Tor in
+https://github.com/apache/spark/pull/407. You can either try the
+master branch or wait for the 1.0 release. -Xiangrui
+I don't think it is easy to make sparse faster than dense with this
+sparsity and feature dimension. You can try rcv1.binary, which should
+show the difference easily.
+David, the breeze operators used here are
+1. DenseVector dot SparseVector
+2. axpy DenseVector SparseVector
+However, the SparseVector is passed in as Vector[Double] instead of
+SparseVector[Double]. It might use the axpy impl of [DenseVector,
+Vector] and call activeIterator. I didn't check whether you used
+multimethods on axpy.
+Best,
+Xiangrui
+Hi DB,
+I saw you are using yarn-cluster mode for the benchmark. I tested the
+yarn-cluster mode and found that YARN does not always give you the
+exact number of executors requested. Just want to confirm that you've
+checked the number of executors.
+The second thing to check is that in the benchmark code, after you
+call cache, you should also call count() to materialize the RDD. I saw
+in the result, the real difference is actually at the first step.
+Adding intercept is not a cheap operation for sparse vectors.
+Best,
+Xiangrui
+I don't understand why sparse falls behind dense so much at the very
+first iteration. I didn't see count() is called in
+https://github.com/dbtsai/spark-lbfgs-benchmark/blob/master/src/main/scala/org/apache/spark/mllib/benchmark/BinaryLogisticRegression.scala
+. Maybe you have local uncommitted changes.
+Best,
+Xiangrui
+I fixed index type and value type to make things simple, especially
+when we need to provide Java and Python APIs. For raw features and
+feature transmations, we should allow generic types. -Xiangrui
+Hi Deb,
+There is a saveAsLibSVMFile in MLUtils now. Also, I submitted a PR for
+standardizing text format of vectors and labeled point:
+https://github.com/apache/spark/pull/685
+Best,
+Xiangrui
+Hi Deb,
+There is a saveAsLibSVMFile in MLUtils now. Also, I submitted a PR for
+standardizing text format of vectors and labeled point:
+https://github.com/apache/spark/pull/685
+Best,
+Xiangrui
+I submitted a PR for standardizing the text format for vectors and
+labeled data: https://github.com/apache/spark/pull/685
+Once it gets merged, saveAsTextFile and loading should be consistent.
+I didn't choose LibSVM as the default format because two reasons:
+1) It doesn't contain feature dimension info in the record. We need to
+scan the dataset to get that info.
+2) It saves index:value tuples. Putting indices together can help data
+compression. Same for value if there are many binary features.
+Best,
+Xiangrui
+3) It is not designed for dense feature vectors.
+3) It is not designed for dense feature vectors.
+I submitted a PR for standardizing the text format for vectors and
+labeled data: https://github.com/apache/spark/pull/685
+Once it gets merged, saveAsTextFile and loading should be consistent.
+I didn't choose LibSVM as the default format because two reasons:
+1) It doesn't contain feature dimension info in the record. We need to
+scan the dataset to get that info.
+2) It saves index:value tuples. Putting indices together can help data
+compression. Same for value if there are many binary features.
+Best,
+Xiangrui
+With 3x replication, we should be able to achieve fault tolerance.
+This checkPointed RDD can be cleared if we have another in-memory
+checkPointed RDD down the line. It can avoid hitting disk if we have
+enough memory to use. We need to investigate more to find a good
+solution. -Xiangrui
+I can re-produce the error with Spark 1.0-RC and YARN (CDH-5). The
+reflection approach mentioned by DB didn't work either. I checked the
+distributed cache on a worker node and found the jar there. It is also
+in the Environment tab of the WebUI. The workaround is making an
+assembly jar.
+DB, could you create a JIRA and describe what you have found so far? Thanks!
+Best,
+Xiangrui
+I created a JIRA: https://issues.apache.org/jira/browse/SPARK-1870
+DB, could you add more info to that JIRA? Thanks!
+-Xiangrui
+Btw, I tried
+rdd.map { i =>
+  System.getProperty("java.class.path")
+}.collect()
+but didn't see the jars added via "--jars" on the executor classpath.
+-Xiangrui
+Hi Patrick,
+If spark-submit works correctly, user only needs to specify runtime
+jars via `--jars` instead of using `sc.addJar`. Is it correct? I
+checked SparkSubmit and yarn.Client but didn't find any code to handle
+`args.jars` for YARN mode. So I don't know where in the code the jars
+in the distributed cache are added to runtime classpath on executors.
+Best,
+Xiangrui
+Hi Sandy,
+It is hard to imagine that a user needs to create an object in that
+way. Since the jars are already in distributed cache before the
+executor starts, is there any reason we cannot add the locally cached
+jars to classpath directly?
+Best,
+Xiangrui
+Talked with Sandy and DB offline. I think the best solution is sending
+the secondary jars to the distributed cache of all containers rather
+than just the master, and set the classpath to include spark jar,
+primary app jar, and secondary jars before executor starts. In this
+way, user only needs to specify secondary jars via --jars instead of
+calling sc.addJar inside the code. It also solves the scalability
+problem of serving all the jars via http.
+If this solution sounds good, I can try to make a patch.
+Best,
+Xiangrui
+I think adding jars dynamically should work as long as the primary jar
+and the secondary jars do not depend on dynamically added jars, which
+should be the correct logic. -Xiangrui
+That's a good example. If we really want to cover that case, there are
+two solutions:
+1. Follow DB's patch, adding jars to the system classloader. Then we
+cannot put a user class in front of an existing class.
+2. Do not send the primary jar and secondary jars to executors'
+distributed cache. Instead, add them to "spark.jars" in SparkSubmit
+and serve them via http by called sc.addJar in SparkContext.
+What is your preference?
+Hi DB,
+I found it is a little hard to implement the solution I mentioned:
+If you look at ApplicationMaster code, which is entry point in
+yarn-cluster mode. It actually creates a thread of the user class
+first and waits the user class to create a spark context. It means the
+user class has to be on the classpath at that time. I think we need to
+add the primary jar and secondary jars twice, once to system
+classpath, and then to the executor classloader.
+Best,
+Xiangrui
+Hi Meethu,
+Thanks for asking! Scala is the native language in Spark. Implementing
+algorithms in Scala can utilize the full power of Spark Core. Also,
+Scala's syntax is very concise. Implementing ML algorithms using
+different languages would increase the maintenance cost. However,
+there are still much work to be done in the Python/Java land. For
+example, we currently do not support distributed matrix and decision
+tree in Python, and those interfaces may not be friendly for Java
+users. If you would like to contribute to MLlib in Python or Java, it
+would be a good place to start. Thanks!
+Best,
+Xiangrui
+Please find my comments inline. -Xiangrui
+RowMatrix has a method to compute column summary statistics. There is
+a trade-off here because centering may densify the data. A utility
+function that centers data would be useful for dense datasets.
+-Xiangrui
+RowMatrix has a method to compute column summary statistics. There is
+a trade-off here because centering may densify the data. A utility
+function that centers data would be useful for dense datasets.
+-Xiangrui
++1
+Tested apps with standalone client mode and yarn cluster and client modes.
+Xiangrui
+Is there a way to specify the target version? -Xiangrui
+Hi Deb,
+Why do you want to make those methods public? If you only need to
+replace the solver for subproblems. You can try to make the solver
+pluggable. Now it supports least squares and non-negative least
+squares. You can define an interface for the subproblem solvers and
+maintain the IPM solver at your own code base, if the only information
+you need is Y^T Y and Y^T b.
+Btw, just curious, what is the use case for quadratic constraints?
+Best,
+Xiangrui
+I don't quite understand why putting linear constraints can promote
+orthogonality. For the interfaces, if the subproblem is determined by
+Y^T Y and Y^T b for each iteration, then the least squares solver, the
+non-negative least squares solver, or your convex solver is simply a
+function
+(A, b) -> x.
+You can define it as an interface, and make the solver pluggable by
+adding a setter to ALS. If you want to use your lgpl solver, just
+include it in the classpath. Creating two separate files still seems
+unnecessary to me. Could you create a JIRA and we can move our
+discussion there? Thanks!
+Best,
+Xiangrui
+For explicit feedback, ALS uses only observed ratings for computation.
+So XtXs are not the same. -Xiangrui
+You idea is close to what implicit feedback does. You can check the
+paper, which is short and concise. In the ALS setting, all subproblems
+are independent in each iteration. This is part of the reason why ALS
+is scalable. If you have some global constraints that make the
+subproblems no longer decoupled, that would certainly affects
+scalability. -Xiangrui
+After checkpoint(), please call count(). This is similar to cache(),
+the RDD is only marked as to be checked with checkpoint(). -Xiangrui
+After checkpoint(), please call count(). This is similar to cache(),
+the RDD is only marked as to be checked with checkpoint(). -Xiangrui
+Calling checkpoint() alone doesn't cut the lineage. It only marks the
+RDD as to be checkpointed. The lineage is cut after the first time
+this RDD is materialized. You see StackOverflow becaure the lineage is
+still there. -Xiangrui
+Calling checkpoint() alone doesn't cut the lineage. It only marks the
+RDD as to be checkpointed. The lineage is cut after the first time
+this RDD is materialized. You see StackOverflow becaure the lineage is
+still there. -Xiangrui
+Hi Deb,
+KNITRO and MOSEK are both commercial. If you are looking for
+open-source ones, you can take a look at PDCO from SOL:
+http://web.stanford.edu/group/SOL/software/pdco/
+Each subproblem is really just a small QP. ADMM is designed for the
+cases when data is distributively stored or the objective function is
+complex but splittable. Neither applies to this case.
+Best,
+Xiangrui
+Alex, please send the pull request to apache/spark instead of your own
+repo, following the instructions in
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+Thanks,
+Xiangrui
+Hey Deb,
+If your goal is to solve the subproblems in ALS, exploring sparsity
+doesn't give you much benefit because the data is small and dense.
+Porting either ECOS's or PDCO's implementation but using dense
+representation should be sufficient. Feel free to open a JIRA and we
+can move our discussion there.
+Best,
+Xiangrui
++1
+Ran mllib examples.
+I don't know if anyone is working on it either. If that JIRA is not
+moved to Apache JIRA, feel free to create a new one and make a note
+that you are working on it. Thanks! -Xiangrui
+It is documented in the official doc:
+http://spark.apache.org/docs/latest/mllib-guide.html
+Please vote on releasing the following candidate as Apache Spark version 0.9.2!
+The tag to be voted on is v0.9.2-rc1 (commit 4322c0ba):
+https://git-wip-us.apache.org/repos/asf?p=spark.git;a=commit;h=4322c0ba7f411cf9a2483895091440011742246b
+The release files, including signatures, digests, etc. can be found at:
+http://people.apache.org/~meng/spark-0.9.2-rc1/
+Release artifacts are signed with the following key:
+https://people.apache.org/keys/committer/meng.asc
+The staging repository for this release can be found at:
+https://repository.apache.org/service/local/repositories/orgapachespark-1023/content/
+The documentation corresponding to this release can be found at:
+http://people.apache.org/~meng/spark-0.9.2-rc1-docs/
+Please vote on releasing this package as Apache Spark 0.9.2!
+The vote is open until Sunday, July 20, at 11:10 UTC and passes if
+a majority of at least 3 +1 PMC votes are cast.
+[ ] +1 Release this package as Apache Spark 0.9.2
+[ ] -1 Do not release this package because ...
+To learn more about Apache Spark, please see
+http://spark.apache.org/
+=== About this release ===
+This release fixes a few high-priority bugs in 0.9.1 and has a variety
+of smaller fixes. The full list is here: http://s.apache.org/d0t. Some
+of the more visible patches are:
+SPARK-2156 and SPARK-1112: Issues with jobs hanging due to akka frame size
+SPARK-2043: ExternalAppendOnlyMap doesn't always find matching keys
+SPARK-1676: HDFS FileSystems continually pile up in the FS cache
+SPARK-1775: Unneeded lock in ShuffleMapTask.deserializeInfo
+SPARK-1870: Secondary jars are not added to executor classpath for YARN
+This is the second maintenance release on the 0.9 line. We plan to make
+additional maintenance releases as new fixes come in.
+Best,
+Xiangrui
+I start the voting with a +1.
+Ran tests on the release candidates and some basic operations in
+spark-shell and pyspark (local and standalone).
+-Xiangrui
+UPDATE:
+The staging repository for this release can be found at:
+https://repository.apache.org/content/repositories/orgapachespark-1023/
+The previous repo contains exactly the same content but mutable.
+Thanks Patrick for pointing it out!
+-Xiangrui
+Hi all,
+The vote has passed with 7 "+1" votes (4 binding) and 0 "-1" vote:
++1:
+Xiangrui Meng*
+Matei Zaharia*
+DB Tsai
+Reynold Xin*
+Patrick Wendell*
+Andrew Or
+Sean McNamara
+I'm closing this vote and going to package v0.9.2 today. Thanks
+everyone for voting!
+Best,
+Xiangrui
+I'm happy to announce the availability of Spark 0.9.2! Spark 0.9.2 is
+a maintenance release with bug fixes across several areas of Spark,
+including Spark Core, PySpark, MLlib, Streaming, and GraphX. We
+recommend all 0.9.x users to upgrade to this stable release.
+Contributions to this release came from 28 developers.
+Visit the release notes[1] to read about the release and download[2]
+the release today.
+[1] http://spark.apache.org/releases/spark-release-0-9-2.html
+[2] http://spark.apache.org/downloads.html
+Best,
+Xiangrui
++1
+Tested basic spark-shell and pyspark operations and MLlib examples on a Mac.
+You can try enabling "spark.files.userClassPathFirst". But I'm not
+sure whether it could solve your problem. -Xiangrui
+Yes, that should work. spark-mllib-1.1.0 should be compatible with
+spark-core-1.0.1.
+I think the build number is included in the SparkQA message, for
+example: https://github.com/apache/spark/pull/1788
+The build number 17941 is in the URL
+"https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/17941/consoleFull".
+Just need to be careful to match the number.
+Another solution is to kill running Jenkins jobs if there is a code change.
+If you cannot change the Spark jar deployed on the cluster, an easy
+solution would be renaming ALS in your jar. If userClassPathFirst
+doesn't work, could you create a JIRA and attach the log? Thanks!
+-Xiangrui
+One thing I like to clarify is that we do not support running a newer
+version of a Spark component on top of a older version of Spark core.
+I don't remember any code change in MLlib that requires Spark v1.1 but
+I might miss some PRs. There were changes to CoGroup, which may be
+relevant:
+https://github.com/apache/spark/commits/master/core/src/main/scala/org/apache/spark/rdd/CoGroupedRDD.scala
+Btw, for the constrained optimization, I'm really interested in how
+they differ in the final recommendation? It would be great if you can
+test prec@k or ndcg@k metrics.
+Best,
+Xiangrui
+Congrats, Joey & Andrew!!
+-Xiangrui
+Did you set driver memory? You can confirm it in the Executors tab of
+the WebUI. Btw, the code may only work in local mode. In a cluster
+mode, counts will be serialized to remote workers and the result is
+not fetched by the driver after foreach. You can use RDD.countByValue
+instead. -Xiangrui
+Did you verify the driver memory in the Executor tab of the WebUI? I
+think you need `--driver-memory 8g` with spark-shell or spark-submit
+instead of setting it in spark-defaults.conf.
+Just saw you used toArray on an RDD. That copies all data to the
+driver and it is deprecated. countByValue is what you need:
+val samples = sc.textFile("s3n://geonames")
+val counts = samples.countByValue()
+val result = samples.map(l => (l, counts.getOrElse(l, 0L))
+Could you also try to use the latest branch-1.1 or master with the
+default akka.frameSize setting? The serialized task size should be
+small because we now use broadcast RDD objects.
+-Xiangrui
+Hi Deb,
+I think this may be the same issue as described in
+https://issues.apache.org/jira/browse/SPARK-2121 . We know that the
+container got killed by YARN because it used much more memory that it
+requested. But we haven't figured out the root cause yet.
++Sandy
+Best,
+Xiangrui
+miniBatchFraction uses RDD.sample to get the mini-batch, and sample
+still needs to visit the elements one after another. So it is not
+efficient if the task is not computation heavy and this is why
+setMiniBatchFraction is marked as experimental. If we can detect that
+the partition iterator is backed by an ArrayBuffer, maybe we can do a
+skip iterator to skip elements. -Xiangrui
++1. Tested some MLlib example code.
+For default changes, maybe it is useful to mention the default
+broadcast factory changed to torrent.
+RJ, could you provide a code example that can re-produce the bug you
+observed in local testing? Breeze's += is not thread-safe. But in a
+Spark job, calls to a resultHandler is synchronized:
+https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/scheduler/JobWaiter.scala#L52
+. Let's move our discussion to the JIRA page. -Xiangrui
+Sorry for my late reply! I'm also very interested in the
+implementation of distributed matrix multiplication. As Shivaram
+mentioned, the communication is the concern here. But maybe we can
+start with a reasonable implementation and then iterate on its
+performance. It would be great if eventually we can implement an
+algorithm close to the 2.5D algorithm
+(http://www.netlib.org/lapack/lawnspdf/lawn248.pdf).
+I created two JIRAs for this topic:
+1. Distributed block matrix: https://issues.apache.org/jira/browse/SPARK-3434
+2. Distributed matrix multiplication:
+https://issues.apache.org/jira/browse/SPARK-3435
+We can move our discussion there.
+Rong, I'm really happy to see the Saury project. It would be great if
+you can share your design and experience (maybe on the JIRA page so it
+is easier to track). I will read the reports on CSDN and ping you if I
+ran into problems. Thanks!
+Best,
+Xiangrui
+Hi Egor,
+Thanks for the feedback! We are aware of some of the issues you
+mentioned and there are JIRAs created for them. Specifically, I'm
+pushing out the design on pipeline features and algorithm/model
+parameters this week. We can move our discussion to
+https://issues.apache.org/jira/browse/SPARK-1856 .
+It would be nice to make tests against interfaces. But it definitely
+needs more discussion before making PRs. For example, we discussed the
+learning interfaces in Christoph's PR
+(https://github.com/apache/spark/pull/2137/) but it takes time to
+reach a consensus, especially on interfaces. Hopefully all of us could
+benefit from the discussion. The best practice is to break down the
+proposal into small independent piece and discuss them on the JIRA
+before submitting PRs.
+For performance tests, there is a spark-perf package
+(https://github.com/databricks/spark-perf) and we added performance
+tests for MLlib in v1.1. But definitely more work needs to be done.
+The dev-list may not be a good place for discussion on the design,
+could you create JIRAs for each of the issues you pointed out, and we
+track the discussion on JIRA? Thanks!
+Best,
+Xiangrui
+It is also used in RDD.randomSplit. -Xiangrui
+Hi Egor,
+I posted the design doc for pipeline and parameters on the JIRA, now
+I'm trying to work out some details of ML datasets, which I will post
+it later this week. You feedback is welcome!
+Best,
+Xiangrui
+The test accuracy doesn't mean the total loss. All points between (-1,
+1) can separate points -1 and +1 and give you 1.0 accuracy, but their
+coressponding loss are different. -Xiangrui
+Try to build the assembly jar first. ClusterSuite uses local-cluster
+mode, which requires the assembly jar. -Xiangrui
+Did you add a different version of breeze to the classpath? In Spark
+1.0, we use breeze 0.7, and in Spark 1.1 we use 0.9. If the breeze
+version you used is different from the one comes with Spark, you might
+see class not found. -Xiangrui
+Hi Yu,
+We upgraded breeze to 0.10 yesterday. So we can call the distance
+functions you contributed to breeze easily. We don't want to maintain
+another copy of the implementation in MLlib to keep the maintenance
+cost low. Both spark and breeze are open-source projects. We should
+try our best to avoid duplicate effort and forking, even though we
+don't have control the release of breeze.
+As we discussed in the PR, if we want users to call them directly,
+they should live in breeze. If we want users to specify them in
+clustering algorithms, we should hide the implementation from users.
+So simple wrappers over the breeze implementation should be
+sufficient. We are reviewing
+https://github.com/apache/spark/pull/2634
+and try to see how we can embed distance measures there. In the
+k-means implementation, we don't use (Vector, Vector) => Double.
+Instead, we cache the norms and use inner product to derive the
+distance, which is faster and takes advantage of sparsity. It would be
+really nice if you can help review it and discuss how to embed
+distance measures there. Thanks!
+Best,
+Xiangrui
+Do not use lambda=0.0. Use a small number instead. Cholesky
+factorization doesn't work on semi-positive systems with 0
+eigenvalues. -Xiangrui
+Thanks for reporting the bug! I will take a look. -Xiangrui
+Hi Ashutosh,
+The process you described is correct, with details documented in
+https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+. There is no outlier detection algorithm in MLlib. Before you start
+coding, please open an JIRA and let's discuss which algorithms are
+appropriate to include, because there are many outlier detection
+algorithms. I'm not sure which one is general enough and easy to
+implement in parallel. For example, I'm not familiar with the
+algorithm you mentioned, while the one I'm familiar with is based on
+leverage scores: http://en.wikipedia.org/wiki/Leverage_(statistics)
+Best,
+Xiangrui
+Hi RJ,
+We are close to the v1.2 feature freeze deadline, so I'm busy with the
+pipeline feature and couple bugs. I will ask other developers to help
+review the PR. Thanks for working with Yu and helping the code review!
+Best,
+Xiangrui
+Let's narrow the context from matrix factorization to recommendation
+via ALS. It adds extra complexity if we treat it as a multi-class
+classification problem. ALS only outputs a single value for each
+prediction, which is hard to convert to probability distribution over
+the 5 rating levels. Treating it as a binary classification problem or
+a ranking problem does make sense. The RankingMetricc is in master.
+Free free to add prec@k and ndcg@k to examples.MovielensALS. ROC
+should be good to add as well. -Xiangrui
+Yes, if there are many distinct values, we need binning to compute the
+AUC curve. Usually, the scores are not evenly distribution, we cannot
+simply truncate the digits. Estimating the quantiles for binning is
+necessary, similar to RangePartitioner:
+https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/Partitioner.scala#L104
+. Limiting the number of bins is definitely useful. Do you have time
+to work on it? -Xiangrui
+Was "user" presented in training? We can put a check there and return
+NaN if the user is not included in the model. -Xiangrui
++1 (binding)
+ALS model contains RDDs. So you cannot put `model.recommendProducts`
+inside a RDD closure `userProductsRDD.map`. -Xiangrui
+There is a JIRA for it: https://issues.apache.org/jira/browse/SPARK-3066
+The easiest case is when one side is small. If both sides are large,
+this is a super-expensive operation. We can do block-wise cross
+product and then find top-k for each user.
+Best,
+Xiangrui
+Searched MLlib on Google Scholar and didn't find any:) MLlib
+implements well-recognized algorithms. Each of which may correspond to
+a paper or serveral papers. Please find the reference in the code if
+you are interested. -Xiangrui
+`sampleByKey` with the same fraction per stratum acts the same as
+`sample`. The operation you want is perhaps `sampleByKeyExact` here.
+However, when you use stratified sampling, there should not be many
+strata. My question is why we need to split on each user's ratings. If
+a user is missing in training and appears in test, we can simply
+ignore it. -Xiangrui
+If all users are equally important, then the average score should be
+representative. You shouldn't worry about missing one or two. For
+stratified sampling, wikipedia has a paragraph about its disadvantage:
+http://en.wikipedia.org/wiki/Stratified_sampling#Disadvantages
+It depends on the size of the population. For example, in the US
+Census survey sampling design, there are many (>> 100) strata:
+https://www.census.gov/acs/www/Downloads/survey_methodology/Chapter_4_RevisedDec2010.pdf
+If you indeed want to do the split per user, you should use groupByKey
+and apply reservoir sampling for ratings from each user.
+-Xiangrui
++1. Checked version numbers and doc. Tested a few ML examples with
+Java 6 and verified some recently merged bug fixes. -Xiangrui
+Hi Yanbo,
+We scale the model coefficients back after training. So scaling in
+prediction is not necessary.
+We had some discussion about this. I'd like to treat feature scaling
+as part of the feature transformation, and recommend users to apply
+feature scaling before training. It is a cleaner solution to me, and
+this is easy with the new pipeline API. DB (cc'ed) recommends
+embedding feature scaling in linear methods, because it generally
+leads better conditioning, which is also valid. Feel free to create a
+JIRA and we can have the discussion there.
+Best,
+Xiangrui
+Krishna, could you send me some code snippets for the issues you saw
+in naive Bayes and k-means? -Xiangrui
+Yes, regularization path could be viewed as training multiple models
+at once. -Xiangrui
+Hi Krishna,
+Thanks for providing the notebook! I tried and found that the problem
+is with PySpark's zip. I created a JIRA to track the issue:
+https://issues.apache.org/jira/browse/SPARK-4841
+-Xiangrui
+Feel free to create a JIRA for this issue. We might need to discuss
+what to put in the public constructors. In the meanwhile, you can use
+Java serialization to save/load the model:
+sc.parallelize(Seq(model), 1).saveAsObjectFile("/tmp/model")
+val model = sc.objectFile[StandardScalerModel]("/tmp/model").first()
+-Xiangrui
+Fan and Stephen (cc'ed) are working on this feature. They will update
+the JIRA page and report progress soon. -Xiangrui
+For large datasets, you need hashing in order to compute k-nearest
+neighbors locally. You can start with LSH + k-nearest in Google
+scholar: http://scholar.google.com/scholar?q=lsh+k+nearest -Xiangrui
+I would call it Scaler. You might want to add it to the spark.ml pipieline
+api. Please check the spark.ml.HashingTF implementation. Note that this
+should handle sparse vectors efficiently.
+Hadamard and FFTs are quite useful. If you are intetested, make sure that
+we call an FFT libary that is license-compatible with Apache.
+-Xiangrui
+60m-vector costs 480MB memory. You have 12 of them to be reduced to the
+driver. So you need ~6GB memory not counting the temp vectors generated
+from '_+_'. You need to increase driver memory to make it work. That being
+said, ~10^7 hits the limit for the current impl of glm. -Xiangrui
+Yes, we need a wrapper under spark.ml. Feel free to create a JIRA for
+it. -Xiangrui
+I like the `/* .. */` style more. Because it is easier for IDEs to
+recognize it as a block comment. If you press enter in the comment
+block with the `//` style, IDEs won't add `//` for you. -Xiangrui
+Btw, I think allowing `/* ... */` without the leading `*` in lines is
+also useful. Check this line:
+https://github.com/apache/spark/pull/4259/files#diff-e9dcb3b5f3de77fc31b3aff7831110eaR55,
+where we put the R commands that can reproduce the test result. It is
+easier if we write in the following style:
+~~~
+/*
+ Using the following R code to load the data and train the model using
+glmnet package.
+ library("glmnet")
+ data <- read.csv("path", header=FALSE, stringsAsFactors=FALSE)
+ features <- as.matrix(data.frame(as.numeric(data$V2), as.numeric(data$V3)))
+ label <- as.numeric(data$V1)
+ weights <- coef(glmnet(features, label, family="gaussian", alpha = 0,
+lambda = 0))
+ */
+~~~
+So people can copy & paste the R commands directly.
+Xiangrui
+The current ALS implementation allow pluggable solvers for
+NormalEquation, where we put CholeskeySolver and NNLS solver. Please
+check the current implementation and let us know how your constraint
+solver would fit. For a general matrix factorization package, let's
+make a JIRA and move our discussion there. -Xiangrui
+It may be too late to merge it into 1.3. I'm going to make another
+pass on your PR today. -Xiangrui
+Please create a JIRA for it and we should discuss the APIs first
+before updating the code. -Xiangrui
+Would you be interested in working on MLlib's Python API during the
+summer? We want everything we implemented in Scala can be used in both
+Java and Python, but we are not there yet. It would be great if
+someone is willing to help. -Xiangrui
+Made 3 votes to each of the talks. Looking forward to see them in
+Hadoop Summit:) -Xiangrui
+There are couple things in Scala/Java but missing in Python API:
+1. model import/export
+2. evaluation metrics
+3. distributed linear algebra
+4. streaming algorithms
+If you are interested, we can list/create target JIRAs and hunt them
+down one by one.
+Best,
+Xiangrui
+There are couple things in Scala/Java but missing in Python API:
+1. model import/export
+2. evaluation metrics
+3. distributed linear algebra
+4. streaming algorithms
+If you are interested, we can list/create target JIRAs and hunt them
+down one by one.
+Best,
+Xiangrui
+`case object` inside an `object` doesn't show up in Java. This is the
+minimal code I found to make everything show up correctly in both
+Scala and Java:
+sealed abstract class StorageLevel // cannot be a trait
+object StorageLevel {
+  private[this] case object _MemoryOnly extends StorageLevel
+  final val MemoryOnly: StorageLevel = _MemoryOnly
+  private[this] case object _DiskOnly extends StorageLevel
+  final val DiskOnly: StorageLevel = _DiskOnly
+}
+For #4, my previous proposal may confuse the IDEs with additional
+types generated by the case objects, and their toString contain the
+underscore. The following works better:
+sealed abstract class StorageLevel
+object StorageLevel {
+  final val MemoryOnly: StorageLevel = {
+    case object MemoryOnly extends StorageLevel
+    MemoryOnly
+  }
+  final val DiskOnly: StorageLevel = {
+    case object DiskOnly extends StorageLevel
+    DiskOnly
+ }
+}
+MemoryOnly and DiskOnly can be used in pattern matching. If people are
+okay with this approach, I can add it to the code style guide.
+Imran, this is not just for internal APIs, which are relatively more
+flexible. It is good to use the same approach to implement public
+enum-like types from now on.
+Best,
+Xiangrui
+Could you try `sc.objectFile` instead?
+sc.parallelize(Seq(model), 1).saveAsObjectFile("path")
+val sameModel = sc.objectFile[NaiveBayesModel]("path").first()
+-Xiangrui
+Well, it is the standard "hacky" way for model save/load in MLlib. We
+have SPARK-4587 and SPARK-5991 to provide save/load for all MLlib
+models, in an exchangeable format. -Xiangrui
+Krishna, I tested your linear regression example. For linear
+regression, we changed its objective function from 1/n * \|A x -
+b\|_2^2 to 1/(2n) * \|Ax - b\|_2^2 to be consistent with common least
+squares formulations. It means you could re-produce the same result by
+multiplying the step size by 2. This is not a problem if both run
+until convergence (if not blow up). However, in your example, a very
+small step size is chosen and it didn't converge in 100 iterations. In
+this case, the step size matters. I will put a note in the migration
+guide. Thanks! -Xiangrui
+In MLlib, we use strings for emu-like types in Python APIs, which is
+quite common in Python and easy for py4j. On the JVM side, we
+implement `fromString` to convert them back to enums. -Xiangrui
+Let me put a quick summary. #4 got majority vote with CamelCase but
+not UPPERCASE. The following is a minimal implementation that works
+for both Scala and Java. In Python, we use string for enums. This
+proposal is only for new public APIs. We are not going to change
+existing ones. -Xiangrui
+~~~
+sealed abstract class StorageLevel
+object StorageLevel {
+  def fromString(name: String): StorageLevel = ???
+  val MemoryOnly: StorageLevel = {
+    case object MemoryOnly extends StorageLevel
+    MemoryOnly
+  }
+  val DiskOnly: StorageLevel = {
+    case object DiskOnly extends StorageLevel
+    DiskOnly
+ }
+}
+~~~
+Hi Alex,
+Since it is non-trivial to make nvblas work with netlib-java, it would
+be great if you can send the instructions to netlib-java as part of
+the README. Hopefully we don't need to modify netlib-java code to use
+nvblas.
+Best,
+Xiangrui
+This is great! Thanks! -Xiangrui
++1 Verified some MLlib bug fixes on OS X. -Xiangrui
+This is being discussed in
+https://issues.apache.org/jira/browse/SPARK-6407. Let's move the
+discussion there. Thanks for providing references! -Xiangrui
+Using Java enums sound good. We can list the values in the JavaDoc and
+hope Scala will be able to correctly generate docs for Java enums in
+the future. -Xiangrui
+Did you set `--driver-memory` with spark-submit? -Xiangrui
++1. One issue with dropping Java 6: if we use Java 7 to build the
+assembly jar, it will use zip64. Could Python 2.x (or even 3.x) be
+able to load zip64 files on PYTHONPATH? -Xiangrui
+Hi all,
+In PySpark, a DataFrame column can be referenced using df["abcd"]
+(__getitem__) and df.abcd (__getattr__). There is a discussion on
+SPARK-7035 on compatibility issues with the __getattr__ approach, and
+I want to collect more inputs on this.
+Basically, if in the future we introduce a new method to DataFrame, it
+may break user code that uses the same attr to reference a column or
+silently changes its behavior. For example, if we add name() to
+DataFrame in the next release, all existing code using `df.name` to
+reference a column called "name" will break. If we add `name()` as a
+property instead of a method, all existing code using `df.name` may
+still work but with a different meaning. `df.select(df.name)` no
+longer selects the column called "name" but the column that has the
+same name as `df.name`.
+There are several proposed solutions:
+1. Keep both df.abcd and df["abcd"], and encourage users to use the
+latter that is future proof. This is the current solution in master
+(https://github.com/apache/spark/pull/5971). But I think users may be
+still unaware of the compatibility issue and prefer `df.abcd` to
+`df["abcd"]` because the former could be auto-completed.
+2. Drop df.abcd and support df["abcd"] only. From Wes' comment on the
+JIRA page: "I actually dragged my feet on the _getattr_ issue for
+several months back in the day, then finally added it (and tab
+completion in IPython with _dir_), and immediately noticed a huge
+quality-of-life improvement when using pandas for actual (esp.
+interactive) work."
+3. Replace df.abcd by df.abcd_ (with a suffix "_"). Both df.abcd_ and
+df["abcd"] would be future proof, and df.abcd_ could be
+auto-completed. The tradeoff is apparently the extra "_" appearing in
+the code.
+My preference is 3 > 1 > 2. Your inputs would be greatly appreciated. Thanks!
+Best,
+Xiangrui
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Yu,
+Reducing the code complexity on the Python side is certainly what we
+want to see:) We didn't call Java directly in Python models because
+Java methods don't work inside RDD closures, e.g.,
+rdd.map(lambda x: model.predict(x[1]))
+But I agree that for model save/load the implementation should be
+simplified. Could you submit a PR and see how much code we can save?
+Thanks,
+Xiangrui
++1. Checked user guide and API doc, and ran some MLlib and SparkR
+examples. -Xiangrui
+This was implemented as sc.wholeTextFiles.
+Not exacly the same as the one you suggested but you can chain it with
+flatMap to get what you want, if each file is not huge.
+Congrats!!

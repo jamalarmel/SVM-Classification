@@ -1,0 +1,1853 @@
+tomorrow morning i will be upgrading jenkins to the latest/greatest (1.577).
+at 730am, i will put jenkins in to a quiet period, so no new builds will be
+accepted.  once any running builds are finished, i will be taking jenkins
+down for the upgrade.
+depending on what and how many jobs are running, i'm expecting this to
+take, at most, an hour.
+i'll send out an update tomorrow morning right before i begin, and will
+send out updates and an all-clear once we're up and running again.
+1.577 release notes:
+http://jenkins-ci.org/changelog
+please let me know if there are any questions/concerns.  thanks in advance!
+shane
+reminder:  this is starting in 10 minutes
+jenkins is now coming down.
+jenkins is upgraded, but a few jobs sneaked in before i could do the plugin
+updates.  i've put jenkins in quiet mode again, and once the spark builds
+finish, i'll restart jenkins to enable the plugin updates and we'll be good
+to go.
+let's all take a moment to bask in the glory of the shiny new UI!  :)
+this one job is blocking the jenkins restart:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/19406/
+i'm about to kill it so that i can get this done.  i'll restart the job
+after jenkins is back up.
+all clear:  jenkins and all plugins have been updated!
+no problem!
+also, i retriggered:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/19406
+it's currently:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/19411
+as with all software upgrades, sometimes things don't always work as
+expected.
+a recent change to stapler[1], to verbosely
+report NotExportableExceptions[2] is spamming our jenkins log file with
+stack traces, which is growing rather quickly (1.2G since 9am).  this has
+been reported to the jenkins jira[3], and a fix has been pushed and will be
+rolled out "soon"[4].
+this isn't affecting any builds, and jenkins is happily humming along.
+in the interim, so that we don't run out of disk space, i will be
+redirecting the jenkins logs tommorow morning to /dev/null for the long
+weekend.
+once a real fix has been released, i will update any packages needed and
+redirect the logging back to the log file.
+other than a short downtime, this will have no user-facing impact.
+please let me know if you have any questions/concerns.
+thanks for your patience!
+shane "the new guy"  :)
+[1] -- https://wiki.jenkins-ci.org/display/JENKINS/Architecture
+[2] --
+https://github.com/stapler/stapler/commit/ed2cb8b04c1514377f3a8bfbd567f050a67c6e1c
+[3] --
+https://issues.jenkins-ci.org/browse/JENKINS-24458?focusedCommentId=209247
+[4] --
+https://github.com/stapler/stapler/commit/e2b39098ca1f61a58970b8a41a3ae79053cf30e3
+reminder:   this is happening right now.  jenkins is currently in quiet
+mode, and in ~30 minutes, will be briefly going down.
+this is done.
+i have always found the 'Rebuild' plugin super useful:
+https://wiki.jenkins-ci.org/display/JENKINS/Rebuild+Plugin
+this is installed and enables.  enjoy!
+shane
+so, i had a meeting w/the databricks guys on friday and they recommended i
+send an email out to the list to say 'hi' and give you guys a quick intro.
+ :)
+hi!  i'm shane knapp, the new AMPLab devops engineer, and will be spending
+time getting the jenkins build infrastructure up to production quality.
+ much of this will be 'under the covers' work, like better system level
+auth, backups, etc, but some will definitely be user facing:  timely
+jenkins updates, debugging broken build infrastructure and some plugin
+support.
+i've been working in the bay area now since 1997 at many different
+companies, and my last 10 years has been split between google and palantir.
+ i'm a huge proponent of OSS, and am really happy to be able to help with
+the work you guys are doing!
+if anyone has any requests/questions/comments, feel free to drop me a line!
+shane
+since our queue is really short, i'm waiting for a couple of builds to
+finish and will be restarting jenkins to install/update some plugins.  the
+github pull request builder looks like it has some fixes to reduce spammy
+github calls, and reduce any potential rate limiting.
+i'll let everyone know when it's back up...  this should be super quick
+(~15 mins for tests to finish, ~2 mins for jenkins to restart).
+thanks in advance!
+shane
+and we're back and building!
+i am trying to get things up and running, but it looks like either the
+firewall gateway or jenkins server itself is down.  i'll update as soon as
+i know more.
+looks like a power outage in soda hall.  more updates as they happen.
+looks like some hardware failed, and we're swapping in a replacement.  i
+don't have more specific information yet -- including *what* failed, as our
+sysadmin is super busy ATM.  the root cause was an incorrect circuit being
+switched off during building maintenance.
+on a side note, this incident will be accelerating our plan to move the
+entire jenkins infrastructure in to a managed datacenter environment.  this
+will be our major push over the next couple of weeks.  more details about
+this, also, as soon as i get them.
+i'm very sorry about the downtime, we'll get everything up and running ASAP.
+it's a faulty power switch on the firewall, which has been swapped out.
+ we're about to reboot and be good to go.
+AND WE'RE UP!
+sorry that this took so long...  i'll send out a more detailed explanation
+of what happened soon.
+now, off to back up jenkins.
+shane
+i'd ping the Jenkinsmench...  the master was completely offline, so any new
+jobs wouldn't have reached it.  any jobs that were queued when power was
+lost probably started up, but jobs that were running would fail.
+looking
+i'm going to restart jenkins and see if that fixes things.
+yep.  that's exactly the behavior i saw earlier, and will be figuring out
+first thing tomorrow morning.  i bet it's an environment issues on the
+slaves.
+it's looking like everything except the pull request builders are working.
+ i'm going to be working on getting this resolved today.
+yeah, it was a problem w/the PRB's OAuth key.  josh rosen added a new key,
+and magique!
+we're about to clear the queue of all builds as most aren't wanted/needed.
+since the power incident last thursday, the github pull request builder
+plugin is still not really working 100%.  i found an open issue
+w/jenkins[1] that could definitely be affecting us, i will be pausing
+builds early thursday morning and then restarting jenkins.
+i'll send out a reminder tomorrow, and if this causes any problems for you,
+please let me know and we can work out a better time.
+but, now for some good news!  yesterday morning, we racked and stacked the
+systems for the new jenkins instance in the berkeley datacenter.  tomorrow
+i should be able to log in to them and start getting them set up and
+configured.  this is a major step in getting us in to a much more
+'production' style environment!
+anyways:  thanks for your patience, and i think we've all learned that hard
+powering down your build system is a definite recipe for disaster.  :)
+shane
+[1] -- https://issues.jenkins-ci.org/browse/JENKINS-22509
+that's kinda what we're hoping as well.  :)
+jenkins is now in quiet mode, and a restart is happening soon.
+...and the restart is done.
+you can just click on 'rebuild', if you'd like.  what project specifically?
+ (i had forgotten that i'd killed
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/557/,
+which i just started a rebuild on)
+all of our systems were affected by the shellshock bug, and i've just
+patched everything w/the latest fix from redhat:
+https://access.redhat.com/articles/1200223
+we're not running bash.x86_64 0:4.1.2-15.el6_5.2 on all of our systems.
+shane
+:)
+happy monday, everyone!
+remember a few weeks back when i upgraded jenkins, and unwittingly began
+DOSing our system due to massive log spam?
+well, that bug has been fixed w/the current release and i'd like to get our
+logging levels back to something more verbose that we have now.
+downtime will be from 730am-1000am PDT (i do expect this to be done well
+before 1000am)
+the update will be from 1.578 -> 1.582
+changelog here:  http://jenkins-ci.org/changelog
+please let me know if there are any questions or concerns.  thanks!
+shane, your friendly devops engineer
+we were running at 8 executors per node, and BARELY even stressing the
+machines (32 cores, ~230G RAM).
+in the interest of actually using system resources, and giving ourselves
+some headroom, i upped the executors to 16 per node.  i'll be keeping an
+eye on ganglia for the rest of the week to make sure everything's cool.
+i hope you all enjoy your freshly allocated capacity!  :)
+shane
+yeah, this is why i'm gonna keep a close eye on things this week...
+as for VMs vs containers, please do the latter more than the former.  one
+of our longer-term plans here at the lab is to move most of our jenkins
+infra to VMs, and running tests w/nested VMs is Bad[tm].
+(this time, reply to all)
+nice catch.  there's a bug in spark/dev/check-license, which i've confirmed
+from the CLI.  i'll open a bug and PR to fix it.
+https://issues.apache.org/jira/browse/SPARK-3745
+reminder:  this is happening tomorrow morning.  i will be putting jenkins
+in to quiet mode at ~7am, and then doing the upgrade once any stray builds
+finish.
+jenkins is currently in quiet mode, and will be restarted once the current
+crop of builds finishes.
+upgrade complete!  we're back online and happily building.
+as of this morning, i've got the new jenkins up, with all of the current
+builds set up (but failing).  i'm in the middle of playing setup/debug
+whack-a-mole, but we're getting there.  my guess would be early next week
+for the switchover.
+https://wiki.jenkins-ci.org/display/SECURITY/Jenkins+Security+Advisory+2014-10-01
+there's some pretty big stuff that's been identified and we need to get
+this upgraded asap.
+i'll be killing off what's currently running, and will retrigger them all
+once we're done.
+sorry for the inconvenience.
+shane
+update complete.  i'm retriggering builds now.
+greetings!
+i've got some updates regarding our new jenkins infrastructure, as well as
+the initial date and plan for rolling things out:
+*** current testing/build break whack-a-mole:
+a lot of out of date artifacts are cached in the current jenkins, which has
+caused a few builds during my testing to break due to dependency resolution
+failure[1][2].
+bumping these versions can cause your builds to fail, due to public api
+changes and the like.  consider yourself warned that some projects might
+require some debugging...  :)
+tomorrow, i will be at databricks working w/@joshrosen to make sure that
+the spark builds have any bugs hammered out.
+***  deployment plan:
+unless something completely horrible happens, THE NEW JENKINS WILL GO LIVE
+ON MONDAY (october 13th).
+all jenkins infrastructure will be DOWN for the entirety of the day
+(starting at ~8am).  this means no builds, period.  i'm hoping that the
+downtime will be much shorter than this, but we'll have to see how
+everything goes.
+all test/build history WILL BE PRESERVED.  i will be rsyncing the jenkins
+jobs/ directory over, complete w/history as part of the deployment.
+once i'm feeling good about the state of things, i'll point the original
+url to the new instances and send out an all clear.
+if you are a student at UC berkeley, you can log in to jenkins using your
+LDAP login, and (by default) view but not change plans.  if you do not have
+a UC berkeley LDAP login, you can still view plans anonymously.
+IF YOU ARE A PLAN ADMIN, THEN PLEASE REACH OUT, ASAP, PRIVATELY AND I WILL
+SET UP ADMIN ACCESS TO YOUR BUILDS.
+***  post deployment plan:
+fix all of the things that break!
+i will be keeping a VERY close eye on the builds, checking for breaks, and
+helping out where i can.  if the situation is dire, i can always roll back
+to the old jenkins infra...  but i hope we never get to that point!  :)
+i'm hoping that things will go smoothly, but please be patient as i'm
+certain we'll hit a few bumps in the road.
+please let me know if you guys have any comments/questions/concerns...  :)
+shane
+1 - https://github.com/bigdatagenomics/bdg-services/pull/18
+2 - https://github.com/bigdatagenomics/avocado/pull/111
+reminder:  this IS happening, first thing monday morning PDT.  :)
+Jenkins is in quiet mode and the move will be starting after i have my
+coffee.  :)
+quick update:  we should be back up and running in the next ~60mins.
+AND WE ARE LIIIIIIIVE!
+https://amplab.cs.berkeley.edu/jenkins/
+have at it, folks!
+ok, i found something that may help:
+https://issues.jenkins-ci.org/browse/JENKINS-20445?focusedCommentId=195638&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-195638
+i set this to 20 minutes...  let's see if that helps.
+i'm going to be downgrading our git plugin (from 2.2.7 to 2.2.2) to see if
+that helps w/the git fetch timeouts.
+this will require a short downtime (~20 mins for builds to finish, ~20 mins
+to downgrade), and will hopefully give us some insight in to wtf is going
+on.
+thanks for your patience...
+shane
+ok, we're up and building...  :crossesfingersfortheumpteenthtime:
+four builds triggered....  and no timeouts.  :crossestoes:  :)
+ok, we've had about 10 spark pull request builds go through w/o any git
+timeouts.  it seems that the git timeout issue might be licked.
+i will be definitely be keeping an eye on this for the next few days.
+thanks for being patient!
+shane
+the bad news is that we've had a couple more failures due to timeouts, but
+the good news is that the frequency that these happen has decreased
+significantly (3 in the past ~18hr).
+seems like the git plugin downgrade has helped relieve the problem, but
+hasn't fixed it.  i'll be looking in to this more today.
+quick update:
+here are some stats i scraped over the past week of ALL pull request
+builder projects and timeout failures.  due to the large number of spark
+ghprb jobs, i don't have great records earlier than oct 7th.  the data is
+current up until ~230pm today:
+spark and new spark ghprb total builds vs git fetch timeouts:
+$ for x in 10-{09..17}; do passed=$(grep $x SORTED.passed | grep -i spark |
+wc -l); failed=$(grep $x SORTED | grep -i spark | wc -l); let
+total=passed+failed; fail_percent=$(echo "scale=2; $failed/$total" | bc |
+sed "s/^\.//g"); line="$x -- total builds: $total\tp/f:
+ $passed/$failed\tfail%: $fail_percent%"; echo -e $line; done
+10-09 -- total builds: 140 p/f: 92/48 fail%: 34%
+10-10 -- total builds: 65 p/f: 59/6 fail%: 09%
+10-11 -- total builds: 29 p/f: 29/0 fail%: 0%
+10-12 -- total builds: 24 p/f: 21/3 fail%: 12%
+10-13 -- total builds: 39 p/f: 35/4 fail%: 10%
+10-14 -- total builds: 7 p/f: 5/2 fail%: 28%
+10-15 -- total builds: 37 p/f: 34/3 fail%: 08%
+10-16 -- total builds: 71 p/f: 59/12 fail%: 16%
+10-17 -- total builds: 26 p/f: 20/6 fail%: 23%
+all other ghprb builds vs git fetch timeouts:
+$ for x in 10-{09..17}; do passed=$(grep $x SORTED.passed | grep -vi spark
+| wc -l); failed=$(grep $x SORTED | grep -vi spark | wc -l); let
+total=passed+failed; fail_percent=$(echo "scale=2; $failed/$total" | bc |
+sed "s/^\.//g"); line="$x -- total builds: $total\tp/f:
+ $passed/$failed\tfail%: $fail_percent%"; echo -e $line; done
+10-09 -- total builds: 16 p/f: 16/0 fail%: 0%
+10-10 -- total builds: 46 p/f: 40/6 fail%: 13%
+10-11 -- total builds: 4 p/f: 4/0 fail%: 0%
+10-12 -- total builds: 2 p/f: 2/0 fail%: 0%
+10-13 -- total builds: 2 p/f: 2/0 fail%: 0%
+10-14 -- total builds: 10 p/f: 10/0 fail%: 0%
+10-15 -- total builds: 5 p/f: 5/0 fail%: 0%
+10-16 -- total builds: 5 p/f: 5/0 fail%: 0%
+10-17 -- total builds: 0 p/f: 0/0 fail%: 0%
+note:  the 15th was the day i rolled back to the earlier version of the git
+plugin.  it doesn't seem to have helped much, so i'll probably bring us
+back up to the latest version soon.
+also note:  rocking some floating point math on the CLI!  ;)
+i also compared the distribution of git timeout failures vs time of day,
+and there appears to be no correlation.  the failures are pretty evenly
+distributed over each hour of the day.
+we could be hitting the rate limit due to the ghprb hitting github a couple
+of times for each build, but we're averaging ~10-20 builds per hour (a
+build hits github 2-4 times, from what i can tell).  i'll have to look more
+in to this on monday, but suffice to say we may need to move from
+unauthorized https fetches to authorized requests.  this means retrofitting
+all of our jobs.  yay!  fun!  :)
+another option is to have local mirrors of all of the repos.  the problem
+w/this is that there might be a window where changes haven't made it to the
+local mirror and tests run against it.  more fun stuff to think about...
+now that i have some stats, and a list of all of the times/dates of the
+failures, i will be drafting my email to github and firing that off later
+today or first thing monday.
+have a great weekend everyone!
+shane, who spent way too much time on the CLI and is ready for some beer.
+hmm, strange.  i'll take a look.
+ok, so earlier today i installed a 2nd JDK within jenkins (7u71), which
+fixed the SparkR build but apparently made Spark itself quite unhappy.  i
+removed that JDK, triggered a build (
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/21943/console),
+and it compiled kinesis w/o dying a fiery death.
+apparently 7u71 is stricter when compiling.  sad times.
+sorry about that!
+shane
+thanks, patrick!
+:)
+i'm currently in a meeting and will be starting to do some tests in ~1 hour
+or so.
+ok, i did some testing and found out what's happening.
+https://issues.apache.org/jira/browse/SPARK-4021
+here's the TL;DR:
+jenkins ignores what JDKs are installed via the web interface when there's
+more than one defined, and falls back to whatever is default on the slave
+the test is run on.  in this case, it's openjdk 7u65...  and spark
+compilation fails.  i've removed the 2nd JDK (7u71) from jenkins, and
+everything is back to normal.
+so, things look like they've stabilized significantly over the past 10
+days, and without any changes on our end:
+$ /root/tools/get_timeouts.sh 10
+timeouts by date:
+2014-10-14 -- 2
+2014-10-16 -- 1
+2014-10-19 -- 1
+2014-10-20 -- 2
+2014-10-23 -- 5
+timeouts by project:
+      5 NewSparkPullRequestBuilder
+      5 SparkPullRequestBuilder
+      1 Tachyon-Pull-Request-Builder
+total builds (excepting aborted by a user):
+602
+total percentage of builds timing out:
+01
+the NewSparkPullRequestBuilder failures are spread over five different days
+(10-14 through 10-20), and the SparkPullRequestBuilder failures all
+happened yesterday.  there were a LOT of SparkPullRequestBuilder builds
+yesterday (60), and the failures happened during these hours (first number
+== number of builds failed, second number == hour of the day):
+$ cat timeouts-102414-130817 | grep SparkPullRequestBuilder | grep
+2014-10-23 | awk '{print$3}' | awk -F":" '{print$1'} | sort | uniq -c
+      1 03
+      2 20
+      1 22
+      1 23
+however, the number of total SparkPullRequestBuilder builds during these
+times don't seem egregious:
+      4 03
+      9 20
+      4 22
+      9 23
+nor does the total for ALL builds at those times:
+      5 03
+      9 20
+      7 22
+     11 23
+9 builds was the largest number of SparkPullRequestBuilder builds per hour,
+but there were other hours with 5, 6 or 7 builds/hour that didn't have a
+timeout issue.
+in fact, hour 16 (4pm) had the most builds running total yesterday, which
+includes 7 SparkPullRequestBuilder builds, and nothing timed out.
+most of the pull request builder hits on github are authenticated w/an
+oauth token.  this gives us 5000 hits/hour, and unauthed gives us 60/hour.
+in conclusion:  there is no way are we hitting github often enough to be
+rate limited.  i think i've finally ruled that out completely.  :)
+i'll be bringing jenkins down tomorrow morning for some system maintenance
+and to get our backups kicked off.
+i do expect to have the system back up and running before 8am.
+please let me know ASAP if i need to reschedule this.
+thanks,
+shane
+so, i'm having a race condition between a plugin i installed putting
+jenkins in to quiet mode and it failing to perform a backup from this past
+weekend.  i'll need to restart the process and get it out of the
+constantly-in-to-quiet-mode cycle it's in now.
+this will be quick, and i'll restart the jobs i've killed.
+this DOES NOT effect the restart/maintenance tomorrow morning.
+sorry about the inconvenience,
+shane
+ok we're back up and building.  i've retriggered the jobs i killed.
+this is done, and jenkins is up and building again.
+i noticed that there were no builds, and noticed that it's throwing a bunch
+of exceptions in the log file.
+i'm looking in to this right now and will update when i get things rolling
+again.
+sorry for the inconvenience,
+shane
+ok, we're back up and building now...  looks like there was a seriously bad
+git (or github) plugin update that caused all sorts of unintended
+consequences, mostly with cron stacktracing.
+i'll take a closer look and see if i can find out exactly what happened,
+but suffice to say, we'll be really cautious when updating even recommended
+plugins.
+sorry for the disruption!
+shane
+i'll send out a reminder next week, but i wanted to give a heads up:  i'll
+be bringing down the entire jenkins infrastructure for reboots and system
+updates.
+please let me know if there are any conflicts with this, thanks!
+shane
+i just turned up a new jenkins slave (amp-jenkins-worker-01) to ensure it
+builds properly.  these machines have half the ram, same number of
+processors and more disk, which will hopefully help us achieve more than
+the ~15-20% system utilization we're getting on the current
+amp-jenkins-slave-{01..05} nodes.
+instead of 5 super beefy slaves w/16 workers each, we're planning on 8 less
+beefy slaves w/12 workers each.  this should definitely cut down on the
+build queue, and not impact build times in a negative way at all.
+i'll keep a close eye on amp-jenkins-worker-01 before i start releasing the
+other seven in to the wild.
+there should be a minimal user impact, but if i happen to miss something,
+please don't hesitate to let me know!
+thanks,
+shane
+forgot to install git on this node.  /headdesk
+i retirggered the failed spark prb jobs.
+reminder -- this is happening friday morning @ 730am!
+here's the plan...  reboots, of course, come last.  :)
+pause build queue at 7am, kill off (and eventually retrigger) any
+stragglers at 8am.  then begin maintenance:
+all systems:
+* yum update all servers (amp-jekins-master, amp-jenkins-slave-{01..05},
+amp-jenkins-worker-{01..08})
+* reboots
+jenkins slaves:
+* install python2.7 (along side 2.6, which would remain the default)
+* install numpy 1.9.1 (currently on 1.4, breaking some spark branch builds)
+* add new slaves to the master, remove old ones (keep them around just in
+case)
+there will be no jenkins system or plugin upgrades at this time.  things
+there seems to be working just fine!
+i'm expecting to be up and building by 9am at the latest.  i'll update this
+thread w/any new time estimates.
+word.
+shane, your rained-in devops guy :)
+reminder:  jenkins is going down NOW.
+downtime is extended to 10am PST so that i can finish testing the numpy
+upgrade...  besides that, everything looks good and the system updates and
+reboots went off w/o a hitch.
+shane
+ok, we're back up w/all new jenkins workers.  i'll be keeping an eye on
+these pretty closely today for any build failures caused by the new
+systems, and if things look bleak, i'll switch back to the original five.
+thanks for your patience!
+josh rosen has this PR open to address the streaming test failures:
+https://github.com/apache/spark/pull/3687
+right now, the following logs are archived on to the master:
+  local log_files=$(
+    find .\
+      -name "unit-tests.log" -o\
+      -path "./sql/hive/target/HiveCompatibilitySuite.failed" -o\
+      -path "./sql/hive/target/HiveCompatibilitySuite.hiveFailed" -o\
+      -path "./sql/hive/target/HiveCompatibilitySuite.wrong"
+  )
+regarding dumping stuff to S3 -- thankfully, since we're not looking at a
+lot of disk usage, i don't see a problem w/this.  we could tar/zip up the
+XML for each build and just dump it there.
+what builds are we thinking about?  spark pull request builder?  what
+others?
+i have no problem w/storing all of the logs.  :)
+i also have no problem w/donated S3 buckets.  :)
+UC Berkeley had some major maintenance done this past weekend, and long
+story short, not everything came back.  our primary webserver's NFS is down
+and that means we're not serving websites, meaning that the redirect to
+jenkins is failing.
+jenkins is still up, and building some jobs, but we will probably see pull
+request builder failures, and other transient issues.  SCM-polling builds
+should be fine.
+there is no ETA on when this will be fixed, but once our
+amplab.cs.berkeley.edu/jenkins redir is working, i will let everyone know.
+ i'm trying to get more status updates as they come.
+i'm really sorry about the inconvenience.
+shane
+the regular url is working now, thanks for your patience.
+the spark master builds stopped triggering ~yesterday and the logs don't
+show anything.  i'm going to give the current batch of spark pull request
+builder jobs a little more time (~30 mins) to finish, then kill whatever is
+left and restart jenkins.  anything that was queued or killed will be
+retriggered once jenkins is back up.
+sorry for the inconvenience, we'll get this sorted asap.
+thanks,
+shane
+jenkins is back up and all builds have been retriggered...  things are
+building and looking good, and i'll keep an eye on the spark master builds
+tonite and tomorrow.
+np!  the master builds haven't triggered yet, but let's give the rube
+goldberg machine a minute to get it's bearings.
+the master builds triggered around ~1am last night (according to the logs),
+so it looks like we're back in business.
+here's the wiki describing the system setup:
+https://cwiki.apache.org/confluence/display/SPARK/Spark+QA+Infrastructure
+we have 1 master and 8 worker nodes, 12 executors per worker (we'd be
+better off w/more and smaller worker nodes however).
+you don't need to install sbt -- it's in the build/ directory.
+the pull request builder builds in parallel, but the master builds require
+specific ports to be reserved and each build effectively locks down a
+worker until it's done.  since we have 8 worker nodes, it's not *that* big
+of a deal...
+shane
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-1.3-SBT/
+we're seeing java OOMs and heap space errors:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-1.3-SBT/AMPLAB_JENKINS_BUILD_PROFILE=hadoop1.0,label=centos/19/console
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-1.3-SBT/AMPLAB_JENKINS_BUILD_PROFILE=hadoop1.0,label=centos/18/console
+memory leak?  i checked the systems (ganglia + logging in and 'free -g')
+and there's nothing going on there.
+20 is building right now:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-1.3-SBT/20/console
+here's the hash of the breaking commit:
+Started on Feb 5, 2015 12:01:01 PM
+Using strategy: Default
+[poll] Last Built Revision: Revision
+de112a2096a2b84ce2cac112f12b50b5068d6c35
+(refs/remotes/origin/branch-1.3)
+ > git ls-remote -h https://github.com/apache/spark.git branch-1.3 # timeout=10
+[poll] Latest remote head revision is: fba2dc663a644cfe76a744b5cace93e9d6646a25
+Done. Took 2.5 sec
+Changes found
+from:  https://amplab.cs.berkeley.edu/jenkins/job/Spark-1.3-SBT/18/pollingLog/
+...to help w/the build backlog.  let's all welcome
+amp-jenkins-slave-{01..03} back to the fray!
+i'll be kicking jenkins to up the open file limits on the workers.  it
+should be a very short downtime, and i'll post updates on my progress
+tomorrow.
+shane
+i'm actually going to do this now -- it's really quiet today.
+there are two spark pull request builds running, which i will kill and
+retrigger once jenkins is back up:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/27689/
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/27690/
+this is done.
+good morning, developers!
+TL;DR:
+i will be installing anaconda and setting it in the system PATH so that
+your python will default to 2.7, as well as it taking over management of
+all of the sci-py packages.  this is potentially a big change, so i'll be
+testing locally on my staging instance before deployment to the wide world.
+deployment is *tentatively* next monday, march 2nd.
+a little background:
+the jenkins test infra is currently (and happily) managed by a set of tools
+that allow me to set up and deploy new workers, manage their packages and
+make sure that all spark and research projects can happily and successfully
+build.
+we're currently at the state where ~50 or so packages are installed and
+configured on each worker.  this is getting a little cumbersome, as the
+package-to-build dep tree is getting pretty large.
+the biggest offender is the science-based python infrastructure.
+ everything is blindly installed w/yum and pip, so it's hard to control
+*exactly* what version of any given library is as compared to what's on a
+dev's laptop.
+the solution:
+anaconda (https://store.continuum.io/cshop/anaconda/)!  everything is
+centralized!  i can manage specific versions much easier!
+what this means to you:
+* python 2.7 will be the default system python.
+* 2.6 will still be installed and available (/usr/bin/python or
+/usr/bin/python/2.6)
+what you need to do:
+* install anaconda, have it update your PATH
+* build locally and try to fix any bugs (for spark, this "should just work")
+* if you have problems, reach out to me and i'll see what i can do to help.
+ if we can't get your stuff running under python2.7, we can default to 2.6
+via a job config change.
+what i will be doing:
+* setting up anaconda on my staging instance and spot-testing a lot of
+builds before deployment
+please let me know if there are any issues/concerns...  i'll be posting
+updates this week and will let everyone know if there are any changes to
+the Plan[tm].
+your friendly devops engineer,
+shane
+it's not downgraded, it's your /etc/alternatives setup that's causing this.
+you can update all of those entries by executing the following commands (as
+root):
+update-alternatives --install "/usr/bin/java" "java"
+"/usr/java/latest/bin/java" 1
+update-alternatives --install "/usr/bin/javah" "javah"
+"/usr/java/latest/bin/javah" 1
+update-alternatives --install "/usr/bin/javac" "javac"
+"/usr/java/latest/bin/javac" 1
+update-alternatives --install "/usr/bin/jar" "jar"
+"/usr/java/latest/bin/jar" 1
+(i have the latest jdk installed in /usr/java/.... with a /usr/java/latest/
+symlink pointing to said jdk's dir)
+i'm going to punt on this until after the next spark 1.3 release (2-3
+weeks?).  since i'll be installing a bunch of other packages (including
+mongodb), i'd rather wait and be safe.  :)
+the full install list is forthcoming, and i'll update the spark infra wiki
+w/what's installed on the workers.
+shane
+the master and workers need some system and package updates, and i'll also
+be rebooting the machines as well.
+this shouldn't take very long to perform, and i expect jenkins to be back
+up and building by 9am at the *latest*.
+important note:  i will NOT be updating jenkins or any of the plugins
+during this maintenance!
+as always, please let me know if you have any questions or concerns.
+danke shane
+this is happening now.  i'm waiting for the pull request builders to finish
+(~16 mins) before i start.
+we're all back up and building now...  looks like the package/kernel
+updates went off w/o a hitch!
+WOOT!
+the big 1.3 push is over, so i'll be reclaiming these three extra workers.
+ :)
+i'll be taking jenkins down for some much-needed plugin updates, as well as
+potentially upgrading jenkins itself.
+this will start at 730am PDT, and i'm hoping to have everything up by noon.
+the move to the anaconda python will take place in the next couple of weeks
+as i'm in the process of rebuilding my staging environment (much needed) to
+better reflect production, and allow me to better test the change.
+and finally, some teasers for what's coming up in the next month or so:
+* move to a fully puppetized environment (yay no more shell script
+deployments!)
+* virtualized workers (including multiple OSes -- OS X, ubuntu, ...,
+profit?)
+more details as they come.
+happy friday!
+shane
+link to a build, please?
+we just started having issues when visiting jenkins and getting 503 service
+unavailable errors.
+i'm on it and will report back with an all-clear.
+ok we have a few different things happening:
+1) httpd on the jenkins master is randomly (though not currently) flaking
+out and causing visits to the site to return a 503.  nothing in the logs
+shows any problems.
+2) there are some github timeouts, which i tracked down and think it's a
+problem with github themselves (see:  https://status.github.com/ and scroll
+down to 'mean hook delivery time')
+3) we have one spark job w/a strange ivy lock issue, that i just
+retriggered (https://github.com/apache/spark/pull/4964)
+4) there's an errant, unkillable pull request builder job (
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/28574/console
+)
+more updates forthcoming.
+i tried a couple of things, but will also be doing a jenkins reboot as soon
+as the current batch of builds finish.
+ok, things seem to have stabilized...  httpd hasn't flaked since ~noon, the
+hanging PRB job on amp-jenkins-worker-06 was removed w/the restart and
+things are now building.
+i cancelled and retriggered a bunch of PRB builds, btw:
+4848 (https://github.com/apache/spark/pull/3699)
+5922 (https://github.com/apache/spark/pull/4733)
+5987 (https://github.com/apache/spark/pull/4986)
+6222 (https://github.com/apache/spark/pull/4964)
+6325 (https://github.com/apache/spark/pull/5018)
+as well as:
+spark-master-maven-with-yarn
+sorry for the inconvenience...  i'm still a little stumped as to what
+happened, but i think it was a confluence of events (httpd flaking,
+problems at github, mercury in retrograde, friday thinking it's monday).
+shane
+i'm thinking that this was something transient, and hopefully won't happen
+again.  a ton of weird stuff happened around the time of this failure (see
+my flaky httpd email), and this was the only build exhibiting this behavior.
+i'll keep an eye out for this failure over the weekend...
+this is starting now.
+looks like we're having some issues w/the pull request builder and cron
+stacktraces in the logs.  i'll be investigating further and will update
+when i figure out what's going on.
+ok, we're back up and building.  upgrading the github plugin (and possibly
+EnvInject) caused the stacktraces, so i've kept those at the old versions
+that were working before.  jenkins and the rest of the plugins are updated
+and we're g2g.
+i'll be, of course, keeping an eye on things today and will squash anything
+else that pops up.
+...due to some big security fixes:
+https://wiki.jenkins-ci.org/display/SECURITY/Jenkins+Security+Advisory+2015-03-23
+:)
+shane
+welcome to python2.7+, java 8 and more!  :)
+i'll be doing a major upgrade to our build system next thursday morning.
+ here's a quick list of what's going on:
+* installation of anaconda python on all worker nodes
+* installation of pypy 2.5.1 (python 2.7) on all nodes
+* matching installation of python modules for the current system python
+(2.6), and anaconda python (2.6, 2.7 and 3.4)
+  - anaconda python 2.7 will be the default for all workers (this has
+stealthily been the case on amp-jenkins-worker-01 for the past two weeks,
+and i've noticed no test failures)
+  - you can now use anaconda environments to specify which version of
+python to use in your tests:  http://www.continuum.io/blog/conda
+* installation of new python 2.7 modules:  pymongo requests six pymongo
+requests six python-crontab
+* bare-bones mongodb installation on all workers
+* installation of java 1.6 and 1.8 internal to jenkins
+  - jobs will default to the system java, which is 1.7.0_75
+  - if you want to run your tests w/java 6 or 8, you can select the JDK
+version of your choice in the job configuration page (it'll be towards the
+top)
+these changes have actually all been tested against a variety of builds
+(yay staging!) and while i'm certain that i have all of the kinks worked
+out, i'm going to schedule a longer downtime so that i have a chance to
+identify and squash any problems that surface.
+thanks to josh rosen, k. shankari and davies liu for helping me test all of
+this and get it working.
+shane
+reminder!  this is happening thurday morning.
+and this is now happening.
+things are looking pretty good and i expect to be done within an hour.
+ i've got some test builds running right now, and will give the green light
+when they successfully complete.
+ok, we're looking good.  i'll keep an eye on this for the rest of the day,
+and if you happen to notice any infrastructure failures before i do (i
+updated a LOT), please let me know immediately!  :)
+fail due to the tests requiring JAVA_HOME being set, and the JDK
+installation jenkins plugin not setting that variable if the JDK was set to
+'Default'.
+thanks to marcelo vanzin for noticing, and josh for helping me come up
+w/the fix...
+many more details here and here:
+https://github.com/apache/spark/pull/5432
+https://github.com/apache/spark/pull/5441
+have i mentioned that i hate jenkins plugins?  :(
+shane
+yep, everything is installed (and i just checked again).  the path for
+python 3.4 is /home/anaconda/bin/envs/py3k/bin, which you can find by
+either manually prepending it to the PATH variable or running 'source
+activate py3k' in the test.
+jenkins is currently unreachable.  i'm not entirely sure why, as i can't
+ssh in to the box and see what's going on.  i've filed a ticket and will
+let everyone know when i have more information.
+shane
+looks like we had a power failure on campus, and our datacenter is working
+to bring things back up:
+http://systemstatus.berkeley.edu/
+ok, power has been restored and jenkins is back up.  we might be taking
+things down again to fix up some power mis-cabling (jon and i are in the
+colo, and the jenkins master wasn't on the UPS and needs to be).
+more updates as they come.  sorry for the inconvenience.
+ok, jenkins is back up and building.  we have a few things to mop up here
+(ganglia is sad), but i think we'll be good for the afternoon.
+shane
+thanks everyone!  happy friday!  :)
+somehow, the power outage on friday caused the pull request builder to lose
+it's config entirely...  i'm not sure why, but after i added the oauth
+token back, we're now catching up on the weekend's pull request builds.
+have i mentioned how much i hate this plugin?  ;)
+sorry for the inconvenience...
+shane
+anyways, the build queue is SLAMMED...  we're going to need at least a day
+to catch up w/this.  i'll be keeping an eye on system loads and whatnot all
+day today.
+whee!
+sure, i'll kill all of the current spark prb build...
+never mind, looks like you guys are already on it.  :)
+that's kinda what we're doing right now, java 7 is the default/standard on
+our jenkins.
+or, i vote we buy a butler's outfit for thomas and have a second jenkins
+instance...  ;)
+that bug predates my time at the amplab...  :)
+anyways, just to restate: jenkins currently only builds w/java 7.  if you
+folks need 6, i can make it happen, but it will be a (smallish) bit of work.
+shane
+...and now the workers all have java6 installed.
+https://issues.apache.org/jira/browse/SPARK-1437
+sadly, the built-in jenkins jdk management doesn't allow us to choose a JDK
+version within matrix projects...  so we need to manage this stuff
+manually.
+sgtm
+taking a look now.
+hmm, still happening.  looking deeper.
+ok, i reset the maven cache on amp-jenkins-worker-03 and some stuff is
+currently building and not failing...  i'll keep a close eye on this for
+now.
++1 to an announce to user and dev.  java6 is so old and sad.
+alright, this is happening again w/this worker and i will be taking it
+offline for further investigation.  i'm OOO for the rest of the day, but
+will check in again later this evening.
+ok, i looked deeper and this is only happening on -03, and not linked
+specifically to the pull request builder:
+      3 NewSparkPullRequestBuilder
+     13 Spark-Master-SBT
+      4 Spark-1.4-SBT
+     49 SparkPullRequestBuilder
+also, it started at ~3pm on this past sunday...  and nothing was done to
+this worker then.  :\
+anyways, to continue testing and make sure we have no poisoned caches, i
+nuked the ivy, sbt and maven caches, as well as wiping the jenkins
+workspace.
+i'll be turning on this worker, and i set up some monitoring and will be
+watching it today.
+if this fails, i'll just wipe and reinstall the node.  sorry for the
+inconvenience!
+ok, things are looking good...  i'll definitely be keeping an eye on this
+worker, but it looks like the ivy cache somehow got poisoned and affected
+the builds.
+it's still not clear to me *how* this happened, but *what* happened is
+clear:  the ivydata properties file for oro is-local=true for the jar, and
+then it was barfing while parsing the local file: path.
+all other properties files on the workers have that flag set to false, and
+a nice url pointing to repo1.maven.org.
+after wiping the .ivy2 repo, it was repopulated and the flag (on -03) is
+now set to false, and we're good.
+shane
+we've had a spate of issues since the power outage, and now the github pull
+request builder is randomly deciding who can and can't trigger builds[1].
+i think it's time for a quick restart of the master and workers, which i'll
+do early tomorrow morning.  the outage should be very brief, and i'll let
+everyone know how it's going.
+sorry again for the inconvenience.
+shane
+this is happening now.
+things are currently rebooting.
+and we're back up and building.  thanks for your patience!
+yes, docker.  that wonderful little wrapper for linux containers will be
+installed and ready for play on all of the jenkins workers tomorrow morning.
+the downtime will be super quick:  i just need to kill the jenkins slaves'
+ssh connections and relaunch to add the jenkins user to the docker group.
+this will begin at around 7am PDT and shouldn't take long at all.
+shane
+this is happening now.
+yes, absolutely.  right now i'm just getting the basics set up for a
+student's build in the lab.  later on today i will be updating the spark
+wiki qa infrastructure page w/more information.
+...and this is done.  thanks for your patience!
+so i spent a good part of the morning parsing out all of the packages and
+versions of things that we have installed on our jenkins workers:
+https://cwiki.apache.org/confluence/display/SPARK/Spark+QA+Infrastructure
+if you're looking to set up something to mimic our build system, this
+should be a great starting point!
+let me know if there's anything else i can do on this page.
+thanks!
+shane
+i will need to restart jenkins to finish a plugin install and resolve
+https://issues.apache.org/jira/browse/SPARK-7561
+this will be very brief, and i'll retrigger any errant jobs i kill.
+please let me know if there are any comments/questions/concerns.
+thanks!
+shane
+this is already done
+our datacenter is rejiggering our network (read: fully re-engineering large
+portions from the ground up) and has downtime scheduled from 9am-3pm PDT,
+this sunday may17th.
+this means our jenkins instance will not be available to the outside world,
+and i will be putting jenkins in to quiet mode the night before.  this will
+allow any running builds to finish, and to save me from getting up @ 6am on
+my day off.  :)
+once things are back up and running (~3pm or earlier), i will purge the
+build queue and bring jenkins out of quiet mode.
+of course, stay tuned to this bat-channel for future, and potentially
+riveting updates!
+jenkins is being a little recalcitrant and i'm looking at logs to see why
+it won't start.
+ok, i think it's time to reboot the jenkins master.
+machine rebooted, but auth is completely broken (web and CLI on the
+server).  i'm trying to fix this now.
+auth is fixed, and jenkins is out of quiet mode and now building.  sorry
+for the delay!
+actually, LDAP auth is fixed, but if you have a local account that i've
+created for you, it's not letting you log in to jenkins' UI.
+looking at this now.
+...and we've lost network connectivity again.
+things are still very flaky.  more updates as they come.
+...and we're back up.  it looks like things are going to be flaky for the
+next couple of hours, so i'm going to let this stabilize before i dig in to
+the auth problems.
+our sysadmins fixed the auth issue about an hour ago...  /etc/shadow's
+perms got borked somehow and that was breaking logins for local (non-ldap)
+accounts.
+we're all green.
+i'm going to be performing system, jenkins, and plugin updates tomorrow
+morning beginning at 730am PDT.
+0700:  pause build queue
+0800:  kill off any errant jobs (retrigger when everything comes back up)
+0800-0900:  system and plugin updates
+0900-1000:  final debugging, roll back versions of plugins if thing get
+borked
+i'll post updates as things progress, and will be hoping to have full
+service restored by 10am
+shane
+well, i started early and am pretty much done.  sadly, i had to roll back
+most of the plugin updates (which doesn't surprise me), but the system and
+jenkins core updates went swimmingly.
+anyways, we're up and building again!
+now, back to my coffee...  :)
+this has occasionally happened on our jenkins as well (twice since last
+august), and deleting the cache fixes it right up.
+interesting...  i definitely haven't seen it happen that often in our build
+system, and when it has happened, i wasn't able to determine the cause.
++1, and i know i've been guilty of this in the past.  :)
+i'll be taking jenkins down for system and jenkins app updates.  this
+should be pretty quick and i'm expecting to have everything back up
+and building by 9am.
+i will send a reminder email this weekend, and again when i start the
+maintenance.
+if there's any reason for me to delay this, please let me know ASAP.
+this downtime isn't critical, and can be delayed if needed.
+thanks!
+your friendly devops guy,
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+reminder:  this is happening tomorrow morning!
+this is happening now.
+this is still ongoing...  30 minutes after applying the system updates
+and running init 6, the jenkins master hasn't yet recovered from the
+reboot.  i've opened a ticket w/our sysadmin group and am crossing my
+fingers that this doesn't mean a trip down to the datacenter.
+more updates as they come.
+(or it's a kernel issue, but whatevs, i'll fix it)
+looks like we lost our boot drive...  i'll be fixing this today, but expect
+the downtime to last for a while as we sort this out.
+ok, we're up.  looks like my yum update, which got interrupted by AT&T for
+2 minutes, messed up the kernel and ganglia updates.  after reinstalling
+the kernel packages and whack-a-moling the user:group settings on some
+ganglia directories w/our sysadmin, things seem to be working fine.
+i'll be keeping an eye on this today to see if i missed anything.
+lessons (re)learned:  use a screen session while doing this, unless you
+trust your telco.  :)
+hey all, i'm just back in from my wedding weekend (woot!) and am
+working on figuring out what's happening w/the git timeouts for pull
+request builds.
+TL;DR:  if your build fails due to a timeout, please retrigger your
+builds.  i know this isn't the BEST solution, but until we get some
+stuff implemented (traffic shaping, git cache for the workers) it's
+the only thing i can recommend.
+here's a snapshot of the state of the union:
+$ get_timeouts.sh 5
+timeouts by date:
+2015-07-23 -- 3
+2015-07-24 -- 1
+2015-07-26 -- 7
+2015-07-27 -- 18
+2015-07-28 -- 9
+timeouts by project:
+     35 SparkPullRequestBuilder
+      3 Tachyon-Pull-Request-Builder
+total builds (excepting aborted by a user):
+1908
+total percentage of builds timing out:
+01%
+nothing has changed on our end AFAIK, our traffic graphs look totally
+fine, but starting sunday, we started seeing a spike in timeouts, with
+yesterday being the worst.  today is also not looking good either.
+github is looking OK, but not "great":
+https://status.github.com/
+as a solution, we'll be setting up some traffic shaping on our end, as
+well as implementing a git cache on the workers so that we'll
+(hopefully) minimize how many hits we make against github.  i was
+planning on doing the git cache months ago, but the timeout issue
+pretty much went away and i back-burnered that idea until today.
+other than that, i'll be posting updates as we get them.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+++joshrosen
+ok, i found out some of what's going on.  some builds were failing as such:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/38749/console
+note that it's unable to remove the target/ directory during the
+build...  this is caused by 'git clean -fdx' running, and deep in the
+target directory there were a couple of dirs that had the wrong
+permission bits set:
+dr-xr-xr-x.  2 jenkins jenkins 4096 Jul 27 06:54
+/home/jenkins/workspace/SparkPullRequestBuilder/target/tmp/spark-615f93cc-27ad-464b-b0d4-4352c96c22ee
+note the missing 'w' on the owner bits.  this is what was causing
+those failures.  after manually deleting the two entries that i found
+(using the command below), we've whacked this mole for now.
+for x in $(cat jenkins_workers.txt); do echo $x; ssh $x "find
+/home/jenkins/workspace/SparkPullRequestBuilder*/target/tmp -maxdepth
+3| xargs ls -ld | egrep ^dr-x"; echo; echo; done
+as for what exactly is messing up the perms, i'm not entirely sure.
+josh, you have any ideas?
+shane
+btw, the directory perm issue was only happening on
+amp-jenkins-worker-04 and -05.  both of the broken dirs were
+clobbered, so we won't be seeing any more of these again.
+git caches are set up on all workers for the pull request builder, and
+builds are building w/the cache...  however in the build logs it
+doesn't seem to be actually *hitting* the cache, so i guess i'll be
+doing some more poking and prodding to see wtf is going on.
+ok, i think i found the problem and solution to the git timeouts:
+https://stackoverflow.com/questions/12236415/git-clone-return-result-18-code-200-on-a-specific-repository
+so, on each worker i've run "git config --global http.postBuffer
+524288000" as the jenkins user and we'll see if this makes a
+difference.
+newp.  still happening, and i'm still looking in to it:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/38880/console
+so i done gone and got myself hitched, and will be disappearing in to
+the rainy island of kol chang in thailand for the next ~2 weeks.  :)
+this means i will be completely out of contact, and have to leave
+jenkins in the gentle hands of jon kuroda (a sysadmin here at the lab)
+and matt massie (my boss).  they've been CCed on this email, and
+briefed on the basic operations, so should be able to maintain things
+while i'm gone.
+i will ask that during these next couple of weeks that we hold off on
+any major system changes and package installations, unless it's a
+blocker and needed for any releases.  this is mostly my fault, as i've
+not finished porting all of the bash setup scripts (of doom) to
+ansible and i'd like to minimize feature drift.
+anyways, i'll be back in a couple of weeks, so don't break anything.  :)
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+hey all...  so this has been happening intermittently and i'm not sure
+what's causing it.
+sometimes directories under the target/tmp/ dir get created w/o the
+owner write bit set, so that they look like this:
+dr-xr-xr-x.  2 jenkins jenkins  4096 Aug  9 01:28
+/home/jenkins/workspace/SparkPullRequestBuilder/target/tmp/spark-67a08260-3318-42ec-b12d-65c700f8f220
+this means that the next build that runs in that directory space fails
+when 'git clean -fdx' encounters a directory that it can't remove.
+for now, i've added the following lines to the pull request builder
+run script (before the git clean command) to fix the target/ dir:
+echo "fixing target dir permissions"
+chmod -R +w target/*
+other than that, i'm looking around the codebase some older builds and
+seeing if i can't find the culprit.
+i've installed the latest java 7 and 8 packages on all of the jenkins workers!
+i haven't updated the /usr/java/latest and /usr/java/default symlinks
+to point to the new java 7 package, as i'd like to wait for downtime
+when no builds are running.  switching java versions mid-build might
+be fun, but also might cause failures and weird behavior.  this
+downtime will happen once voting is done for spark 1.5 and the release
+is cut.
+however, java 8 is ready to go!  tests can be configured to point
+JAVA_HOME at /usr/java/jdk1.8.0_60
+related JIRAs:
+https://issues.apache.org/jira/browse/SPARK-10455
+https://issues.apache.org/jira/browse/SPARK-10456
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+good morning, denizens of the aether!
+your hard working build system (and some associated infrastructure)
+has been in need of some updates and housecleaning for quite a while
+now.  we will be splitting the maintenance over two mornings to
+minimize impact.
+here's the plan:
+7am-9am wednesday, 9-24-15  (or 24-9-15 for those not in amurrica):
+* firewall taken offline for system and firewall updates
+* expected downtime:  maybe an hour, but we'll say two just in case
+* this will be done by jkuroda (CCed on this message)
+630am-10am thursday, 9-24-15:
+* jenknins update to 1.629 (we're a few months behind in versions, and
+some big bugs have been fixed)
+* jenkins master and worker system package updates
+* all systems get a reboot (lots of hanging java processes have been
+building up over the months)
+* builds will stop being accepted ~630am, and i'll kill any hangers-on
+at 730am, and retrigger once we're done
+* expected downtime:  3.5 hours or so
+* i will also be testing out some of my shiny new ansible playbooks
+for the system updates!
+please let me know if you have any questions, or requests to postpone
+this maintenance.  thanks in advance!
+shane & jon
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+i forgot one thing:
+* moving default system java for builds from jdk1.7.0_71 to jdk1.7.0_79
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+TL; DR:  jenkins is currently down and will probably not be brought
+back up until monday morning.
+a machine caught fire in the colo this evening, and this tripped the
+halon, and now IST is overheating...  it looks like it may have been
+one of our servers that popped and caused the event, and thankfully no
+one was hurt.
+http://ucbsystems.org/
+amplab jenkins is currently down.  some ot her university services are
+also down as well.
+jon is currently at the colo unplugging the remaining machines of the
+type that caught fire and we've reached out to the vendor who supplied
+them to see about an investigation.
+IST staff will be starting their investigation tomorrow morning, and
+jon or i will post some updates as soon as we get them.
+sorry for the inconvenience,
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+it was definitely one of our servers...  we have no ETA on when
+jenkins will be back online.  we will need to inspect the rack closely
+before we plug in and turn everything on.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+we're up and building!  time for breakfast...  :)
+https://amplab.cs.berkeley.edu/jenkins/
+we're up and building!  time for breakfast...  :)
+https://amplab.cs.berkeley.edu/jenkins/
+quick update:  we actually did some of the maintenance on our systems
+after the berkeley-wide outage caused by one of our (non-jenkins)
+servers halting and catching fire.
+we'll still have some downtime early wednesday, but tomorrow's will be
+cancelled.  i'll send out another update real soon now with what we'll
+be covering on wednesday once we get our current situation more under
+control.  :)
+ok, here's the updated downtime schedule for this week:
+wednesday, sept 23rd:
+firewall maintenance cancelled, as jon took care of the update
+saturday morning while we were bringing jenkins back up after the colo
+fire
+thursday, sept 24th:
+jenkins maintenance is still scheduled, but abbreviated as some of the
+maintenance was performed saturday morning as well
+* new builds will stop being accepted ~630am PDT
+  - i'll kill any hangers-on at 730am, and after maintenance is done,
+i will retrigger any killed jobs
+* jenkins worker system package updates
+  - amp-jenkins-master was completed on saturday
+  - this will NOT include kernel updates as moving to
+2.6.32-573.3.1.el6 bricked amp-jenkins-master
+* moving default system java for builds from jdk1.7.0_71 to jdk1.7.0_79
+* all systems get a reboot
+* expected downtime:  3.5 hours or so
+i'll post updates as i progress.
+also, i'll post a copy of our post-mortem once the dust settles.  it's
+been, shall we say, a pretty crazy few days.
+http://news.berkeley.edu/2015/09/19/campus-network-outage/
+:)
+this is happening now.
+...and we're finished and now building!
+i'll have to head down to the colo and see what's up with it...  it
+seems to be wedged (pings ok, can't ssh in) and i'll update the list
+when i figure out what's wrong.
+i don't think it caught fire (#toosoon?), because everything else is
+up and running.  :)
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+worker 05 is back up now...  looks like the machine OOMed and needed
+to be kicked.
+all we did was reboot -05 and -03...  i'm seeing a bunch of green
+builds.  could you provide me w/some specific failures so i can look
+in to them more closely?
+++joshrosen
+some of those 1.4 builds were incorrectly configured and launching on
+a reserved executor...  josh fixed them and we're looking a lot better
+(meaning that we're building and not failing at launch).
+shane
+things are green, nice catch on the job config, josh.
+starting this saturday (oct 17) we started getting alerts on the
+jenkins workers that various processes were dying (specifically ssh).
+since then, we've had half of our workers OOM due to java processes
+and have had now to reboot two of them (-05 and -06).
+if we look at the current machine that's wedged (amp-jenkins-worker-06), we see:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-SBT/AMPLAB_JENKINS_BUILD_PROFILE=hadoop1.0,label=spark-test/3814/
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-pre-YARN/HADOOP_VERSION=2.0.0-mr1-cdh4.1.2,label=spark-test/4508/
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-pre-YARN/HADOOP_VERSION=1.2.1,label=spark-test/4508/
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-Maven-with-YARN/3868/
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Compile-Master-Maven-with-YARN/4510/
+have there been any changes to any of these builds that might have
+caused this?  anyone have any ideas?
+sadly, even though i saw that -06 was about to OOM and got a shell
+opened before SSH died, my command prompt is completely unresponsive.
+:(
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+-06 just kinda came back...
+[root@amp-jenkins-worker-06 ~]# uptime
+ 15:29:07 up 26 days,  7:34,  2 users,  load average: 1137.91, 1485.69, 1635.89
+the builds that, from looking at the process table, seem to be at
+fault are the Spark-Master-Maven-pre-yarn matrix builds, and possibly
+a Spark-Master-SBT matrix build.  look at the build history here:
+https://amplab.cs.berkeley.edu/jenkins/computer/amp-jenkins-worker-06/builds
+the load is dropping significantly and quickly, but swap is borked and
+i'm still going to reboot.
+here's the related stack trace from dmesg...  UID 500 is jenkins.
+Out of memory: Kill process 142764 (java) score 40 or sacrifice child
+Killed process 142764, UID 500, (java) total-vm:24685036kB,
+anon-rss:5730824kB, file-rss:64kB
+Uhhuh. NMI received for unknown reason 21 on CPU 0.
+Do you have a strange power saving mode enabled?
+Dazed and confused, but trying to continue
+java: page allocation failure. order:2, mode:0xd0
+Pid: 142764, comm: java Not tainted 2.6.32-573.3.1.el6.x86_64 #1
+Call Trace:
+ [] ? __alloc_pages_nodemask+0x7dc/0x950
+ [] ? copy_process+0x168/0x1530
+ [] ? do_fork+0x96/0x4c0
+ [] ? sys_futex+0x7b/0x170
+ [] ? sys_clone+0x28/0x30
+ [] ? stub_clone+0x13/0x20
+ [] ? system_call_fastpath+0x16/0x1b
+amp-jenkins-worker-06 is back up.
+my next bets are on -07 and -08...  :\
+https://amplab.cs.berkeley.edu/jenkins/computer/
+ok, based on the timing, i *think* this might be the culprit:
+https://amplab.cs.berkeley.edu/jenkins/job/Spark-Master-SBT/AMPLAB_JENKINS_BUILD_PROFILE=hadoop1.0,label=spark-test/3814/console
+well, it was -08, and ssh stopped working (according to the alerts)
+just as i was logging in to kill off any errant processes.  i've taken
+that worker offline in jenkins and will be rebooting it asap.
+on a positive note, i was able to clear out -07 before anything
+horrible happened to that one.
+here's the current heap settings on our workers:
+InitialHeapSize == 2.1G
+MaxHeapSize == 32G
+system ram:  128G
+we can bump it pretty easily...  it's just a matter of deciding if we
+want to do this globally (super easy, but will affect ALL maven builds
+on our system -- not just spark) or on a per-job basis (this doesn't
+scale that well).
+thoughts?
+i'd like to take jenkins down briefly thursday morning to install some
+plugin updates.
+this will hopefully be short (~1hr), but could easily become longer as
+the jenkins plugin ecosystem is fragile and updates like this are
+known to cause things to explode.  the only reason why i'm
+contemplating this, is i'm having some issues with the git plugin on
+new github pull request builder builds.
+i'll send updates as things progress.
+thanks,
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+well, i forgot to put this on my calendar and didn't get around to
+getting it done this morning.  :)
+anyways, i'll be shooting for tomorrow (friday) morning instead.
+shane
+this is happening now.
+and we're back!
+looking in to this now.
+a pox on the github pull request builder...  the update wiped out the
+github auth creds.  :\
+alright, i'm downgrading our ghprb plugin back to the last known
+working version.  this will require a jenkins restart, which i will do
+immediately.
+sorry about this!  :(
+i (stupidly) updated the ghprb plugin as the version we're using is
+really, really old.  this re-wrote the config and broke stuff.
+so, i just downgraded the plugin back to the last known working
+version, and noticed that some of the fields in the xml are missing.
+thankfully i have a backup config from ~5 days ago....  i'm working on
+munging them together right now.
+and thankfully our new hardware has just showed up so i'll have a
+jenkins staging instance up really, really soon and be able to test
+stuff like this in the future.
+shane
+gonna have to kick jenkins again, folks.  sorry!
+ok, i think i've kicked jenkins enough that it's now working again w/o
+spamming tracebacks.
+sorry for the interruption...  i should have realized that touching
+the house of cards (aka ghprb plugin) would cause it to fall down no
+matter what i did.  :)
+shane
+ps - did i mention the hardware for our staging instance just showed up?  :)
+hey everyone!
+i'm about to shut down jenkins to deploy a temporary fix for a massive
+security hole i found out about late friday:
+http://foxglovesecurity.com/2015/11/06/what-do-weblogic-websphere-jboss-jenkins-opennms-and-your-application-have-in-common-this-vulnerability/
+read the whole thing.  it's kinda nuts.
+anyways, jenkins/cloudbees is on top of it and they've released a
+quick patch, which i will be deploying right now:
+https://jenkins-ci.org/content/mitigating-unauthenticated-remote-code-execution-0-day-jenkins-cli
+downtime should be minimal, and i'll let every know when we're back up.
+i'm shutting jenkins down immediately.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+ok, we're good to go.
+https://amplab.cs.berkeley.edu/jenkins/cli/  returns a 404, as it should.
+thanks for your patience...
+shane
+i'll be at the USENIX LISA conference in DC, so josh and jon will be
+keeping an eye on jenkins and making sure it doesn't misbehave.
+since attending every session of every day will drive one insane, i
+will be sporadically checking in and making sure things are humming
+along...  but for emergencies, feel free to reach out to either josh
+rosen or jon kuroda (CCed on this mail).
+danke shane  :)
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+i will admit that it does seem like a bad idea to poke jenkins on
+friday the 13th, but there's a release that fixes a lot of security
+issues:
+https://wiki.jenkins-ci.org/display/SECURITY/Jenkins+Security+Advisory+2015-11-11
+i'll set jenkins to stop kicking off any new builds around 5am PST,
+and will upgrade and restart jenkins around 7am PST.  barring anything
+horrible happening, we should be back up and building by 730am.
+...and this time, i promise not to touch any of the plugins.  :)
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+this is happening now.
+this is still ongoing.  the update is running 'chown -R jenkins' on
+the jenkins root directory, which is a hair under 3T.
+this might take a while...  :\
+shane
+phew.  this is finally done...  jenkins is up and building.
+were you hitting any particular URL when you noticed this, or was it
+generally slow?
+there's Yet Another Jenkins Security Advisory[tm], and a big release
+to patch it all coming out next wednesday.
+to that end i will be performing a jenkins update, as well as
+performing the work to resolve the following jira issue:
+https://issues.apache.org/jira/browse/SPARK-11255
+i will put jenkins in to quiet mode around 6am, start work around 7am
+and expect everything to be back up and building before 9am.  i'll
+post updates as things progress.
+please let me know ASAP if there's any problem with this schedule.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+reminder!  this is happening tomorrow morning.
+here's the security advisory for the update:
+https://wiki.jenkins-ci.org/display/SECURITY/Jenkins+Security+Advisory+2015-12-09
+this is happening now.
+jenkins is done, but we'll also be updating the firewall.  this
+shouldn't take very long and i'll let everyone know when we're done.
+and we're done!  this was a quick one.  :)
+that probably was me, sorry.  i pulled up the rest api command on my
+phone before i fell asleep and must have accidentally put jenkins in
+to quiet mode.  sorry about that!
+++joshrosen
+This Is Known[tm], and we have a bug open against it:
+https://issues.apache.org/jira/browse/SPARK-11823
+last week i forgot to downgrade R to 3.1.1, and since there's not much
+activity right now, i'm going to take jenkins down and finish up the
+ticket.
+https://issues.apache.org/jira/browse/SPARK-11255
+we should be back up and running within 30 minutes.
+thanks!
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+ok, we're back up and building.
+after killing and restarting jenkins, things seem to be VERY slow.
+i'm gonna kick jenkins again and see if that helps.
+something is up w/apache.  looking.
+...and we're back.  we were getting reverse proxy timeouts, which seem
+to have been caused by jenkins churning and doing a lot of IO.  i'll
+dig in to the logs and see if i can find out what happened.
+weird.
+shane
+that looks like the lintr checks failed, causing the build to fail.
+jenkins looked to be wedged, and nothing was showing up in the logs.
+i tried a restart, and am still looking in to the problem.
+we should be back up and building shortly.  sorry for the inconvenience.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+...aaaaaaand we're back up and building.
+shane
+mark:  yes.  yes i can.  :)
+currently, we have a set of bash scripts and binary packages on our
+jenkins master that can turn a bare centos install in to a jenkins
+worker.
+i've also been porting over these bash tools in to ansible playbooks,
+but a lot of development stopped on this after we lost our staging
+instance due to a datacenter fire (yes, really) back in september.
+we're getting a new staging instance (master + slaves) set up in the
+next week or so, and THEN i can finish the ansible port.
+these scripts are checked in to a private AMPLab github repo.
+does this help?
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+we currently have docker 1.5 running on the worker, and after the
+Great Upgrade To CentOS7, we'll be running a much more modern version
+of docker.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+happy monday!
+i will be bringing down jenkins and the workers thursday morning to
+upgrade docker on all of the workers from 1.5.0-1 to 1.7.1-2.
+as of december last year, docker 1.5 and older lost the ability to
+pull from the docker hub.  since we're running centos 6.X on our
+workers, and can't run the 3.X kernel, that limits our options to
+docker 1.7.
+this will allow us to close out https://github.com/apache/spark/pull/9893
+i'll be sure to send updates as they happen.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+reminder:  this is happening tomorrow morning.
+reminder:  this is happening in ~30 minutes
+this is now done.
+there's a big security patch coming out next week, and i'd like to
+upgrade our jenkins installation so that we're covered.  it'll be
+around 8am, again, and i'll send out more details about the upgrade
+when i get them.
+thanks!
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+the security release has been delayed until next wednesday morning,
+and i'll be doing the upgrade first thing thursday morning.
+i'll update everyone when i get more information.
+thanks!
+shane
+this may cause builds to timeout on the git fetch much more than usual[1].
+https://status.github.com/messages
+just thought people might want to know...
+shane
+1 -- this actually happens pretty often, sadly.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+i noticed that jenkins was quiet...  too quiet...  and not building
+anything.  i looked in the logs and it looks like things stopped
+building after the backup at midnight.  looking through the logs, it
+looks like we had some jenkins java processes stacktrace.  i'll keep a
+close eye on things this week and see if we have any ongoing problems.
+anyways, a service restart seemed to get jenkins back in the mood to
+build, and we're working through the backlog now.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+not a problem!  :)
+the security update has been released, and it's a doozy!
+https://wiki.jenkins-ci.org/display/SECURITY/Security+Advisory+2016-02-24
+i will be putting jenkins in to quiet mode ~7am PST tomorrow morning
+for the upgrade, and expect to be back up and building by 9am PST at
+the latest.
+amp-jenkins-worker-08 will also be getting a reboot to test out a fix for:
+https://github.com/apache/spark/pull/9893
+shane
+this is happening now.
+alright, the update is done and worker-08 rebooted.  we're back up and
+building already!
+looks like something filled up /home (0% space left), and i'll need to
+figure out what that is as well as clean up some space.
+once we're good, i'll put them back online and let everyone know.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+we had a couple of hanging/stuck builds that were filling up /home.
+some of the procs didn't like the SIGKILL, so i just rebooted them.
+/home on both of these boxes is back down to ~33% usage.
+anyways, these two nodes are back up and building.  if i find anymore
+stuck builds, i'll open a spark ticket for further investigation.
+right now it looks like we're having problems connection to jenkins
+through our firewall.  i'm currently looking in to this and will let
+everyone know immediately when it's been resolved.
+thanks in advance for your patience...
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+for now, you can log in to jenkins by ignoring the http reverse proxy:
+https://hadrian.ist.berkeley.edu/jenkins/
+this still doesn't allow for things like the pull request builder and
+whatnot to run...  i'm still digging in to this.
+thanks,
+shane
+somehow DNS, internal to berkeley, got borked and the redirect failed.
+we've hard-coded in some entries in to /etc/hosts, and re-ordered our
+nameservers, and are still trying to figure out what happened.
+anyways, we're back:
+https://amplab.cs.berkeley.edu/jenkins/
+another project hosted on our jenkins (e-mission) needs anaconda scipy
+upgraded from 0.15.1 to 0.17.0.  this will also upgrade a few other
+libs, which i've included at the end of this email.
+i've spoken w/josh @ databricks and we don't believe that this will
+impact the spark builds at all.  if this causes serious breakage, i
+will roll everything back to pre-update.
+i have created a JIRA issue to look in to creating conda environments
+for spark builds, something that we should have done long ago:
+https://issues.apache.org/jira/browse/SPARK-14905
+builds will be paused:  ~7am PDT
+anaconda package updates:  ~8am
+jenkins quiet time ends:  ~9am at the latest
+i do not expect the downtime to last very long, and will update this
+thread w/updates as they come.
+here's what will be updated under anaconda:
+The following NEW packages will be INSTALLED:
+    libgfortran: 3.0-0
+    mkl:         11.3.1-0
+    wheel:       0.29.0-py27_0
+The following packages will be UPDATED:
+    conda:       3.10.1-py27_0     --> 4.0.5-py27_0
+    conda-env:   2.1.4-py27_0      --> 2.4.5-py27_0
+    numpy:       1.9.2-py27_0      --> 1.11.0-py27_0
+    openssl:     1.0.1k-1          --> 1.0.2g-0
+    pip:         6.1.1-py27_0      --> 8.1.1-py27_1
+    python:      2.7.9-2           --> 2.7.11-0
+    pyyaml:      3.11-py27_0       --> 3.11-py27_1
+    requests:    2.6.0-py27_0      --> 2.9.1-py27_0
+    scipy:       0.15.1-np19py27_0 --> 0.17.0-np111py27_2
+    setuptools:  15.0-py27_0       --> 20.7.0-py27_0
+    sqlite:      3.8.4.1-1         --> 3.9.2-0
+    yaml:        0.1.4-0           --> 0.1.6-0
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+this will be postponed due to the 2.0 code freeze.  sorry for the late notice.
+we're going to go ahead and do this on monday.  i'll send out another
+email later this week w/the details.
+(copy-pasta of previous message)
+another project hosted on our jenkins (e-mission) needs anaconda scipy
+upgraded from 0.15.1 to 0.17.0.  this will also upgrade a few other
+libs, which i've included at the end of this email.
+i've spoken w/josh @ databricks and we don't believe that this will
+impact the spark builds at all.  if this causes serious breakage, i
+will roll everything back to pre-update.
+i have created a JIRA issue to look in to creating conda environments
+for spark builds, something that we should have done long ago:
+https://issues.apache.org/jira/browse/SPARK-14905
+builds will be paused:  ~7am PDT
+anaconda package updates:  ~8am
+jenkins quiet time ends:  ~9am at the latest
+i do not expect the downtime to last very long, and will update this
+thread w/updates as they come.
+here's what will be updated under anaconda:
+The following NEW packages will be INSTALLED:
+    libgfortran: 3.0-0
+    mkl:         11.3.1-0
+    wheel:       0.29.0-py27_0
+The following packages will be UPDATED:
+    conda:       3.10.1-py27_0     --> 4.0.5-py27_0
+    conda-env:   2.1.4-py27_0      --> 2.4.5-py27_0
+    numpy:       1.9.2-py27_0      --> 1.11.0-py27_0
+    openssl:     1.0.1k-1          --> 1.0.2g-0
+    pip:         6.1.1-py27_0      --> 8.1.1-py27_1
+    python:      2.7.9-2           --> 2.7.11-0
+    pyyaml:      3.11-py27_0       --> 3.11-py27_1
+    requests:    2.6.0-py27_0      --> 2.9.1-py27_0
+    scipy:       0.15.1-np19py27_0 --> 0.17.0-np111py27_2
+    setuptools:  15.0-py27_0       --> 20.7.0-py27_0
+    sqlite:      3.8.4.1-1         --> 3.9.2-0
+    yaml:        0.1.4-0           --> 0.1.6-0
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+this is happening now.
+hey everyone!
+looks like two of the workers didn't survive a reboot, so i will need
+to head to the colo and console in to see what's going on.
+sadly, one of the workers that didn't come back is -01, which runs the
+doc builds.
+anyways, i will post another update within the hour with the status of
+these two machines.  i'm also unpausing builds.
+workers -01 and -04 are back up, is is -06 (as i hit the wrong power
+button by accident).  :)
+-01 and -04 got hung on shutdown, so i'll investigate them and see
+what exactly happened.  regardless, we should be building happily!
+there's a security update coming out for jenkins next week, and i'm
+going to install the update first thing thursday morning.
+i'll send out another reminder early next week.
+thanks!
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+reminder:  this is happening thursday morning.
+reminder:  this is happening tomorrow morning!
+7am PDT:  builds paused
+8am PDT:  master reboot, upgrade happens
+9am PDT:  builds restarted
+this is happening now.
+things are looking good -- i'm backing up the entire jenkins
+installation right now (just in case), so that's taking a while to
+finish.
+i'm doing the backup as LTS has finally surpassed the version we're
+on, so i'm taking this opportunity to move this installation to LTS.
+shane
+ok, i've decided to roll back the upgrade and do this again early next
+week.  some of the new features/security fixes break the pull request
+builder, so i will need to revisit my plan.
+sorry for the downtime -- we're back up and running now.
+chiming in, as i'm the one who currently maintains the CI infrastructure...  :)
++1 on not having more than one CI system...  there's no way i can
+commit to keeping an eye on anything else other than jenkins.
+and i agree wholeheartedly w/michael:  if it's this important, let's
+add it to the jenkins builds.
+vanzin and i are working together on this right now...  we currently
+have java 7u79 installed on all of the workers.  if some random test
+failures keep happening during his tests, i will roll out 7u80 (which
+is known to be 'good') and set that as the default java on all of the
+workers (which is currently 7-79).
+if this is the route we decide to go, could you please update the qa
+infra wiki entry and add a relevant section for the travis setup?
+https://cwiki.apache.org/confluence/display/SPARK/Spark+QA+Infrastructure
+thanks,
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+i can't give you permissions -- that has to be (most likely) through
+someone @ databricks, like michael.
+let's hold off on adding a section until we actually decide that this
+is critical and something that cannot be done currently w/jenkins.
+ayup.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+word.  i'll make the changes if we need to.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+of course, on my first day back from vacation, i notice that the
+jenkins process got wedged immediately upon my visiting the page.
+one quick jenkins/httpd restart later and we're back up and building.
+sorry for any inconvenience!
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+jenkins got itself in to another state and was killing the master.
+while poking around, i noticed lots of sleeping processes that were
+using a TON of cpu and had a bunch of log files open, but not writing
+to them.  anyways, it looked like it needed a quick restart and that
+seems to have fixed the problem.
+i'll keep an eye on things for the rest of today, but we're looking better.
+ah, java webapps.
+shane
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+i assume you're talking about zinc ports?
+the tests are designed to run one at a time on randomized ports -- no
+containerization.  we're on bare metal.
+the test launch code executes this for each build:
+# Generate random point for Zinc
+export ZINC_PORT
+ZINC_PORT=$(python -S -c "import random; print random.randrange(3030,4030)")
+gotcha...  adding @joshrosen directly who might be of more assistance...  :)
+i put jenkins in quiet mode as i noticed we have almost no builds
+queued.  one of our students needed rust installed on the workers, and
+i need to update the PATH on all of the workers.
+we should be back up and building within 30 minutes.
+thanks!
+shane
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+aaaaaand we're back.
+around 1pm  friday, july 29th, we will be taking jenkins down for a
+rack move and celebrating national systems administrator day.
+the outage should only last a couple of hours at most, and will be
+concluded with champagne toasts.
+yes, the outage and holiday are real, but the champagne in the colo is
+not...  ;)
+shane
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+reminder -- this is happening friday afternoon.
+i will pause the build queue late friday morning.
+reminder -- this is happening TOMORROW.
+reminder -- this is happening TODAY.  jenkins is currently in quiet mode.
+i will post updates over the course of the afternoon, and we should be
+back up and building before COB.
+machines are going down NOW
+the move is complete and the machines powered back up right away, with
+no problems.  we're doing a quick update on the firewall, and then
+we'll be done!
+we're done and building!
+a bunch of builds failed w/git auth issues, due to me cancelling the
+quiet period early (as i thought the firewall update was done).  this
+is no longer the case as i was more patient this time.  :)
+happy friday!
+shane
+jenkins got in to one of it's "states" and wasn't accepting new builds
+starting this past saturday night.  i restarted it, and now it's
+catching up on the weekend's queue.
+shane
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+and now a screen grab of the ganglia system load metrics for your amusement:
+our weekly backups failed due to a hung job.   even though i tried to
+change the backup scheduler (internal to jenkins) to run tonite, it's
+still insisting that it needs to run immediately and is continually
+putting jenkins in to quiet mode.
+short of killing all of the current jobs and restarting jenkins, we'll
+let the backups run later this morning and things should return to
+normal by lunchtime.
+i'll keep an eye on this and make sure things move along properly.
+sorry about the glitch!  :(
+shane
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+the backup is done and we're building again!
+i just noticed that jenkins was still in quiet mode this morning due
+to a hung build.  i killed the build, backups happened, and the queue
+is now happily building.
+sorry for any delay!
+shane
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+TL;DR:  amplab is becomine riselab, and is much more C++ oriented.
+centos 6 is so far behind, and i'm already having to roll C++
+compilers and various libraries by hand.  centos 7 is an absolute
+no-go, so we'll be moving the jenkins workers over to a recent (TBD)
+version of ubuntu server.  also, we'll finally get jenkins upgraded to
+the latest LTS version, as well as our insanely out of date plugins.
+riselab (me) will still run the build system, btw.
+oh, we'll also have a macOS worker!
+well, that was still pretty long.  :)
+anyways, you have the gist of it.  this is something we're going to do
+slowly, so as to not interrupt any spark, alluxio or lab builds.
+i'll be spinning up a master and two worker ubuntu nodes, and then
+port a couple of builds over and get the major kinks worked out.
+then, early next year, we can point the new master at the old workers,
+and one-by-one reinstall and deploy them w/ubuntu.
+i'll be reaching out to some individuals (you know who you are) as
+things progress.
+if we do this right, we'll have minimal service interruptions and end
+up w/a clean and fresh jenkins.  this is the opposite of our current
+jenkins, which is at least 4 years old and is super-glued and
+duct-taped together.
+the ubuntu staging servers should be ready early next week, but i
+don't foresee much work happening until after thanksgiving.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+nope, no changes to jenkins in the past few months.  ganglia graphs
+show higher, but not worrying, memory usage on the workers when the
+jobs failed...
+i'll take a closer look later tonite/first thing tomorrow morning.
+shane
+preliminary findings:  seems to be transient, and affecting 4% of
+builds from late december until now (which is as far back as we keep
+build records for the PRB builds).
+ 408 builds
+  16 builds.gc   <--- failures
+it's also happening across all workers at about the same rate.
+and best of all, there seems to be no pattern to which tests are
+failing (different each time).  i'll look a little deeper and decide
+what to do next.
+as of first thing this morning, here's the list of recent GC overhead
+build failures:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70891/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70874/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70842/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70927/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70551/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70835/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70841/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70869/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70598/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70898/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70629/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70644/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70686/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70620/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70871/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70873/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70622/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70837/console
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70626/console
+i haven't really found anything that jumps out at me except perhaps
+auditing/upping the java memory limits across the build.  this seems
+to be a massive shot in the dark, and time consuming, so let's just
+call this a "method of last resort".
+looking more closely at the systems themselves, it looked to me that
+there was enough java "garbage" that had accumulated over the last 5
+months (since the last reboot) that system reboots would be a good
+first step.
+https://www.youtube.com/watch?v=nn2FB1P_Mn8
+over the course of this morning i've been sneaking in worker reboots
+during quiet times...  the ganglia memory graphs look a lot better
+(free memory up, cached memory down!), and i'll keep an eye on things
+over the course of the next few days to see if the build failure
+frequency is effected.
+also, i might be scheduling quarterly system reboots if this indeed
+fixes the problem.
+shane
+unsurprisingly, we had another GC:
+https://amplab.cs.berkeley.edu/jenkins/job/SparkPullRequestBuilder/70949/console
+so, definitely not the system (everything looks hunky dory on the build node).
+yeah, this would be a great way to check for leaks. :)
+yep...  i agree on both points.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+FYI, this is happening across all spark builds...  not just the PRB.
+i'm compiling a report now and will email that out this afternoon.
+:(
+(adding michael armbrust and josh rosen for visibility)
+ok.  roughly 9% of all spark tests builds (including both PRB builds
+are failing due to GC overhead limits.
+$ wc -l SPARK_TEST_BUILDS GC_FAIL
+ 1350 SPARK_TEST_BUILDS
+  125 GC_FAIL
+here are the affected builds (over the past ~2 weeks):
+$ sort builds.raw | uniq -c
+      6 NewSparkPullRequestBuilder
+      1 spark-branch-2.0-test-sbt-hadoop-2.6
+      6 spark-branch-2.1-test-maven-hadoop-2.7
+      1 spark-master-test-maven-hadoop-2.4
+     10 spark-master-test-maven-hadoop-2.6
+     12 spark-master-test-maven-hadoop-2.7
+      5 spark-master-test-sbt-hadoop-2.2
+     15 spark-master-test-sbt-hadoop-2.3
+     11 spark-master-test-sbt-hadoop-2.4
+     16 spark-master-test-sbt-hadoop-2.6
+     22 spark-master-test-sbt-hadoop-2.7
+     20 SparkPullRequestBuilder
+please note i also included the spark 1.6 test builds in there just to
+check...  they last ran ~1 month ago, and had no GC overhead failures.
+this leads me to believe that this behavior is quite recent.
+so yeah...  looks like we (someone other than me?) needs to take a
+look at the sbt and maven java opts.  :)
+shane
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+quick update:
+things are looking slightly...  better.  the number of failing builds
+due to GC overhead has decreased slightly since the reboots last
+week...  in fact, in the last three days the only builds to be
+affected are spark-master-test-maven-hadoop-2.7 (three failures) and
+spark-master-test-maven-hadoop-2.6 (five failures).
+overall percentages (over two weeks) have also dropped from ~9% to
+~7%, so at least the rate of failure is dropping.
+so, the while we're still bleeding, it's slowed down a bit.  we'll
+still need to audit the java heap size allocs in the various tests,
+however.
+shane
+congrats to the both of you!  :)
+it's not an open-file limit -- i have the jenkins workers set up w/a soft
+file limit of 100k, and a hard limit of 200k.
+we don't have many builds running right now, and i need to restart the
+daemon quickly to enable a new plugin.
+i'll wait until the pull request builder jobs are finished and then
+(gently) kick jenkins.
+updates as they come,
+shane (who's always nervous about touching this house of cards)
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+and we're back!  :)
+the jenkins master is wedged and i'm going to reboot it to increase
+it's happiness.
+more updates as they come.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+we're back and things are much snappier!  sorry for the downtime.

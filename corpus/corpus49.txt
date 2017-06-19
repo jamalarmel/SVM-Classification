@@ -1,0 +1,1274 @@
+Hi Nick,
+I think it is due to a bug in UnsafeKVExternalSorter. I created a Jira and a
+PR for this bug:
+https://issues.apache.org/jira/browse/SPARK-18800
+-----
+Liang-Chi Hsieh | @viirya
+Spark Technology Center
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/java-lang-IllegalStateException-There-is-no-space-for-new-record-tp20108p20190.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Satyajit,
+I am not sure why you think DIMSUM cannot apply for your use case. Or you've
+tried it but encountered some problems.
+Although in the paper[1] the authors mentioned they concentrate on the
+regime where the number of rows is very large, and the number of columns is
+not too large. But I think it doesn't prevent you applying it on the dataset
+of large columns. By the way, in another paper[2], they experimented it on a
+dataset of 10^7 columns.
+Even the number of column is very large, if your dataset is very sparse, and
+you use SparseVector, DIMSUM should work well too. You can also adjust the
+threshold when using DIMSUM.
+[1] Reza Bosagh Zadeh and Gunnar Carlsson, "Dimension Independent Matrix
+Square using MapReduce (DIMSUM)"
+[2] Reza Bosagh Zadeh and Ashish Goel, "Dimension Independent Similarity
+Computation"
+-----
+Liang-Chi Hsieh | @viirya
+Spark Technology Center
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Document-Similarity-Spark-Mllib-tp20196p20198.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Dongjoon,
+I know some people only use Spark SQL with SQL syntax not Dataset API. So I
+think it should be useful to provide a way to do this in SQL.
+-----
+Liang-Chi Hsieh | @viirya
+Spark Technology Center
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Question-about-SPARK-11374-skip-header-line-count-tp20180p20203.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+There is a plan to add this into Spark ML. Please check out
+https://issues.apache.org/jira/browse/SPARK-18023. You can also follow this
+jira to get the latest update.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Why-don-t-we-imp-some-adaptive-learning-rate-methods-such-as-adadelat-adam-tp20057p20205.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Satyajit,
+Have you tried to adjust a higher threshold for columnSimilarities to lower
+the computation cost?
+BTW, can you also comment out most of other codes and just run
+columnSimilarities and do a simple computation like counting for the entries
+of returned CoordinateMatrix? So we can make sure the problem is exactly at
+columnSimilarities?
+E.g,
+val exact = mat.columnSimilarities(0.5)
+val exactCount = exact.entries.count
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Document-Similarity-Spark-Mllib-tp20196p20219.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+OK. I go to check the DIMSUM implementation in Spark MLlib. The probability
+a column is sampled is decided by math.sqrt(10 * math.log(nCol) / threshold)
+/ colMagnitude. The most influential parameter is colMagnitude. If in your
+dataset, the colMagnitude for most columns is very low, then looks like it
+might not work much better than brute-force even you set a higher threshold.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Document-Similarity-Spark-Mllib-tp20196p20226.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+I tried your example with latest Spark master branch and branch-2.0. It
+works well.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Mistake-in-Apache-Spark-Java-tp20233p20254.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+As I know, Spark SQL doesn't provide native support for this feature now.
+After searching, I found only few database systems support it, e.g.,
+PostgreSQL.
+Actually based on the Spark SQL's aggregate system, I think it is not very
+difficult to add the support for this feature. The problem is how frequently
+this feature is needed for Spark SQL users and if it is worth adding this,
+because as I see, this feature is not very common.
+Alternative possible to achieve this in current Spark SQL, is to use
+Aggregator with Dataset API. You can write your custom Aggregator which has
+an user-defined JVM object as buffer to hold the input data into your
+aggregate function. But you may need to write necessary encoder for the
+buffer object.
+If you really need this feature, you may open a Jira to ask others' opinion
+about this feature.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Aggregating-over-sorted-data-tp19999p20273.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Nick,
+The scope of the PR I submitted is reduced because we can't make sure if it
+is really the root cause of the error you faced. You can check out the
+discussion on the PR. So I can just change the assert in the code as shown
+in the PR.
+If you can have a repro, we can go back to see if it is the root cause and
+fix it then.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/java-lang-IllegalStateException-There-is-no-space-for-new-record-tp20108p20298.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+You can't invoke any RDD actions/transformations inside another
+transformations. They must be invoked by the driver.
+If I understand your purpose correctly, you can partition your data (i.e.,
+`partitionBy`) when writing out to parquet files.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Null-pointer-exception-with-RDD-while-computing-a-method-creating-dataframe-tp20308p20309.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+Can you try the combination of `repartition` + `sortWithinPartitions` on the
+dataset?
+E.g.,
+    val df = Seq((2, "b c a"), (1, "c a b"), (3, "a c b")).toDF("number",
+"letters")
+    val df2 =
+      df.explode('letters) {
+        case Row(letters: String) => letters.split(" ").map(Tuple1(_)).toSeq
+      }
+    df2
+      .select('number, '_1 as 'letter)
+      .repartition('number)
+      .sortWithinPartitions('number, 'letter)
+      .groupBy('number)
+      .agg(collect_list('letter))
+      .show()
+    +------+--------------------+
+    |number|collect_list(letter)|
+    +------+--------------------+
+    |     3|           [a, b, c]|
+    |     1|           [a, b, c]|
+    |     2|           [a, b, c]|
+    +------+--------------------+
+I think it should let you do aggregate on sorted data per key.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Aggregating-over-sorted-data-tp19999p20310.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+As you launch multiple Spark jobs through `SparkLauncher`, I think it
+actually works like you run multiple Spark applications with `spark-submit`.
+By default each application will try to use all available nodes. If your
+purpose is to share cluster resources across those Spark jobs/applications,
+you may need to set some configs properly.
+Please check out:
+http://spark.apache.org/docs/latest/job-scheduling.html#scheduling-across-applications
+As you said you launch the main Spark job on yarn cluster, if you are using
+cluster mode, actually you will submit those Spark jobs/applications on the
+node which the driver runs. It looks weird.
+Looks like you try to fetch some data first and do some jobs on the data.
+Can't you just do those jobs in the main driver as Spark actions with its
+API?
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Launching-multiple-spark-jobs-within-a-main-spark-job-tp20311p20312.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+OK.
+I think it is little unusual use pattern, but it should work.
+As I said before, if you want those Spark applications to share cluster
+resources, proper configs is needed for Spark.
+If you submit the main driver and all other Spark applications in client
+mode under yarn, you should make sure the node running the driver has enough
+resources to run them.
+I am not sure if you can use `SparkLauncher` to submit them in different
+mode, e.g., main driver in client mode, others in cluster mode. Worth
+trying.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Launching-multiple-spark-jobs-within-a-main-spark-job-tp20311p20315.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+If you run the main driver and other Spark jobs in client mode, you can make
+sure they (I meant all the drivers) are running at the same node. Of course
+all drivers now consume the resources at the same node.
+If you run the main driver in client mode, but run other Spark jobs in
+cluster mode, the drivers of those Spark jobs will be launched at other
+nodes in the cluster. It should work too. It is as same as you run a Spark
+app in client mode and more others in cluster mode.
+If you run your main driver in cluster mode, and run other Spark jobs in
+cluster mode too, you may need  Spark properly installed in all nodes in the
+cluster, because those Spark jobs will be launched at the node which the
+main driver is running on.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Launching-multiple-spark-jobs-within-a-main-spark-job-tp20311p20327.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Your sample codes first select distinct zipcodes, and then save the rows of
+each distinct zipcode into a parquet file.
+So I think you can simply partition your data by using
+`DataFrameWriter.partitionBy` API, e.g.,
+df.repartition("zip_code").write.partitionBy("zip_code").parquet(.....)
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Null-pointer-exception-with-RDD-while-computing-a-method-creating-dataframe-tp20308p20328.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+I agreed that to make sure this work, you might need to know the Spark
+internal implementation for APIs such as `groupBy`.
+But without any more changes to current Spark implementation, I think this
+is the one possible way to achieve the required function to aggregate on
+sorted data per key.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Aggregating-over-sorted-data-tp19999p20331.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+You can't use existing aggregation functions with that. Besides, the
+execution plan of `mapPartitions` doesn't support wholestage codegen.
+Without that and some optimization around aggregation, that might be
+possible performance degradation. Also when you have more than one keys in a
+partition, you will need to take care of that in your function applied to
+each partition.
+Koert Kuipers wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Aggregating-over-sorted-data-tp19999p20333.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+I think there is an issue in `ExternalAppendOnlyMap.forceSpill` which is
+called to release memory when there is another memory consumer tried to ask
+more memory than current available.
+I created a Jira and submit a PR for it. Please check out
+https://issues.apache.org/jira/browse/SPARK-18986.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/java-lang-AssertionError-assertion-failed-tp20277p20338.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+I think the comment [1] is only correct for "getStatistics" as it is called
+at driver side. It should be added in "getMapSizesByExecutorId" by mistake.
+Jacek Laskowski wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/MapOutputTracker-getMapSizesByExecutorId-and-mutation-on-the-driver-tp20342p20349.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+Let me quote your example codes:
+var totalTime: Long = 0
+var allDF: org.apache.spark.sql.DataFrame = null
+for {
+  x <- dataframes
+} {
+  val timeLen = time {
+    allDF = if (allDF == null) x else allDF.union(x)
+    val grouped = allDF.groupBy("cat1",
+"cat2").agg(sum($"valToAdd").alias("v"))
+    val grouped2 = grouped.groupBy("cat1").agg(sum($"v"), count($"cat2"))
+    grouped2.show()
+  }
+  totalTime += timeLen
+  println(s"Took $timeLen miliseconds")
+}
+println(s"Total time was $totalTime miliseconds")
+Basically what you do is to union some dataframes for each iteration, and do
+aggregation on this union data. I don't see any reused operations.
+1st iteration: aggregation(x1 union x2)
+2nd iteration: aggregation(x3 union (x1 union x2))
+3rd iteration: aggregation(x4 union(x3 union (x1 union x2)))
+...
+Your first example just does two aggregation operations. But your second
+example like above does this aggregation operations for each iteration. So
+the time of second example grows as the iteration increases.
+ 
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Shuffle-intermidiate-results-not-being-cached-tp20358p20361.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+Every iteration the data you run aggregation on it is different. As I showed
+in previous reply:
+1st iteration: aggregation(x1 union x2)
+2nd iteration: aggregation(x3 union (x1 union x2))
+3rd iteration: aggregation(x4 union(x3 union (x1 union x2)))
+In 1st you run aggregation on the data of x1 and x2. In 2nd the data is x1,
+x2 and x3. Even you work on the same RDD, you won't see reuse of the shuffle
+data because the shuffle data is different.
+In your second example, I think the way to reduce the computation is like:
+var totalTime: Long = 0
+var allDF: org.apache.spark.sql.DataFrame = null
+for {
+  x <- dataframes
+} {
+  val timeLen = time {
+    allDF = if (allDF == null) x else allDF.union(x) // Union previous
+aggregation summary with new dataframe in this window
+    val grouped = allDF.groupBy("cat1",
+"cat2").agg(sum($"valToAdd").alias("v"))
+    val grouped2 = grouped.groupBy("cat1").agg(sum($"v"), count($"cat2"))
+    grouped2.show()
+    allDF = grouped  // Replace the union of data with aggregated summary
+  }
+  totalTime += timeLen
+  println(s"Took $timeLen miliseconds")
+}
+println(s"Total time was $totalTime miliseconds")
+You don't need to recompute the aggregation of previous dataframes in each
+iteration. You just need to get the summary and union it with new dataframe
+to compute the newer aggregation summary in next iteration. It is more
+similar to streaming case, I don't think you can/should recompute all the
+data since the beginning of a stream.
+assaf.mendelson wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Shuffle-intermidiate-results-not-being-cached-tp20358p20371.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+The shuffle data can be reused only if you use the same RDD. When you union
+x1's RDD and x2's RDD in first iteration, and union x1's RDD and x2's RDD
+and x3's RDD in 2nd iteration, how do you think they are the same RDD?
+I just use the previous example code to show that you should not recompute
+all data since the beginning of stream. Usually, a streaming job computes a
+summary of collected data in a window. If you want to compute all the data,
+you should use batch instead of streaming. In other words, if you run a
+long-running streaming job, would you like to recompute all data every few
+seconds after one year?
+BTW, you don't need to compute:
+      val grouped2 = allDF.groupBy("cat1").agg(sum($"v"), count($"cat2"))
+for each iteration. This should be run after the loop if you want to compare
+it with batch. And you don't need to run two aggregation in the loop for
+allDF.
+  var totalTime: Long = 0
+  var allDF: DataFrame = null
+  for {
+    x <- dataframes
+  } {
+    val timeLen = time {
+      allDF = if (allDF == null) x else {
+        allDF.union(x).groupBy("cat1", "cat2").agg(sum($"v").alias("v"))
+      }
+    }
+    val timeLen2 = time {
+      val grouped2 = allDF.groupBy("cat1").agg(sum($"v"), count($"cat2"))
+      grouped2.show()
+    }
+    totalTime += timeLen + timeLen2
+    println(s"Took $timeLen miliseconds")
+  }
+  println(s"Overall time was $totalTime miliseconds")
+}
+Of course, this may not work for all aggregations. I just show that you do
+redundant work in this version when comparing to your batch code. For other
+aggregations, you may need other design to do similar job.
+assaf.mendelson wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Shuffle-intermidiate-results-not-being-cached-tp20358p20385.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+  var totalTime: Long = 0
+  var allDF: DataFrame = null
+  for {
+    x <- dataframes
+  } {
+    val timeLen = time {
+      allDF = if (allDF == null) x else {
+        allDF.union(x).groupBy("cat1", "cat2").agg(sum($"v").alias("v"))
+      }
+    }
+    println(s"Took $timeLen miliseconds")
+    totalTime += timeLen
+  }
+  val timeLen2 = time {
+    val grouped2 = allDF.groupBy("cat1").agg(sum($"v"), count($"cat2"))
+    grouped2.show()
+  }
+  totalTime += timeLen2
+  println(s"Overall time was $totalTime miliseconds")
+} 
+Liang-Chi Hsieh wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Shuffle-intermidiate-results-not-being-cached-tp20358p20386.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Your schema is all fields are string:
+But looks like you have integer columns in the RDD?
+Chetan Khatri wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Error-at-sqlContext-createDataFrame-with-RDD-and-Schema-tp20382p20387.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+This https://github.com/apache/spark/pull/1799 seems the first PR to
+introduce this number. But there is no explanation about the number.
+Jacek Laskowski wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Why-is-spark-shuffle-sort-bypassMergeThreshold-200-tp20379p20389.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Actually, as you use Dataset's union API, unlike RDD's union API, it will
+break the nested structure. So that should not be the issue.
+The additional time introduced when the number of dataframes grows, is spent
+on analysis stage. I can think that as the Union has a long children list,
+the analyzer needs more time to traverse the tree.
+When the dataset of Union(Range1, Range2) is created, the Analyzer needs to
+go through 2 Range(s). When the next union happens, i.e., Union(Range1,
+Range2, Range3), the Analyzer needs to go through 3 Range(s), except for the
+first 2 Range(s). The two Range plans are overlapped. But the Analyzer still
+goes through them.
+If there is an Union with 5 Range logical plans, the Analyzer goes through:
+2 + 3 + 4 + 5 = 14 Range(s) under the Union
+When you increase the Range plans to 10. It becomes:
+2 + 3 + 4 + 5 + ... + 10 = 54 Range(s)
+So if an Union of 100 Range plans, there are 5049 Range(s) needed to go
+through. For 200 Range plans, it becomes 20099.
+You can see it is not linear relation.
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/repeated-unioning-of-dataframes-take-worse-than-O-N-2-time-tp20394p20408.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+Simply said, you submit another Job in the event thread which will be
+blocked and can't receive the this job submission event. So your second job
+submission is never processed, and the getPreferredLocations method is never
+returned.
+Fei Hu wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/context-runJob-was-suspended-in-getPreferredLocations-function-tp20412p20419.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Actually, I think UDTs can directly translates an object into Spark's
+internal format by ScalaReflection and encoder, without the intermediate
+generic row. You can directly create a dataset of the objects of UDT.
+If you don't convert the dataset to a dataframe, I think RowEncoder won't
+step in.
+Michael Armbrust wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/What-is-mainly-different-from-a-UDT-and-a-spark-internal-type-that-ExpressionEncoder-recognized-tp20370p20448.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+The method readAllFootersInParallel is implemented in Parquet's
+ParquetFileReader. So the spark config "spark.sql.files.ignoreCorruptFiles"
+doesn't work for it.
+Reading all footers in parallel can speed up the task. However, we can't
+control if ignoring corrupt files or not.
+Of course we can read this footers in sequence and ignore the corrupt ones.
+But it might be inefficient. Since this is a relatively corner use case, I
+don't expect we can have this.
+Maybe Parquet can implement an option to ignore corrupt files. However, even
+so, it can't be expected to have this updated Parquet implementation
+available to Spark very soon.
+khyati wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Skip-Corrupted-Parquet-blocks-footer-tp20418p20450.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Forget to say, another option is we can replace readAllFootersInParallel
+with our parallel reading logic, so we can ignore corrupt files.
+Liang-Chi Hsieh wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Skip-Corrupted-Parquet-blocks-footer-tp20418p20451.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+You need to resolve and bind the encoder.
+ExpressionEncoder enconder = RowEncoder.apply(struct).resolveAndBind();
+Andy Dang wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Converting-an-InternalRow-to-a-Row-tp20460p20465.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+After checking the codes, I think there are few issues regarding this
+ignoreCorruptFiles config, so you can't actually use it with Parquet files
+now.
+I opened a JIRA https://issues.apache.org/jira/browse/SPARK-19082 and also
+submitted a PR for it.
+khyati wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Skip-Corrupted-Parquet-blocks-footer-tp20418p20466.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Can you show how you use the encoder in your UDAF?
+Andy Dang wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Converting-an-InternalRow-to-a-Row-tp20460p20487.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Ryan,
+Great! Thanks for pushing this forward.
+Ryan Blue wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Parquet-patch-release-tp20500p20505.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Andy,
+Thanks for sharing the code snippet.
+I am not sure if you miss something in the snippet, because some function
+signature are not matched, e.g.,
+    @Override
+    public StructType bufferSchema() {
+        return new UserDefineType(schema, unboundedEncoder);
+    }
+Maybe you define a class UserDefineType which extends StructType.
+Anyway, I noticed that in this line:
+        data.add(unboundedEncoder.toRow(input));
+If you read the comment of "toRow", you will find it says:
+Note that multiple calls to toRow are allowed to return the same actual
+[[InternalRow]] object.  Thus, the caller should copy the result before
+making another call if required.
+I think it is why you get a list of the same entries.
+So you may need to change it to:
+        data.add(unboundedEncoder.toRow(input).copy());
+Andy Dang wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Converting-an-InternalRow-to-a-Row-tp20460p20506.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Georg,
+Can you describe your question more clear?
+Actually, the example codes you posted in stackoverflow doesn't crash as you
+said in the post.
+geoHeil wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/handling-of-empty-partitions-tp20496p20515.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Actually I think it is possibly that an user/developer needs the
+standardized features with population mean and std in some cases. It would
+be better if StandardScaler can offer the option to do that.
+Holden Karau wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/A-note-about-MLlib-s-StandardScaler-tp20513p20517.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+The map "toCarry" will return you (partitionIndex, None) for empty
+partition.
+So I think line 51 won't fail. Line 58 can fail if "lastNotNullRow" is None.
+You of course should check if an Option has value or not before you access
+it.
+As the "toCarry" returned is the following when I tested your codes:
+Map(1 -> Some(FooBar(Some(2016-01-04),lastAssumingSameDate)), 0 ->
+Some(FooBar(Some(2016-01-02),second)))
+As you seen, there is no None, so the codes work without failure. But of
+course it depends how your data partitions.
+For empty partition, when you do mapPartitions, it just gives you an empty
+iterator as input. You can do what you need. You already return a None when
+you find an empty iterator in preparing "toCarry". So I was wondering what
+you want to ask in the previous reply.
+geoHeil wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/handling-of-empty-partitions-tp20496p20519.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+As Seq(0 to 8) is:
+scala> Seq(0 to 8)
+res1: Seq[scala.collection.immutable.Range.Inclusive] = List(Range(0, 1, 2,
+3, 4, 5, 6, 7, 8))
+Do you actually want to create a Dataset of Range? If so, I think currently
+ScalaReflection which the encoder relies doesn't support Range.
+Jacek Laskowski wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/scala-MatchError-scala-collection-immutable-Range-Inclusive-from-catalyst-ScalaReflection-serializer-tp20520p20522.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Andy,
+Because hash-based aggregate uses unsafe row as aggregation states, so the
+aggregation buffer schema must be mutable types in unsafe row.
+If you can use TypedImperativeAggregate to implement your aggregation
+function, SparkSQL has ObjectHashAggregateExec which supports hash-based
+aggregate using arbitrary JVM objects as aggregation states.
+Andy Dang wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/How-to-hint-Spark-to-use-HashAggregate-for-UDAF-tp20526p20531.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Georg,
+It is not strange. As I said before, it depends how the data is partitioned.
+When you try to get the available value from next partition like this:
+var lastNotNullRow: Option[FooBar] = toCarryBd.value.get(i).get
+      if (lastNotNullRow == None) {
+        lastNotNullRow = toCarryBd.value.get(i + 1).get
+      }
+You may need to make sure the next partition has a value too. Holden has
+pointed out before, you need to deal with the case that the previous/next
+partition is empty too and go next until you find a non-empty partition.
+geoHeil wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/handling-of-empty-partitions-tp20496p20558.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+Will it be a problem if the staging directory is already deleted? Because
+even the directory doesn't exist, fs.delete(stagingDirPath, true) won't
+cause failure but just return false.
+Rostyslav Sotnychenko wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Both-Spark-AM-and-Client-are-trying-to-delete-Staging-Directory-tp20588p20600.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Sujith,
+Thanks for suggestion.
+The codes you quoted are from `CollectLimitExec` which will be in the plan
+if a logical `Limit` is the final operator in an logical plan. But in the
+physical plan you showed, there are `GlobalLimit` and `LocalLimit` for the
+logical `Limit` operation, so the `doExecute` method of `CollectLimitExec`
+will not be executed.
+In the case `CollectLimitExec` is the final physical operation, its
+`executeCollect` will be executed and delegate to `SparkPlan.executeTake`
+which is optimized to only retrieved required number of rows back to the
+driver. So when using `limit n` with a huge partition number it should not
+be a problem.
+In the case `GlobalLimit` and `LocalLimit` are the final physical
+operations, your concern is that when returning `n` rows from `N` partitions
+and `N` is huge, the total `n * N` rows will cause heavy memory pressure on
+the driver. I am not sure if you really observe this problem or you just
+think it might be a problem. In this case, there will be a shuffle exchange
+between `GlobalLimit` and `LocalLimit` to retrieve data from all partitions
+to one partition. In `GlobalLimit` we will only take the required number of
+rows from the input iterator which really pulls data from local blocks and
+remote blocks. Due to the use of iterator approach, I think when we get the
+enough rows in `GlobalLimit`, we won't continue to consume the input
+iterator and pull more data back. So I don't think your concern will be a
+problem.
+sujith71955 wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Limit-Query-Performance-Suggestion-tp20570p20607.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+When calling `coalesce` with `shuffle = false`, it is going to produce at
+most min(numPartitions, previous RDD's number of partitions). So I think it
+can't be used to double the number of partitions.
+Anastasios Zouzias wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Equally-split-a-RDD-partition-into-two-partition-at-the-same-node-tp20597p20608.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Fei,
+I think it should work. But you may need to add few logic in compute() to
+decide which half of the parent partition is needed to output. And you need
+to get the correct preferred locations for the partitions sharing the same
+parent partition.
+Fei Hu wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Equally-split-a-RDD-partition-into-two-partition-at-the-same-node-tp20597p20613.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Sujith,
+I saw your updated post. Seems it makes sense to me now.
+If you use a very big limit number, the shuffling before `GlobalLimit` would
+be a bottleneck for performance, of course, even it can eventually shuffle
+enough data to the single partition.
+Unlike `CollectLimit`, actually I think there is no reason `GlobalLimit`
+must shuffle all limited data from all partitions to one single machine with
+respect to query execution. In other words, I think we can avoid shuffling
+data in `GlobalLimit`.
+I have an idea to improve this and may update here later if I can make it
+work.
+sujith71955 wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Limit-Query-Performance-Suggestion-tp20570p20652.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Can you just cancel the `ScheduledFuture` returned by `scheduleAtFixedRate`
+when catching the exception in the main thread of the spark driver?
+John Fang wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/spark-main-thread-quit-but-the-driver-don-t-crash-at-standalone-cluster-tp20634p20679.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Vinayak,
+Thanks for reporting this.
+I don't think it is left out intentionally for UserDefinedType. If you
+already know how the UDT is represented in internal format, you can
+explicitly convert the UDT column to other SQL types, then you may get
+around this problem. It is a bit hacky, anyway.
+I submitted a PR to fix this, but not sure if it will get in the master
+soon.
+vijoshi wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Spark-SQL-Dataframe-resulting-from-an-except-is-unusable-tp20802p20812.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Maciej,
+Basically the fitting algorithm in Pipeline is an iterative operation.
+Running iterative algorithm on Dataset would have RDD lineages and query
+plans that grow fast. Without cache and checkpoint, it gets slower when the
+iteration number increases.
+I think it is why when you run a Pipeline with long stages, it gets much
+longer time to finish. As I think it is not uncommon to have long stages in
+a Pipeline, we should improve this. I will submit a PR for this.
+zero323 wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/SQL-ML-Pipeline-performance-regression-between-1-6-and-2-x-tp20803p20821.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Maciej,
+FYI, the PR is at https://github.com/apache/spark/pull/16775.
+Liang-Chi Hsieh wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/SQL-ML-Pipeline-performance-regression-between-1-6-and-2-x-tp20803p20822.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi,
+You don't need to run approxPercentile against a list. Since it is an
+aggregation function, you can simply run:
+// Just for illustrate the idea.
+val approxPercentile = new ApproximatePercentile(v1, Literal(percentage))
+val agg_approx_percentile = Column(approxPercentile.toAggregateExpression())
+df.groupBy (k1, k2, k3).agg(collect_list(v1), agg_approx_percentile)
+Rishi wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/approx-percentile-computation-tp20820p20823.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Thanks Nick for pointing it out. I totally agreed.
+In 1.6 codebase, actually Pipeline uses DataFrame instead of Dataset,
+because they are not merged yet in 1.6.
+In StringIndexer and OneHotEncoder, they have called ".rdd" on the Dataset,
+this would deserialize the rows.
+In 1.6, as they use DataFrame, there is no extra cost for deserialization.
+I think this would cause some regression. As Maciej didn't show how much
+performance regression observed, I can't judge if this is the root cause for
+it. But this is the initial idea after I check 1.6 and current Pipeline.
+Nick Pentreath wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/SQL-ML-Pipeline-performance-regression-between-1-6-and-2-x-tp20803p20825.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Maciej,
+Thanks for the info you provided.
+I tried to run the same example with 1.6 and current branch and record the
+difference between the time cost on preparing the executed plan.
+Current branch:
+292 ms                                                                             
+95 ms                             
+57 ms
+34 ms
+128 ms
+120 ms
+63 ms
+106 ms
+179 ms
+159 ms
+235 ms
+260 ms
+334 ms
+464 ms
+547 ms                             
+719 ms
+942 ms
+1130 ms
+1928 ms
+1751 ms
+2159 ms                            
+2767 ms
+3333 ms
+4175 ms
+5106 ms
+6269 ms
+7683 ms
+9210 ms
+10931 ms
+13237 ms
+15651 ms
+19222 ms
+23841 ms
+26135 ms
+31299 ms
+38437 ms
+47392 ms
+51420 ms
+60285 ms
+69840 ms
+74294 ms
+1.6:
+3 ms
+4 ms
+10 ms
+4 ms
+17 ms
+8 ms
+12 ms
+21 ms
+15 ms
+15 ms
+19 ms
+23 ms
+28 ms
+28 ms
+58 ms
+39 ms
+43 ms
+61 ms
+56 ms
+60 ms
+81 ms
+73 ms
+100 ms
+91 ms
+96 ms
+116 ms
+111 ms
+140 ms
+127 ms
+142 ms
+148 ms
+165 ms
+171 ms
+198 ms
+200 ms
+233 ms
+237 ms
+253 ms
+256 ms
+271 ms
+292 ms
+452 ms
+Although they both take more time after each iteration due to the grown
+query plan, it is obvious that current branch takes much more time than 1.6
+branch. The optimizer and query planning in current branch is much more
+complicated than 1.6.
+zero323 wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/SQL-ML-Pipeline-performance-regression-between-1-6-and-2-x-tp20803p20829.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Maciej,
+After looking into the details of the time spent on preparing the executed
+plan, the cause of the significant difference between 1.6 and current
+codebase when running the example, is the optimization process to generate
+constraints.
+There seems few operations in generating constraints which are not
+optimized. Plus the fact the query plan grows continuously, the time spent
+on generating constraints increases more and more.
+I am trying to reduce the time cost. Although not as low as 1.6 because we
+can't remove the process of generating constraints, it is significantly
+lower than current codebase (74294 ms -> 2573 ms).
+385 ms
+107 ms
+46 ms
+58 ms
+64 ms
+105 ms
+86 ms
+122 ms
+115 ms
+114 ms
+100 ms
+109 ms
+169 ms
+196 ms
+174 ms
+212 ms
+290 ms
+254 ms
+318 ms
+405 ms
+347 ms
+443 ms
+432 ms
+500 ms
+544 ms
+619 ms
+697 ms
+683 ms
+807 ms
+802 ms
+960 ms
+1010 ms
+1155 ms
+1251 ms
+1298 ms
+1388 ms
+1503 ms
+1613 ms
+2279 ms
+2349 ms
+2573 ms
+Liang-Chi Hsieh wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/SQL-ML-Pipeline-performance-regression-between-1-6-and-2-x-tp20803p20836.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Maciej,
+FYI, this fix is submitted at https://github.com/apache/spark/pull/16785.
+Liang-Chi Hsieh wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/SQL-ML-Pipeline-performance-regression-between-1-6-and-2-x-tp20803p20837.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Leo,
+The checkpointing of a RDD will be performed after a job using this RDD has
+completed. Since you have only one job, rdd1 will only be checkpointed after
+it is finished.
+To checkpoint rdd1, you can simply materialize (and maybe cache it to avoid
+recomputation) rdd1 (e.g., rdd1.count) after calling rdd1.checkpoint().
+leo9r wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/How-to-checkpoint-and-RDD-after-a-stage-and-before-reaching-an-action-tp20852p20862.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Congratulations!
+Takuya UESHIN wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/welcoming-Takuya-Ueshin-as-a-new-Apache-Spark-committer-tp20940p20994.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Gen,
+I submitted a PR to fix the issue of refreshByPath:
+https://github.com/apache/spark/pull/17064
+Thanks.
+tgbaggio wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/A-DataFrame-cache-bug-tp21044p21082.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Stan,
+Looks like it is the same issue we are working to solve. Related PRs are:
+https://github.com/apache/spark/pull/16998
+https://github.com/apache/spark/pull/16785
+You can take a look of those PRs and help review too. Thanks.
+StanZhai wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/The-driver-hangs-at-DataFrame-rdd-in-Spark-2-1-0-tp21050p21083.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Hi Stan,
+Looks like it is the same issue we are working to solve. Related PRs are:
+https://github.com/apache/spark/pull/16998
+https://github.com/apache/spark/pull/16785
+You can take a look of those PRs and help review too. Thanks. 
+StanZhai wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Re-The-driver-hangs-at-DataFrame-rdd-in-Spark-2-1-0-tp21052p21084.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Yeah, I'd agree with Nick.
+To have an implementation of RNN/LSTM in Spark, you may need a comprehensive
+abstraction of neural networks which is general enough to represent the
+computation (think of Torch, Keras, Tensorflow, MXNet, Caffe, etc.), and
+modify current computation engine to work with various computing units such
+as GPU. I don't think we will have such thing to be in Spark in the near
+future.
+There are many efforts to integrate Spark and the specialized frameworks
+doing well in this abstraction and parallel computation. The best approach I
+think is to look at this efforts and contribute to them if possible.
+Nick Pentreath wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/Implementation-of-RNN-LSTM-in-Spark-tp14866p21094.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Internally, in each partition of the resulting RDD[InternalRow], you will
+get the same UnsafeRow when iterating the rows. Typical RDD.cache doesn't
+work for it. You will get the output with the same rows. Not sure why you
+get empty output.
+Dataset.cache() is used for caching SQL query results. Even you really cache
+RDD[InternalRow] by RDD.cache with the trick which copies the rows (with
+significant performance penalty), a new query (plan) will not automatically
+reuse the cached RDD, because new RDDs will be created.
+summerDG wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/How-to-cache-SparkPlan-execute-for-reusing-tp21097p21098.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Not sure what you mean in "its parents have to reuse it by creating new
+RDDs".
+As SparkPlan.execute returns new RDD every time, you won't expect the cached
+RDD can be reused automatically, even you reuse the SparkPlan in several
+queries.
+Btw, is there any existing ways to reuse SparkPlan?
+summerDG wrote
+-----
+Liang-Chi Hsieh | @viirya 
+Spark Technology Center 
+http://www.spark.tc/ 
+--
+View this message in context: http://apache-spark-developers-list.1001551.n3.nabble.com/How-to-cache-SparkPlan-execute-for-reusing-tp21097p21100.html
+Sent from the Apache Spark Developers List mailing list archive at Nabble.com.
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org

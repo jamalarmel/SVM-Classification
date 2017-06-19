@@ -1,5 +1,6 @@
 import csv
 import time
+import glob
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.pipeline import Pipeline
@@ -9,6 +10,10 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.svm import LinearSVC
 from sklearn.metrics import confusion_matrix
 
+#file_list = glob.glob('corpus/corpus/*.txt')
+#arrays = [np.genfromtxt(f, delimiter=',', dtype=None) for f in file_list]
+#final_array = np.concatenate([arrays])
+
 class News_Classifier:
     X_train=[]
     X_test=[]
@@ -17,7 +22,6 @@ class News_Classifier:
     Y1=[]
     size=0
     train_ex=0
-    
     def __init__(self):
         #List to store input text
         data_input=[]
@@ -54,6 +58,7 @@ class News_Classifier:
         
         self.X_train = np.array(train_text[:self.train_ex])
         self.X_test  = np.array(train_text[self.train_ex:self.size])
+    	#self.X_test  = final_array
         
         self.lb=LabelBinarizer()
         self.Y1=self.Y_train[:self.train_ex]
@@ -79,7 +84,8 @@ class News_Classifier:
                 correct=correct+1
             i = i + 1
         for item, labels in zip(self.X_test, y_pred):
-            print('{0} => {1}'.format(item, labels))  
+            print('{0} => {1}'.format(item, labels)) 
+
         print 'Number of Examples used for Training',self.train_ex
         print 'Number of Correctly classified',correct
         print 'Total number of samples classified in Test data',self.size-self.train_ex

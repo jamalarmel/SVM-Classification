@@ -1,0 +1,951 @@
+Replied on https://issues.apache.org/jira/browse/INFRA-6418 -- overall it looks good.
+Matei
+Yeah, similarly to the users list, we asked for a "commits" one on the incubator proposal, where we'll hopefully set up Git to email commit messages. Do we have to request these specifically with JIRAs on INFRA?
+Matei
+Ah, got it. I'd prefer not to do this actually because we already had separate dev and issues lists before we moved to Apache. It could be annoying for people to add new filters that deal with them as one list.
+Matei
+Hey Chris,
+I definitely understand that we need to move to Apache lists, and I think that's fine, but maybe one question -- is it possible to transform the *@spark.incubator.apache.org lists into *@spark.apache.org more seamlessly when we graduate? It's weird to ask users to move twice. If these could somehow become aliases that would be ideal.
+In any case though, I think we'll have a gradual transition. I'd first move the dev list over, then the user one, and for a while I'd keep both and keep a notice on the Google group. I'm not sure how Google groups allow that but there must be a way.
+Matei
+Hey Chris,
+I definitely understand that we need to move to Apache lists, and I think that's fine, but maybe one question -- is it possible to transform the *@spark.incubator.apache.org lists into *@spark.apache.org more seamlessly when we graduate? It's weird to ask users to move twice. If these could somehow become aliases that would be ideal.
+In any case though, I think we'll have a gradual transition. I'd first move the dev list over, then the user one, and for a while I'd keep both and keep a notice on the Google group. I'm not sure how Google groups allow that but there must be a way.
+Matei
+Folks, it seems from the incubator@ list like the deadline for this is actually July 10th or so, but I'll work on getting this done tomorrow or Thursday. I'll put it on the incubator wiki and send it out when done.
+Matei
+Hey Chris, given that we'll do this, how do we request a user@spark.incubator.apache.org list?
+Matei
+Hey Chris, unfortunately I don't have permission to edit the wiki page (on my MateiZaharia account), but here is the update in plain text:
+------------
+Spark
+Spark is an open source system for fast and flexible large-scale data analysis. Spark provides a general purpose runtime that supports low-latency execution in several forms.
+Spark has been incubating since 2013-06-19.
+Three most important issues to address in the move towards graduation:
+  1. Finish bringing up infrastructure on Apache (JIRA, "user" mailing list, SVN repo for website)
+  2. Migrate mailing lists and development to Apache
+  3. Make a Spark 0.8 under the Apache Incubator
+Any issues that the Incubator PMC (IPMC) or ASF Board wish/need to be aware of?
+While most of our infrastructure is now up, it has taken a while to get a JIRA, a SVN repo for our website (so we can use the CMS), and a user@spark.incubator.apache.org mailing list (so we can move our existing user list, which is large).
+How has the community developed since the last report?
+We only entered the Apache Incubator at the end of June, but in the existing developer community keeps expanding and we are seeing many new features from new contributors.
+How has the project developed since the last report?
+In terms of the Apache incubation process, we filed our IP papers and got a decent part of the infrastructure set up (Git, dev list, wiki, Jenkins group).
+Date of last release: 
+Please check this [ ] when you have filled in the report for Spark.
+Signed-off-by: 
+Chris Mattmann: [ ](spark)
+Paul Ramirez: [ ](spark)
+Andrew Hart: [ ](spark)
+Thomas Dudziak: [ ](spark)
+Suresh Marru: [ ](spark)
+Henry Saputra: [ ](spark)
+Roman Shaposhnik: [ ](spark)
+Shepherd notes:
+------------
+My account name is MateiZaharia. I'm pretty sure I had access at some point in the past, but I guess I don't. Maybe they added the access controls after I joined.
+Thanks for signing this off! I also saw you set up a SVN for the CMS, which is great. The other thing I'm curious about is the user mailing list -- is the thing to set those up working? Once that's up I want to announce the transition on our Google groups (I can also do it before if needed but I thought it would be nice to do both lists at once).
+Matei
+Hey Chris, do people other than you have commit access to this yet? I might be missing something but I tried to svn commit and I get this:
+svn: Commit failed (details follow):
+svn: access to '/repos/asf/!svn/act/a4f3b6e0-0f36-485f-8d12-9e68583ba0b5' forbidden
+My svn info says:
+Path: .
+URL: http://svn.apache.org/repos/asf/incubator/spark/site
+Repository Root: http://svn.apache.org/repos/asf
+Repository UUID: 13f79535-47bb-0310-9956-ffa450edef68
+Revision: 1502606
+Node Kind: directory
+Schedule: normal
+Last Changed Author: mattmann
+Last Changed Rev: 1500725
+Last Changed Date: 2013-07-08 06:42:05 -0700 (Mon, 08 Jul 2013)
+Hi Karthik,
+Are you trying to import Spark into an IDE, or just write a project that depends on it?
+I've found IDEA works pretty well for importing Spark. You do sbt/sbt gen-idea in the Spark folder, then make sure you have the Scala plugin in IDEA, and import it. I saw one weird warning about "same path for test and production" in the root-build project that I fixed by going to the project options and giving a different path for test.
+Matei
+Sure, let me know if you have any problems.
+Hi Henry,
+I actually want to do this soon but haven't had the time yet. Hopefully we'll announce it in the next few days. I just want to test that the GitHub pull request workflow works with this, which I believe it should, but it's slightly more complicated because the GitHub repo will be a mirror.
+Matei
+Hi all,
+I wanted to bring up a topic that there isn't a 100% perfect solution for, but that's been bothering the team at Berkeley for a while: consolidating Spark's build system. Right now we have two build systems, Maven and SBT, that need to be maintained together on each change. We added Maven a while back to try it as an alternative to SBT and to get some better publishing options, like Debian packages and classifiers, but we've found that 1) SBT has actually been fairly stable since then (unlike the rapid release cycle before) and 2) classifiers don't actually seem to work for publishing versions of Spark with different dependencies (you need to give them different artifact names). More importantly though, because maintaining two systems is confusing, it would be good to converge to just one soon, or to find a better way of maintaining the builds.
+In terms of which system to go for, neither is perfect, but I think many of us are leaning toward SBT, because it's noticeably faster and it has less code to maintain. If we do this, however, I'd really like to understand the use cases for Maven, and make sure that either we can support them in SBT or we can do them externally. Can people say a bit about that? The ones I've thought of are the following:
+- Debian packaging -- this is certainly nice, but there are some plugins for SBT too so may be possible to migrate.
+- BigTop integration; I'm not sure how much this relies on Maven but Cos has been using it.
+- Classifiers for hadoop1 and hadoop2 -- as far as I can tell, these don't really work if you want to publish to Maven Central; you still need two artifact names because the artifacts have different dependencies. However, more importantly, we'd like to make Spark work with all Hadoop versions by using hadoop-client and a bit of reflection, similar to how projects like Parquet handle this.
+Are there other things I'm missing here, or other ways to handle this problem that I'm missing? For example, one possibility would be to keep the Maven build scripts in a separate repo managed by the people who want to use them, or to have some dedicated maintainers for them. But because this is often an issue, I do think it would be simpler for the project to have one build system in the long term. In either case though, we will keep the project structure compatible with Maven, so people who want to use it internally should be fine; I think that we've done this well and, if anything, we've simplified the Maven build process lately by removing Twirl.
+Anyway, as I said, I don't think any solution is perfect here, but I'm curious to hear your input.
+Matei
+Cos, do you have any experience with Gradle by any chance? Is it something you'd recommend trying? I do agree that SBT's dependency management, being based on Ivy, is not ideal, but I'm not sure how common Gradle is and whether it will really work well with Scala.
+Matei
+Henry, our hope is to avoid having to create two different Hadoop profiles altogether by using the hadoop-client package and reflection. This is what projects like Parquet (https://github.com/Parquet) are doing. If this works out, you get one artifact that can link to any Hadoop version that includes hadoop-client (which I believe means 1.2 onward).
+Matei
+Unfortunately, we'll probably have to have different branches of Spark for different Scala versions, because there are also other libraries we depend on (e.g. Akka) that have separate versions for Scala 2.10. You can actually find a Scala 2.10 port of Spark in the scala-2.10 branch on GitHub.
+Matei
+Thanks for the feedback. It looks like there are more advantages to Maven than I was originally thinking of -- specifically, the better dependency resolution and assembly construction. (SBT assembly just takes all the JARs in lib_managed and packages them together unfortunately, which means you sometimes get multiple versions of the same artifact if you aren't very careful with exclusion rules). I think what we'll do is to wait until we see whether we can have a single Spark artifact that works with any Hadoop version, and go back to the build system issue then.
+Matei
+Hey Mark,
+The motivation was to separate internal DAGScheduler data structures, such as Stage, from the interface we'll present to SparkListener, which will be a semi-public API. (Semi-public in that it might still change if we make drastic changes to the scheduler, but we want people to be able to use it for monitoring with as little pain as possible). We aren't following this consistently in all the SparkListener events yet but the goal is to do so.
+Matei
+Hey Nick,
+Thanks for your interest in this stuff! I'm going to let the MLbase team answer this in more detail, but just some quick answers on the first part of your email:
+- From my point of view, the ML library in Spark is meant to be just a library of "kernel" functions you can call, not a complete ETL and data format system like Mahout. The goal was to have good implementations of common algorithms that different higher-level systems (e.g. MLbase, Shark, PySpark) can call into.
+- We wanted to try keeping this in Spark initially to make it a kind of "standard library". This is something that can help ensure it becomes high-quality over time and keep it supported by the project. If you think about it, projects like R and Matlab are very strong primarily because they have great standard libraries. This was also one of the things we thought would differentiate us from Hadoop and Mahout. However, we will of course see how things go and separate it out if it needs a faster dev cycle.
+- I haven't worried much about compatibility with Mahout because I'm not sure Mahout is too widely used and I'm not sure its abstractions are best. Mahout is very tied to HDFS, SequenceFiles, etc. We will of course try to interoperate well with data from Mahout, but at least as far as I was concerned, I wanted an API that makes sense for Spark users.
+- Something that's maybe not clear about the MLlib API is that we also want it to be used easily from Java and Python. So we've explicitly avoided having very high-level types or using Scala-specific features, in order to get something that will be simple to call from these languages. This does leave room for wrappers that provide higher-level interfaces.
+In any case, if you like this "kernel" design for MLlib, it would be great to get more people contributing to it, or to get it used in other projects. I'll let the MLbase folks talk about higher-level interfaces -- this is definitely something they want to do, but they might be able to use help. In any case though, sharing the low-level kernels across Spark projects would make a lot of sense.
+Matei
+BTW I should also add about Mahout that it might also make sense for Mahout to call MLlib internally. I just haven't looked into it enough to decide whether we'd want to provide more than input/output wrappers. But it would certainly be great to have Mahout people help out with MLlib in some way.
+Matei
+I fully agree that we need to be clearer with the timelines in AMP Lab. One thing is that many of these are still research projects, so it's hard to predict when they will be ready for prime-time. Usually with all the things we officially announce (e.g. MLlib, GraphX), and especially the things we put in the Spark codebase, the team behind them really wants to make them widely available and has committed to spend the engineering to make them usable in real applications (as opposed to prototyping and moving on). But even then it can take some time to get the first release out. Hopefully we'll improve our communication about this through more careful tracking in JIRA.
+Matei
+Hey Michael,
+Glad to hear you're interested in helping. Are there specific things you'd like to work on? Certainly we will need help with various Apache packaging, etc so it's good to have more people with experience at Apache.
+Matei
+Hey Michael,
+Depending on your background, there are quite a few things to do.
+One general area that we might use more help for, if you have experience there, is the Python API. Part of it can be just to add more examples in Python, e.g., to show how one can use NumPy or SciPy with it. Another thing that would be super useful if you also have access to Windows is this: https://spark-project.atlassian.net/browse/SPARK-649. We want to make Spark very broadly accessible for science work and it sounds like your background at JPL is good for that.
+Alternatively, if you prefer to work on the Java VM, there are a bunch of internal things to do there too -- I can give an overview of what I'd consider easy to jump into there.
+Matei
+Let's at the very least make it configurable, but an even better thing will be to make sbt assembly not include it. I think the only thing that depends on HBase is the examples project, but unfortunately SBT puts all its JARs in the lib_managed folder and just stupidly creates an assembly by grouping those. The Maven build, for example, should not do that.
+Matei
+Cool! The way I'd start is perhaps by adding a new Python example job. For example, a good one to implement would be PageRank -- you can look at these slides for a Scala version of it: http://ampcamp.berkeley.edu/wp-content/uploads/2012/06/matei-zaharia-part-2-amp-camp-2012-standalone-programs.pdf. Another possibility is linear regression. But feel free to also come up with your own.
+There are also a number of Python issues open relating to adding some missing API features, but these require a more thorough understanding of how PySpark work and possibly some hacking around in pickled data: https://spark-project.atlassian.net/browse/SPARK-791?jql=component%20%3D%20PySpark%20AND%20status%20%3D%20Open . The easiest one to start with is probably SPARK-838.
+Matei
+Yeah, and maybe we will want to change to Maven as the recommended tool for assembly building. I want to look into this more for the 0.8 release.
+Matei
+Yeah, that is true. But the assembly shouldn't include the examples project at all IMO -- if it does now, we should remove it.
+Matei
+Basically the way to think of the assembly is that it should have libraries that users' client programs need to run. These are core, repl (needed if they use the shell), and likely bagel and streaming and mllib, though originally we'd opted to leave those out. We are still deciding on that -- could go either way.
+Matei
+Hey folks, FYI, I've added a "Starter" tag in JIRA to identify such issues. Here's the page listing them: https://spark-project.atlassian.net/browse/SPARK-865?jql=project%20%3D%2010000%20AND%20labels%20%3D%20Starter
+Matei
+I'll work on it later today and send it out. Thanks for the reminder!
+Matei
+Alright, I've written it up: https://wiki.apache.org/incubator/August2013. Let me know if you have any comments.
+Matei
+Ah, good idea. I've added that in.
+Matei
+Hi folks,
+In order to make the 0.8 release soon, I've created a new branch for it, on which we'll merge only bug fixes and a few of the new deployment features we still want there (e.g. updated EC2 scripts and some work to build one artifact that works with all Hadoop versions). If you continue sending pull requests against master, we will cherry-pick the ones with bug fixes into branch-0.8. Let me know if there are any other things you believe should be in 0.8 as well.
+Matei
+Yes, that's what I count under "bug fixes".
+Matei
+I think a change to Optional is good, so let's do that.
+@Evan -- documentation should definitely be added; feel free to send a PR adding a page on this to the docs. I also want to take a look at the binary distribution stuff once we've figured out the SBT build a little bit better.
+Matei
+Thanks for forwarding this! We had indeed looked at SciKit-learn for MLLib.
+Matei
+Hi Evan,
+We plan to do it after Spark 0.8 comes out. You can already find a fairly complete work-in-progress version on branch scala-2.10.
+Matei
+Hi Henry,
+I'd be happy to do this as long as Apache is okay with it! It will save a lot of hassle for our users. Does it basically just require subscribing user@spark.i.a.o to the Google Group?
+Matei
+The other point, in case it wasn't clear, is that we do want to have an archive on the Apache mailing lists -- all messages sent to Google would also appear on user@spark.i.a.o.
+Matei
+I understand this Cos, but Jey's patch actually removes the idea of "hadoop2". You only set SPARK_HADOOP_VERSION (which can be 1.0.x, 2.0.0-cdh4, 2.0.5-alpha, etc) and possibly SPARK_YARN_MODE if you want to run on YARN.
+Matei
+Thanks Chris! We're still working on it and hopefully we'll have some improvements over the old one soon too.
+Matei
+Hi Mike,
+I think the Eclipse project is just broken. The SBT-Eclipse plugin isn't great. I recommend using IntelliJ IDEA (community edition, which is free) -- this is what most of us use. You can do sbt/sbt gen-idea to create an IDEA project.
+Matei
+Yes, as posted there, we uploaded some files for INFRA to try, and haven't heard back. Is this a thing you could personally help with?
+Matei
+I sent an email about a week ago saying we're doing a feature freeze and only finishing up some of the current tasks (e.g. better build setup for linking to Hadoop). I think many of those are now in. The other big scary thing left is to change the package name to org.apache.spark.. will do that this weekend. When it's done I plan to post a release candidate.
+Matei
+Guys, FYI, I'm going to try adding user@spark.i.a.o as a member of the Google group, but before that I'll do it temporarily for the dev group for testing. (I agree that we should move the dev group permanently to Apache). Cross your fingers.
+Matei
+ Testing cross-posting to Apache.
+About this group:
+Developer list for the Spark cluster computing framework: www.spark-project.
+org.
+----------------------- Google Groups Information ----------------------
+The owner of the group has set your subscription type as "Email", meaning that
+you'll receive a copy of every message posted to the group as they are posted.
+Visit this group:
+http://groups.google.com/group/spark-developers?hl=en
+You can unsubscribe from this group using the following URL:
+http://groups.google.com/group/spark-developers/unsub?u=qDIzWBQAAAA3hagNqQDQBiFNMFu2FqbBtx20f395-tTXprg9jvQSzw&hl=en
+If you feel that this message is abuse, please inform the Google Groups staff 
+by using the URL below. 
+http://groups.google.com/groups/abuse?direct=YQAAAB264nDzAAAA0h766AoAAACbjS9RI7DltbsBUGhHhNwnqX8Z_fM&hl=en
+We're going to switch from GitHub to the Apache git repo [3] soon. We've been periodically importing stuff there, but I want to have new pull requests happen against https://github.com/apache/incubator-spark directly once we release 0.8. The Apache SVN is only needed for the website, and that's why it has commits.
+Matei
+Alright, here's a new backup: http://cs.berkeley.edu/~matei/JIRA-backup-20130831.tgz. We only need to import the "SPARK" project from in there. Thanks for looking into it.
+Matei
+Hi everyone,
+In preparation for the 0.8 release, I've put together a first release candidate mostly to help mentors or more experienced Apache people check whether the licensing, POMs, etc are right: http://www.cs.berkeley.edu/~matei/spark-0.8.0-incubating-RC1.tgz. I've tried to write the LICENSE, NOTICE, and POMs as required by Apache. Please take a look if you have a chance -- the ReadMe contains instructions on how to build it and launch the shell.
+This first release candidate is still missing some doc pages, so it won't be the final release, but it should have in place all the packaging stuff we'd like for 0.8, and it should be able to run out of the box on Linux, Windows and Mac OS X. Feel free to also test it for functionality; we may merge in a couple more bug fixes but most of the functionality will be there.
+Matei
+By the way, this tar file also corresponds to commit a106ed8b97e707b36818c11d1d7211fa28636178 in our Apache git repo.
+Matei
+Hi guys,
+Right now the branches are the same in terms of content (though I might not have merged the latest changes into 0.8). If we add stuff into master that we won't want in 0.8 we'll break that.
+Cool, thanks for the pointer. I'll try to follow the steps there about signing.
+We'll probably use the GitHub repo for the last few changes in this release and then switch. The reason is that there's a bit of work to do pull requests against the Apache one.
+Matei
+Okay, thanks for asking them about it. I agree that it would be awesome to move JIRA over as soon as possible.
+Matei
+Yup, the plan is as follows:
+- Make pull request against the mirror
+- Code review on GitHub as usual
+- Whoever merges it will simply merge it into the main Apache repo; when this propagates, the PR will be marked as merged
+I found at least one other Apache project that did this: http://wiki.apache.org/cordova/ContributorWorkflow.
+Matei
+Yes, please do the PRs against the GitHub repo for now.
+Matei
+As far as I understood, we will have to manually merge those PRs into the Apache repo. However, GitHub will notice that they're "merged" as soon as it sees those commits in the repo, and will automatically close them. At least this is my experience merging other peoples' code (sometimes I just check out their branch from their repo and merge it manually).
+Matei
+BTW, what docs are you planning to write? Something on make-distribution.sh would be nice.
+Matei
+Cool, thanks for trying it out!
+Regarding the pull request model, let's see how it goes. I'd prefer not to have to support two different ways to send patches, but let's see what people ask for -- maybe existing Apache contributors will be more familiar with the JIRA way. I do want to document the model much better on our "how to contribute" page before our last release candidate of 0.8 though.
+Matei
+Nope, go for it. It would be great if people started doing this now.
+Matei
+Yup, use a) for pre-0.8 stuff.
+Matei
+Hi guys,
+I've written a draft update at https://wiki.apache.org/incubator/September2013#preview. Let me know how it looks.
+Matei
+Let me try to put together a doc on this. I wanted to wait for 0.8 to be out to simplify the process and immediately have a new "how to contribute" doc on the website, but I guess I can host this elsewhere if the release takes a while.
+Matei
+Henry, the problem is that we already have a website: http://spark.incubator.apache.org/docs/latest/contributing-to-spark.html. That's what most people read, so we need to update that.
+Matei
+Cos, the examples are being built into a separate assembly. That should also be true in the Maven assembly project as far as I can tell.
+Matei
+The examples do ship with their dependencies though AFAIK. I added a Maven shade plugin entry in the examples POM. Anyway, as long as you can run with that JAR, it means it works!
+Matei
+Yup, expect to see a pull request soon.
+Matei
+Hi Henry,
+Regarding this, it's a third-party library that we included and modified under a different license. It's listed in LICENSE.
+Thanks for the feedback otherwise! I'm also working on a guide on how to contribute via the Apache repo but I've been traveling the past few days and am still away today.
+Matei
+I don't think we're allowed to just slap on a license header since it's mostly their code, but I'm not sure. Maybe you can ask someone who's done this before. I though it was best to use and report it under the terms of their license. Which package name it's in doesn't matter -- it's still substantially the same code.
+Matei
+Yeah, unfortunately I think this way of doing mirroring won't work. Give me a few days and I'll start closing the Google groups and getting people here (starting with the dev list first).
+Matei
+Cool, thanks for posting this! We'll probably merge it after the 0.8.0 release since it's a big change.
+Matei
+Please use 1 for now, because Apache Infra hasn't finished importing our issues into 2.
+Matei
+Hmm, good point -- might be worth it to fix this for 0.8.0.
+Matei
+We could also manually write an overview of the high-level changes (similar to a set of release notes) if desired.
+Matei
+I'm not sure where to ask this, but here goes: since we'll receive pull requests on https://github.com/apache/incubator-spark, is there any way to subscribe the dev@ list (or some other list) to the GitHub emails from those discussions? I think that would be useful, and similar to subscribing it to JIRA. My main question is who manages the mirroring (i.e. the github.com/apache account), since they'd have to configure this.
+Matei
+Awesome, thanks.
+Matei
+Patrick's emails to this are not making it, so I just want to try sending one.
+Matei
+Yes, unfortunately this is a side-effect of how we change the Scala REPL's code generation. Before, the REPL would create a singleton object for each line:
+object Line1 {
+  class Foo
+}
+object Line2 {
+  import Line1.Foo
+  class Bar(val x: Int) extends Foo
+}
+And so on. We change this to:
+class Line1 {
+  class Foo
+}
+object Line1 { val INSTANCE = new Line1 }
+class Line2 {
+  import Line1.INSTANCE.Foo
+  class Bar(val x: Int) extends Foo
+}
+object Line1 { val INSTANCE = new Line2 }
+Now, Foo becomes an inner class of Line1 instead of a top-level static class, so it's bound to the Line1 instance that it belongs to, and the compiler can't prove that the Foos you pass to meow are necessarily subclasses of Line1.INSTANCE.Bar (as opposed to Bar in general). 
+Unfortunately this is kind of tricky to fix without more hacking of the Scala interpreter. The reason we switched to these classes is to allow variable definitions to work correctly. For example, if you do
+var x = Console.readLine()
+The original Scala interpreter would do
+object Line1 {
+  var x = Console.readLine()
+}
+This is bad because it would mean that on *every* worker node that uses x, we'd be trying to call Console.readLine.
+Matei
+Hey Patrick, unfortunately, I noticed some bugs in the documentation on Mesos that I thought I had pushed a fix for, but I didn't. The fix is:
+- In docs/_config.yml, change MESOS_VERSION to 0.12.1
+In addition, if we do this, we might as well change it to 0.13.0 throughout. That is in docs/_config.yml, project/SparkBuild.scala, and pom.xml.
+I also noticed that there's no CHANGES.txt in this release.
+Otherwise, the files and code look fine. I built it and ran through the tests on Mac OS X.
+Matei
+FWIW, I tested it otherwise and it seems good modulo this issue.
+Matei
+Hi Shane,
+I agree with all these points. Improving the configuration system is one of the main things I'd like to have in the next release.
+Yup, right now we don't have any attempt to install on standard system paths.
+Yes, I think this should always be Configuration class in code > system properties > env vars. Over time we will deprecate the env vars and maybe even system properties.
+I think this is the main thing to do first -- pick one configuration class and change the code to use this.
+Makes sense.
+This sounds great to me! The one thing I'll add is that we might want to prevent applications from overriding certain settings on each node, such as work directories. The best way is to probably just ignore the app's version of those settings in the Executor.
+If you guys would like, feel free to write up this design on SPARK-544 and start working on it. I think it looks good.
+Matei
++1
+Tried new staging repo to make sure the issue with RC5 is fixed.
+Matei
+In Maven, mvn package should also create the assembly, but the non-obvious thing is that it needs to happen for all projects before mvn test for core works. Unfortunately I don't know any easy way around that.
+Matei
+Good catch, we should probably just load it from the checkpoint in the latter case.
+Please send pull requests to apache/incubator-spark instead -- there are some new docs on it here: https://cwiki.apache.org/confluence/display/SPARK/Contributing+to+Spark
+Matei
+Maybe we can replace the link to "official Apache download site" in the release notes to point to the mirrors? Do the mirrors all have signatures on them too?
+Matei
+If the mirrors don't have the signatures, then we should probably link to the mirrors and the signatures separately. It's definitely important to have a link to the mirrors so people can get this through ASF infrastructure without hitting only the main server.
+It's true that they don't seem to have them, even for other projects -- for example check out http://mirror.tcpdiag.net/apache/hadoop/common/hadoop-2.0.5-alpha/.
+Matei
+Hi Evan,
+I think this is an old property that isn't used anymore, so it would be good to clean it up and get rid of it.
+Matei
+The main reason I wanted them separate was that people might use Akka in their own application for other things. As such, the Spark Akka properties only affect Akka instances started by Spark. I think we should keep them separate to avoid messing with users' applications.
+Matei
+Sure, that makes sense.
+Matei
+Yeah, that's too bad. I've now pushed the scala-2.10 branch from the old repo to Apache. It should show up on the Apache GitHub mirror soon.
+Matei
+Hey folks, sorry for the delay, but I've now written a report at https://wiki.apache.org/incubator/October2013. I saw Dave Fisher, who was assigned to oversee the project, already looked at the page earlier today. Dave, please take another look.
+Matei
+For most development, you might not need to do assembly. You can run most of the unit tests if you just do sbt compile -- only the ones that spawn processes, like DistributedSuite, won't work. That said, we are looking to optimize assembly by maybe having it only package the dependencies rather than Spark itself -- there were some messages on this earlier. For now I'd just recommend doing it in a RAMFS if possible (symlink the assembly/target directory to be a RAMFS).
+Matei
+Hey Shane, I don't know if you saw my message on GitHub, but I did review this a few days ago: https://github.com/apache/incubator-spark/pull/21. Make sure you're allowing emails from GitHub to get comments. It looks good overall but I had some suggestions in there.
+Matei
+Hey folks, FYI, the talk submission deadline for this is October 25th. We've gotten a lot of great submissions already. If you'd like to submit one, go to http://www.spark-summit.org/submit/. It can be about anything -- projects you're doing with Spark, open source development within the project, tips / tutorials, etc. Demos are also welcome.
+Matei
+This is a good idea, though you may also be able to do it in your KryoRegistrator by just calling kryo.setRegistrationOptional there. (You get full access to the Kryo object.)
+Omitting to register a class is not an error by the way, it just leads to bigger data.
+Matei
+Hi folks,
+Just as a heads-up, I think we're getting close to the major features to make a Spark 0.8.1 release, and we'd like to merge the Scala 2.10 branch into master to facilitate work on Spark 0.9. I'm thinking of doing this in the next week. This won't mean that development on Scala 2.9 will stop -- that will keep going on in the spark-0.8 branch, where we've been cherry-picking nearly every change from master. But it will make it easier to do the next phase of development (configuration system, changes to run scripts, etc) for Scala 2.10 and Spark 0.9. Let me know if you have any concerns about this.
+By the way, there's been a lot of stuff contributed to 0.8.1 in the month since we released 0.8! Here are some of the things either merged or close to merging:
+- Standalone master fault tolerance
+- Shuffle file consolidation (improves performance of big shuffles)
+- Better P2P broadcast (improves speed and stability of big broadcasts)
+- Optimized hashtable classes
+- Sending of large task results through block manager (improves performance)
+- Sort() function in PySpark
+- New ALS variant for implicit feedback
+- Task and job killing
+Matei
+If this could be compiled to run on a Spark-like engine, it would be interesting, from a quick look this doesn't seem easy because this model has arbitrary graphs of fine-grained tasks (more similar to something like Cilk) rather than parallel operations on collections. I think it would require a different engine with different properties about fault tolerance, locality, etc.
+Matei
+Just to be clear, Spark actually *does* support general task graphs, similar to Dryad (though a bit simpler in that there's a notion of "stages" and a fixed set of connection patterns between them). However, MBrace goes a step beyond that, in that the graphs can be modified dynamically based on user code. It's also not clear what the granularity of task spawns in MBrace is -- can you spawn stuff that runs for 1 millisecond, or 1 second, or 1 hour? The choice there greatly affects system design.
+Matei
+Yeah, very cool, thanks for writing these up.
+Hi Nick,
+This would definitely be interesting to explore, especially if the Julia folks are open to supporting other parallel compute engines. In terms of technical work, the toughest part will likely be capturing Julia functions and shipping them across the network, as you said. It all depends on how easy that is within that language. Beyond that, you may want to ask them for JVM bindings. There is lots of software that uses the JVM so it might not be a bad idea to add it. I would avoid going through Python if possible unless you specifically think mixing those libraries is important (but even then it might be possible to do that in a different way, e.g. call Python from Julia).
+Matei
+So far we've maintained backwards compatibility for point releases in everything except internal or alpha APIs. One place where it changed, for example, is when Twitter removed its username/password authentication method, which required us to change the Spark Streaming API (but that was actually alpha). Which APIs did you see broken?
+The problem is likely that Shark calls into on some internal APIs, which we should fix in the future to put it on more equal footing with other clients. But you can expect that Shark releases from our team will work with the corresponding Spark release, and user programs written for Spark 0.8.0 will definitely work for 0.8.1.
+Matei
+Yeah, true. It would be good to add it back.
+Matei
+Hi everyone,
+We're glad to announce the agenda of the Spark Summit, which will happen on December 2nd and 3rd in San Francisco. We have 5 keynotes and 24 talks lined up, from 18 different companies. Check out the agenda here: http://spark-summit.org/agenda/.
+This will be the biggest Spark event yet, with some very cool use case talks, so we hope to see you there! Sign up now to still get access to the early-bird registration rate.
+Matei
+No worries Chris! Apart from the JIRA thing, we also plan another release or two soon.
+Matei
+Looks cool! Josh, if you replace CloudPickle with this, make sure to also update the LICENSE file, which is supposed to contain third-party licenses.
+Matei
++1
+Built and tested it on Mac OS X.
+Matei
+Thanks Patrick for coordinating this release!
+Matei
+Not that I know of. This would be very useful to add, especially if we can make SBT automatically check the code style (or we can somehow plug this into Jenkins).
+Matei
++1 for me as well.
+I built and tested this on Mac OS X, and looked through the new docs.
+Matei
+This is definitely an important issue to fix. Instead of renaming properties, one solution would be to replace Typesafe Config with just reading Java system properties, and disable config files for this release. I kind of like that over renaming.
+Matei
+Yeah, this is exactly my reasoning as well.
+Matei
++1
+Re-tested on Mac.
+Matei
++1 looked at changes since last RC and tested on mac.
+Matei
+Just sending a test email from another email address to check for bounces..
++1
+Congrats Michael and all for getting this so far. Spark SQL and Catalyst will make it much easier to use structured data in Spark, and open the door for some very cool extensions later.
+Matei
++1 tested on Mac OS X.
+Matei
+Shh, maybe I really wanted people to fix that one issue.
+Your key needs to implement hashCode in addition to equals.
+Matei
+We do actually have replicated StorageLevels in Spark. You can use MEMORY_AND_DISK_2 or construct your own StorageLevel with your own custom replication factor.
+BTW you guys should probably have this discussion on the JIRA rather than the dev list; I think the replies somehow ended up on the dev list.
+Matei
++1
+Tested it on both Windows and Mac OS X, with both Scala and Python. Confirmed that the issues in the previous RC were fixed.
+Matei
++1
+Tested on Mac OS X and Windows.
+Matei
+Madhu, can you send me your Wiki username? (Sending it just to me is fine.) I can add you to the list to edit it.
+Matei
+Done. Looks like this was lost in the JIRA import.
+Matei
+You can modify project/SparkBuild.scala and build Spark with sbt instead of Maven.
++1
+Tested it out on Mac OS X and Windows, looked through docs.
+Matei
++1
+Tested on Mac OS X.
+Matei
+Unless you can diagnose the problem quickly, Gary, I think we need to go ahead with this release as is. This release didn't touch the Mesos support as far as I know, so the problem might be a nondeterministic issue with your application. But on the other hand the release does fix some critical bugs that affect all users. We can always do 1.0.2 later if we discover a problem.
+Matei
+I haven't seen issues using the JVM's own tools (jstack, jmap, hprof and such), so maybe there's a problem in YourKit or in your release of the JVM. Otherwise I'd suggest increasing the heap size of the unit tests a bit (you can do this in the SBT build file). Maybe they are very close to full and profiling pushes them over the edge.
+Matei
+Yeah, I'd just add a spark-util that has these things.
+Matei
+You can actually turn off shuffle compression by setting spark.shuffle.compress to false. Try that out, there will still be some buffers for the various OutputStreams, but they should be smaller.
+Matei
+Yeah, that seems like something we can inline :).
+Yeah, that seems like something we can inline :).
+Hey Reynold, just to clarify, users will still have to manually broadcast objects that they want to use *across* operations (e.g. in multiple iterations of an algorithm, or multiple map functions, or stuff like that). But they won't have to broadcast something they only use once.
+Matei
++1
+Tested on Mac, verified CHANGES.txt is good, verified several of the bug fixes.
+Matei
+For this particular issue, it would be good to know if Hadoop provides an API to determine the Hadoop version. If not, maybe that can be added to Hadoop in its next release, and we can check for it with reflection. We recently added a SparkContext.version() method in Spark to let you tell the version.
+Matei
++1
+Tested this on Mac OS X.
+Matei
+We could also do this, though it would be great if the Hadoop project provided this version number as at least a baseline. It's up to distributors to decide which version they report but I imagine they won't remove stuff that's in the reported version number.
+Matei
+I agree as well. FWIW sometimes I've seen this happen due to language barriers, i.e. contributors whose primary language is not English, but we need more motivation for each change.
+Hah, weird. "log" should be protected actually (look at trait Logging). Is your class extending SparkContext or somehow being placed in the org.apache.spark package? Or maybe the Scala compiler looks at it anyway.. in that case we can rename it. Please open a JIRA for it if that's the case.
+Hi everyone,
+The PMC recently voted to add two new committers and PMC members: Joey Gonzalez and Andrew Or. Both have been huge contributors in the past year -- Joey on much of GraphX as well as quite a bit of the initial work in MLlib, and Andrew on Spark Core. Join me in welcoming them as committers!
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Just as a note, when you're developing stuff, you can use "test-only" in sbt, or the equivalent feature in Maven, to run just some of the tests. This is what I do, I don't wait for Jenkins to run things. 90% of the time if it passes the tests that I know could break stuff, it will pass all of Jenkins.
+Jenkins should always be doing all the integration tests, so I don't think it will become *that* much shorter in the long run, though it can certainly be improved.
+Matei
+Just as a note on this paper, apart from implementing the algorithms in naive Python, they also run it in a fairly inefficient way. In particular their implementations send the model out with every task closure, which is really expensive for a large model, and bring it back with collectAsMap(). It would be much more efficient to send it e.g. with SparkContext.broadcast() or keep it distributed on the cluster throughout the computation, instead of making the drive node a bottleneck for communication.
+Implementing ML algorithms well by hand is unfortunately difficult, and this is why we have MLlib. The hope is that you either get your desired algorithm out of the box or get a higher-level primitive (e.g. stochastic gradient descent) that you can plug some functions into, without worrying about the communication.
+Matei
+Hey Gary, just as a workaround, note that you can use Mesos in coarse-grained mode by setting spark.mesos.coarse=true. Then it will hold onto CPUs for the duration of the job.
+Matei
+BTW it seems to me that even without that patch, you should be getting tasks launched as long as you leave at least 32 MB of memory free on each machine (that is, the sum of the executor memory sizes is not exactly the same as the total size of the machine). Then Mesos will be able to re-offer that machine whenever CPUs free up.
+Matei
+Was the original issue with Spark 1.1 (i.e. master branch) or an earlier release?
+One possibility is that your S3 bucket is in a remote Amazon region, which would make it very slow. In my experience though saveAsTextFile has worked even for pretty large datasets in that situation, so maybe there's something else in your job causing a problem. Have you tried other operations on the data, like count(), or saving synthetic datasets (e.g. sc.parallelize(1 to 100*1000*1000, 20).saveAsTextFile(...)?
+Matei
+My problem is that I'm not sure this workaround would solve things, given the issue described here (where there was a lot of memory free but it didn't get re-offered). If you think it does, it would be good to explain why it behaves like that.
+Matei
+Got it. Another thing that would help is if you spot any exceptions or failed tasks in the web UI (http://:4040).
+Matei
+Hey Nicholas,
+In general we've been looking at these periodically (at least I have) and asking people to close out of date ones, but it's true that the list has gotten fairly large. We should probably have an expiry time of a few months and close them automatically. I agree that it's daunting to see so many open PRs.
+Matei
+Personally I'd actually consider putting CDH4 back if there are still users on it. It's always better to be inclusive, and the convenience of a one-click download is high. Do we have a sense on what % of CDH users still use CDH4?
+Matei
++1
+Matei
+Hi Tom,
+HDFS and Spark don't actually have a minimum block size -- so in that first dataset, the files won't each be costing you 64 MB. However, the main reason for difference in performance here is probably the number of RDD partitions. In the first case, Spark will create an RDD with 10000 partitions, one per file, while in the second case it will likely have only 1-2 of them. The number of partitions affects the level of parallelism of operations like reduceByKey (by default, reduceByKey uses as many partitions as the parent RDD it runs on), and in this case, I think it's causing reduceByKey to spill to disk within tasks in the second case and not in the first case, because each task has more input data.
+You can see the number of partitions in each stage of your computation on the application web UI at http://:4040 if you want to confirm this. Also, for both programs, you can manually set the number of partitions for the reduce by passing a second argument to reduceByKey (e.g. reduceByKey(myFunc, 100)). In general it's best to choose this so that the input data for each reduce task fits in memory to avoid spilling.
+Matei
+PySpark doesn't attempt to support Jython at present. IMO while it might be a bit faster, it would lose a lot of the benefits of Python, which are the very strong data processing libraries (NumPy, SciPy, Pandas, etc). So I'm not sure it's worth supporting unless someone demonstrates a really major performance benefit.
+There was actually a recent patch to add PyPy support (https://github.com/apache/spark/pull/2144), which is worth a try if you want Python applications to run faster. It might actually be faster overall than Jython.
+Matei
+Hi folks,
+I interrupt your regularly scheduled user / dev list to bring you some pretty cool news for the project, which is that we've been able to use Spark to break MapReduce's 100 TB and 1 PB sort records, sorting data 3x faster on 10x fewer nodes. There's a detailed writeup at http://databricks.com/blog/2014/10/10/spark-breaks-previous-large-scale-sort-record.html. Summary: while Hadoop MapReduce held last year's 100 TB world record by sorting 100 TB in 72 minutes on 2100 nodes, we sorted it in 23 minutes on 206 nodes; and we also scaled up to sort 1 PB in 234 minutes.
+I want to thank Reynold Xin for leading this effort over the past few weeks, along with Parviz Deyhim, Xiangrui Meng, Aaron Davidson and Ali Ghodsi. In addition, we'd really like to thank Amazon's EC2 team for providing the machines to make this possible. Finally, this result would of course not be possible without the many many other contributions, testing and feature requests from throughout the community.
+For an engine to scale from these multi-hour petabyte batch jobs down to 100-millisecond streaming and interactive queries is quite uncommon, and it's thanks to all of you folks that we are able to make this happen.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Michael,
+I've been working on this in my repo: https://github.com/mateiz/spark/tree/decimal. I'll make some pull requests with these features soon, but meanwhile you can try this branch. See https://github.com/mateiz/spark/compare/decimal for the individual commits that went into it. It has exactly the precision stuff you need, plus some optimizations for working on decimals.
+Matei
+I'm also against these huge reformattings. They slow down development and backporting for trivial reasons. Let's not do that at this point, the style of the current code is quite consistent and we have plenty of other things to worry about. Instead, what you can do is as you edit a file when you're working on a feature, fix up style issues you see. Or, as Josh suggested, some way to make this apply only to new files would help.
+Matei
+The fixed-length binary type can hold fewer bytes than an int64, though many encodings of int64 can probably do the right thing. We can look into supporting multiple ways to do this -- the spec does say that you should at least be able to read int32s and int64s.
+Matei
+The biggest scaling issue was supporting a large number of reduce tasks efficiently, which the JIRAs in that post handle. In particular, our current default shuffle (the hash-based one) has each map task open a separate file output stream for each reduce task, which wastes a lot of memory (since each stream has its own buffer).
+A second thing that helped efficiency tremendously was Reynold's new network module (https://issues.apache.org/jira/browse/SPARK-2468). Doing I/O on 32 cores, 10 Gbps Ethernet and 8+ disks efficiently is not easy, as can be seen when you try to scale up other software.
+Finally, with 30,000 tasks even sending info about every map's output size to each reducer was a problem, so Reynold has a patch that avoids that if the number of tasks is large.
+Matei
+I'd also wait a bit until these are gone. Jetty is unfortunately a much hairier topic by the way, because the Hadoop libraries also depend on Jetty. I think it will be hard to update. However, a patch that shades Jetty might be nice to have, if that doesn't require shading a lot of other stuff.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+So from my point of view, I'd do it maybe 1-2 years after all the major Hadoop vendors have stopped supporting Java 6. We're not there yet, but we will be soon. The reason is that the cost of staying on Java 6 is much smaller to us (as developers) than the cost of fragmenting the Spark community by having a big chunk of users unable to upgrade past a certain version of Spark (or requiring them to use a modified third-party version, which is a similar thing). There's very little stuff in Java 7 or 8 that would make the project much better if we dropped support for 6 -- this Jetty issue might be one, but we can certainly work around it.
+We've done a lot of stuff to reach the broadest set of users, including pushing back the versions of Python and NumPy we support, and in my experience it's been well worth it. In surveys I've seen the majority of users (something like 75%) updating to each new Spark release within a few months of it coming out, which is awesome for keeping the community healthy.
+Matei
+Hi Stephen,
+How did you generate your Maven workspace? You need to make sure the Hive profile is enabled for it. For example sbt/sbt -Phive gen-idea.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+In Spark 1.1, the sort-based shuffle (spark.shuffle.manager=sort) will have better performance while creating fewer files. So I'd suggest trying that too.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+(BTW this had a bug with negative hash codes in 1.1.0 so you should try branch-1.1 for it).
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Congrats to everyone who helped make this happen. And if anyone has even more machines they'd like us to run on next year, let us know :).
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Several people asked about having maintainers review the PR queue for their modules regularly, and I like that idea. We have a new tool now to help with that in https://spark-prs.appspot.com.
+In terms of the set of open PRs itself, it is large but note that there are also 2800 *closed* PRs, which means we close the majority of PRs (and I don't know the exact stats but I'd guess that 90% of those are accepted and merged). I think one problem is that with GitHub, people often develop something as a PR and have a lot of discussion on there (including whether we even want the feature). I recently updated our "how to contribute" page to encourage opening a JIRA and having discussions on the dev list first, but I do think we need to be faster with closing ones that we don't have a plan to merge. Note that Hadoop, Hive, HBase, etc also have about 300 issues each in the "patch available" state, so this is some kind of universal constant :P.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+So I don't understand, Greg, are the partial committers committers, or are they not? Spark also has a PMC, but our PMC currently consists of all committers (we decided not to have a differentiation when we left the incubator). I see the Subversion partial committers listed as "committers" on https://people.apache.org/committers-by-project.html#subversion, so I assume they are committers. As far as I can see, CloudStack is similar.
+Matei
+Alright, Greg, I think I understand how Subversion's model is different, which is that the PMC members are all full committers. However, I still think that the model proposed here is purely organizational (how the PMC and committers organize themselves), and in no way changes peoples' ownership or rights. Certainly the reason I proposed it was organizational, to make sure patches get seen by the right people. I believe that every PMC member still has the same responsibility for two reasons:
+1) The PMC is actually what selects the maintainers, so basically this mechanism is a way for the PMC to make sure certain people review each patch.
+2) Code changes are all still made by consensus, where any individual has veto power over the code. The maintainer model mentioned here is only meant to make sure that the "experts" in an area get to see each patch *before* it is merged, and choose whether to exercise their veto power.
+Let me give a simple example, which is a patch to the Spark core public API. Say I'm a maintainer in this API. Without the maintainer model, the decision on the patch would be made as follows:
+- Any committer could review the patch and merge it
+- At any point during this process, I (as the main expert on this) could come in and -1 it, or give feedback
+- In addition, any other committer beyond me is allowed to -1 this patch
+With the maintainer model, the process is as follows:
+- Any committer could review the patch and merge it, but they would need to forward it to me (or another core API maintainer) to make sure we also approve
+- At any point during this process, I could come in and -1 it, or give feedback
+- In addition, any other committer beyond me is still allowed to -1 this patch
+The only change in this model is that committers are responsible to forward patches in these areas to certain other committers. If every committer had perfect oversight of the project, they could have also seen every patch to their component on their own, but this list ensures that they see it even if they somehow overlooked it.
+It's true that technically this model might "gate" development in the sense of adding some latency, but it doesn't "gate" it any more than consensus as a whole does, where any committer (not even PMC member) can -1 any code change. In fact I believe this will speed development by motivating the maintainers to be active in reviewing their areas and by reducing the chance that mistakes happen that require a revert.
+I apologize if this wasn't clear in any way, but I do think it's pretty clear in the original wording of the proposal. The sign-off by a maintainer is simply an extra step in the merge process, it does *not* mean that other committers can't -1 a patch, or that the maintainers get to review all patches, or that they somehow have more "ownership" of the component (since they already had the ability to -1). I also wanted to clarify another thing -- it seems there is a misunderstanding that only PMC members can be maintainers, but this was not the point; the PMC *assigns* maintainers but they can do it out of the whole committer pool (and if we move to separating the PMC from the committers, I fully expect some non-PMC committers to be made maintainers).
+I hope this clarifies where we're coming from, and why we believe that this still conforms fully with the spirit of Apache (collaborative, open development that anyone can participate in, and meritocracy for project governance). There were some comments made about the maintainers being only some kind of list of people without a requirement to review stuff, but as you can see it's the requirement to review that is the main reason I'm proposing this, to ensure we have an automated process for patches to certain components to be seen. If it helps we may be able to change the wording to something like "it is every committer's responsibility to forward patches for a maintained component to that component's maintainer", or something like that, instead of using "sign off". If we don't do this, I'd actually be against any measure that lists some component "maintainers" without them having a specific responsibility. Apache is not a place for people to gain kudos by having fancier titles given on a website, it's a place for building great communities and software.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Yup, the JIRA for this was https://issues.apache.org/jira/browse/SPARK-540 (one of our older JIRAs). I think it would be interesting to explore this further. Basically the way to add it into the API would be to add a version of persist() that takes another class than StorageLevel, say StorageStrategy, which allows specifying a custom serializer or perhaps even a transformation to turn each partition into another representation before saving it. It would also be interesting if this could work directly on an InputStream or ByteBuffer to deal with off-heap data.
+One issue we've found with our current Serializer interface by the way is that a lot of type information is lost when you pass data to it, so the serializers spend a fair bit of time figuring out what class each object written is. With this model, it would be possible for a serializer to know that all its data is of one type, which is pretty cool, but we might also consider ways of expanding the current Serializer interface to take more info.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Thanks everyone for voting on this. With all of the PMC votes being for, the vote passes, but there were some concerns that I wanted to address for everyone who brought them up, as well as in the wording we will use for this policy.
+First, like every Apache project, Spark follows the Apache voting process (http://www.apache.org/foundation/voting.html), wherein all code changes are done by consensus. This means that any PMC member can block a code change on technical grounds, and thus that there is consensus when something goes in. It's absolutely true that every PMC member is responsible for the whole codebase, as Greg said (not least due to legal reasons, e.g. making sure it complies to licensing rules), and this idea will not change that. To make this clear, I will include that in the wording on the project page, to make sure new committers and other community members are all aware of it.
+What the maintainer model does, instead, is to change the review process, by having a required review from some people on some types of code changes (assuming those people respond in time). Projects can have their own diverse review processes (e.g. some do commit-then-review and others do review-then-commit, some point people to specific reviewers, etc). This kind of process seems useful to try (and to refine) as the project grows. We will of course evaluate how it goes and respond to any problems.
+So to summarize,
+- Every committer is responsible for, and more than welcome to review and vote on, every code change. In fact all community members are welcome to do this, and lots are doing it.
+- Everyone has the same voting rights on these code changes (namely consensus as described at http://www.apache.org/foundation/voting.html)
+- Committers will be asked to run patches that are making architectural and API changes by the maintainers before merging.
+In practice, none of this matters too much because we are not exactly a hot-well of discord ;), and even in the case of discord, the point of the ASF voting process is to create consensus. The goal is just to have a better structure for reviewing and minimize the chance of errors.
+Here is a tally of the votes:
+Binding votes (from PMC): 17 +1, no 0 or -1
+Matei Zaharia
+Michael Armbrust
+Reynold Xin
+Patrick Wendell
+Andrew Or
+Prashant Sharma
+Mark Hamstra
+Xiangrui Meng
+Ankur Dave
+Imran Rashid
+Jason Dai
+Tom Graves
+Sean McNamara
+Nick Pentreath
+Josh Rosen
+Kay Ousterhout
+Tathagata Das
+Non-binding votes: 18 +1, one +0, one -1
++1:
+Nan Zhu
+Nicholas Chammas
+Denny Lee
+Cheng Lian
+Timothy Chen
+Jeremy Freeman
+Cheng Hao
+Jackylk Likun
+Kousuke Saruta
+Reza Zadeh
+Xuefeng Wu
+Witgo
+Manoj Babu
+Ravindra Pesala
+Liquan Pei
+Kushal Datta
+Davies Liu
+Vaquar Khan
++0: Corey Nolet
+-1: Greg Stein
+I'll send another email when I have a more detailed writeup of this on the website.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hey Andrew, your JIRA search link seems wrong, it's probably supposed to be this:
+https://issues.apache.org/jira/issues/?jql=project%20%3D%20SPARK%20AND%20resolution%20%3D%20Fixed%20AND%20fixVersion%20%3D%201.1.1%20ORDER%20BY%20priority%20DESC
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++1
+Tested on Mac OS X, and verified that sort-based shuffle bug is fixed.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++1
+Tested on Mac OS X, checked that bugs with too many small files being spilled are fixed.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+You can still send patches for docs until the release goes out -- please do if you see stuff.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hector, is this a comment on 1.1.1 or on the 1.2 preview?
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Ah, I see. But the spark.shuffle.blockTransferService property doesn't exist in 1.1 (AFAIK) -- what exactly are you doing to get this problem?
+Matei
+Interesting, perhaps we could publish each one with two IDs, of which the rc one is unofficial. The problem is indeed that you have to vote on a hash for a potentially final artifact.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hey Patrick, unfortunately you got some of the text here wrong, saying 1.1.0 instead of 1.2.0. Not sure it will matter since there can well be another RC after testing, but we should be careful.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Ryan,
+As a tip (and maybe this isn't documented well), I normally use SBT for development to avoid the slow build process, and use its interactive console to run only specific tests. The nice advantage is that SBT can keep the Scala compiler loaded and JITed across builds, making it faster to iterate. To use it, you can do the following:
+- Start the SBT interactive console with sbt/sbt
+- Build your assembly by running the "assembly" target in the assembly project: assembly/assembly
+- Run all the tests in one module: core/test
+- Run a specific suite: core/test-only org.apache.spark.rdd.RDDSuite (this also supports tab completion)
+Running all the tests does take a while, and I usually just rely on Jenkins for that once I've run the tests for the things I believed my patch could break. But this is because some of them are integration tests (e.g. DistributedSuite, which creates multi-process mini-clusters). Many of the individual suites run fast without requiring this, however, so you can pick the ones you want. Perhaps we should find a way to tag them so people  can do a "quick-test" that skips the integration ones.
+The assembly builds are annoying but they only take about a minute for me on a MacBook Pro with SBT warmed up. The assembly is actually only required for some of the "integration" tests (which launch new processes), but I'd recommend doing it all the time anyway since it would be very confusing to run those with an old assembly. The Scala compiler crash issue can also be a problem, but I don't see it very often with SBT. If it happens, I exit SBT and do sbt clean.
+Anyway, this is useful feedback and I think we should try to improve some of these suites, but hopefully you can also try the faster SBT process. At the end of the day, if we want integration tests, the whole test process will take an hour, but most of the developers I know leave that to Jenkins and only run individual tests locally before submitting a patch.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+An update on this: After adding the initial maintainer list, we got feedback to add more maintainers for some components, so we added four others (Josh Rosen for core API, Mark Hamstra for scheduler, Shivaram Venkataraman for MLlib and Xiangrui Meng for Python). We also decided to lower the "timeout" for waiting for a maintainer to a week. Hopefully this will provide more options for reviewing in these components.
+The complete list is available at https://cwiki.apache.org/confluence/display/SPARK/Committers.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++1
+Tested on Mac OS X.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+It's just Bootstrap checked into SVN and built using Jekyll. You can check out the raw source files from SVN from https://svn.apache.org/repos/asf/spark. IMO it's fine if you guys use the layout, but just make sure it doesn't look exactly the same because otherwise both sites will look like they're copied from some standard template. We used a slightly customized Bootstrap theme for it.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Please ask someone else to assign them for now, and just comment on them that you're working on them. Over time if you contribute a bunch we'll add you to that list. The problem is that in the past, people would assign issues to themselves and never actually work on them, making it confusing for others.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+FYI, ApacheCon North America call for papers is up.
+Matei
++1 on this.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+It's hard to tell without more details, but the start-up latency in Hive can sometimes be high, especially if you are running Hive on MapReduce. MR just takes 20-30 seconds per job to spin up even if the job is doing nothing.
+For real use of Spark SQL for short queries by the way, I'd recommend using the JDBC server so that you can have a long-running Spark process. It gets quite a bit faster after the first few queries.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+(Actually when we designed Spark SQL we thought of giving it another name, like Spark Schema, but we decided to stick with SQL since that was the most obvious use case to many users.)
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+While it might be possible to move this concept to Spark Core long-term, supporting structured data efficiently does require quite a bit of the infrastructure in Spark SQL, such as query planning and columnar storage. The intent of Spark SQL though is to be more than a SQL server -- it's meant to be a library for manipulating structured data. Since this is possible to build over the core API, it's pretty natural to organize it that way, same as Spark Streaming is a library.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+The type alias means your methods can specify either type and they will work. It's just another name for the same type. But Scaladocs and such will show DataFrame as the type.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+This looks like a pretty serious problem, thanks! Glad people are testing on Windows.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi all,
+The PMC recently voted to add three new committers: Cheng Lian, Joseph Bradley and Sean Owen. All three have been major contributors to Spark in the past year: Cheng on Spark SQL, Joseph on MLlib, and Sean on ML and many pieces throughout Spark Core. Join me in welcoming them as committers!
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++1
+Tested on Mac OS X.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Thanks Denny; added you.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+You're not really supposed to subclass DataFrame, instead you can make it from an RDD of Rows and a schema (e.g. with SQLContext.applySchema). Actually the Spark SQL data source API supports that too (org.apache.spark.sql.sources). Think of DataFrame as a container for structured data, not as a class that all data sources will have to implement. If you want to do something fancy like compute the Rows dynamically, your RDD can implement its own compute() method to do that.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++1
+Tested it on Mac OS X.
+One small issue I noticed is that the Scala 2.11 build is using Hadoop 1 without Hive, which is kind of weird because people will more likely want Hadoop 2 with Hive. So it would be good to publish a build for that configuration instead. We can do it if we do a new RC, or it might be that binary builds may not need to be voted on (I forgot the details there).
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Our goal is to let people use the latest Apache release even if vendors fall behind or don't want to package everything, so that's why we put out releases for vendors' versions. It's fairly low overhead.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Yeah, my concern is that people should get Apache Spark from *Apache*, not from a vendor. It helps everyone use the latest features no matter where they are. In the Hadoop distro case, Hadoop made all this effort to have standard APIs (e.g. YARN), so it should be easy. But it is a problem if we're not packaging for the newest versions of some distros; I think we just fell behind at Hadoop 2.4.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Just a note, one challenge with the BYOH version might be that users who download that can't run in local mode without also having Hadoop. But if we describe it correctly then hopefully it's okay.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+You do actually sign a CLA when you become a committer, and in general, we should ask for CLAs from anyone who contributes a large piece of code. This is the individual CLA: https://www.apache.org/licenses/icla.txt. Some people have sent them proactively because their employer asks them too.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++1. Tested on Mac OS X and verified that some of the bugs were fixed.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+It could also be that your hash function is expensive. What is the key class you have for the reduceByKey / groupByKey?
+Matei
+Your best bet might be to use a map in SQL and make the keys be longer paths (e.g. params_param1 and params_param2). I don't think you can have a map in some of them but not in others.
+Matei
++1 
+Tested on Mac OS X
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I don't like the idea of removing Hadoop 1 unless it becomes a significant maintenance burden, which I don't think it is. You'll always be surprised how many people use old software, even though various companies may no longer support them.
+With Hadoop 2 in particular, I may be misremembering, but I believe that the experience on Windows is considerably worse because it requires these shell scripts to set permissions that it won't find if you just download Spark. That would be one reason to keep Hadoop 1 in the default build. But I could be wrong, it's been a while since I tried Windows.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hey all,
+Over the past 1.5 months we added a number of new committers to the project, and I wanted to welcome them now that all of their respective forms, accounts, etc are in. Join me in welcoming the following new committers:
+- Davies Liu
+- DB Tsai
+- Kousuke Saruta
+- Sandy Ryza
+- Yin Huai
+Looking forward to more great contributions from all of these folks.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Just FYI, it would be easiest to follow SparkR's example and add the DataFrame API first. Other APIs will be designed to work on DataFrames (most notably machine learning pipelines), and the surface of this API is much smaller than of the RDD API. This API will also give you great performance as we continue to optimize Spark SQL.
+Matei
+I agree with this -- basically, to build on Reynold's point, you should be able to get almost the same performance by implementing either the Hadoop FileSystem API or the Spark Data Source API over Ignite in the right way. This would let people save data persistently in Ignite in addition to using it for caching, and it would provide a global namespace, optionally a schema, etc. You can still provide data locality, short-circuit reads, etc with these APIs.
+Matei
+I like the idea of popping out Tachyon to an optional component too to reduce the number of dependencies. In the future, it might even be useful to do this for Hadoop, but it requires too many API changes to be worth doing now.
+Regarding Scala 2.12, we should definitely support it eventually, but I don't think we need to block 2.0 on that because it can be added later too. Has anyone investigated what it would take to run on there? I imagine we don't need many code changes, just maybe some REPL stuff.
+Needless to say, but I'm all for the idea of making "major" releases as undisruptive as possible in the model Reynold proposed. Keeping everyone working with the same set of releases is super important.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi all,
+The PMC has recently added two new Spark committers -- Herman van Hovell and Wenchen Fan. Both have been heavily involved in Spark SQL and Tungsten, adding new features, optimizations and APIs. Please join me in welcoming Herman and Wenchen.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+I agree that putting it in 2.0 doesn't mean keeping Scala 2.10 for the entire 2.x line. My vote is to keep Scala 2.10 in Spark 2.0, because it's the default version we built with in 1.x. We want to make the transition from 1.x to 2.0 as easy as possible. In 2.0, we'll have the default downloads be for Scala 2.11, so people will more easily move, but we shouldn't create obstacles that lead to fragmenting the community and slowing down Spark 2.0's adoption. I've seen companies that stayed on an old Scala version for multiple years because switching it, or mixing versions, would affect the company's entire codebase.
+Matei
+Hi folks,
+Around 1.5 years ago, Spark added a maintainer process for reviewing API and architectural changes (https://cwiki.apache.org/confluence/display/SPARK/Committers#Committers-ReviewProcessandMaintainers) to make sure these are seen by people who spent a lot of time on that component. At the time, the worry was that changes might go unnoticed as the project grows, but there were also concerns that this approach makes the project harder to contribute to and less welcoming. Since implementing the model, I think that a good number of developers concluded it doesn't make a huge difference, so because of these concerns, it may be useful to remove it. I've also heard that we should try to keep some other instructions for contributors to find the "right" reviewers, so it would be great to see suggestions on that. For my part, I'd personally prefer something "automatic", such as easily tracking who reviewed each patch and having people look at the commit history of the module they want to work on, instead of a list that needs to be maintained separately.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+It looks like the discussion thread on this has only had positive replies, so I'm going to call a VOTE. The proposal is to remove the maintainer process in https://cwiki.apache.org/confluence/display/SPARK/Committers#Committers-ReviewProcessandMaintainers  given that it doesn't seem to have had a huge impact on the project, and it can unnecessarily create friction in contributing. We already have +1s from Mridul, Tom, Andrew Or and Imran on that thread.
+I'll leave the VOTE open for 48 hours, until 9 PM EST on May 24, 2016.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Correction, let's run this for 72 hours, so until 9 PM EST May 25th.
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Just wondering, what is the main use case for the Docker images -- to develop apps locally or to deploy a cluster? If the image is really just a script to download a certain package name from a mirror, it may be okay to create an official one, though it does seem tricky to make it properly use the right mirror.
+Matei
+Thanks everyone for voting. With only +1 votes, the vote passes, so I'll update the contributor wiki appropriately.
++1 votes:
+Matei Zaharia (binding)
+Mridul Muralidharan (binding)
+Andrew Or (binding)
+Sean Owen (binding)
+Nick Pentreath (binding)
+Tom Graves (binding)
+Imran Rashid (binding)
+Holden Karau
+Owen O'Malley
+No 0 or -1 votes.
+Matei
+Hi all,
+The PMC recently voted to add Yanbo Liang as a committer. Yanbo has been a super active contributor in many areas of MLlib. Please join me in welcoming Yanbo!
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Personally I'd just put them on the staging repo and link to that on the downloads page. It will create less confusion for people browsing Maven Central later and wondering which releases are safe to use.
+Matei
+Is there any way to remove artifacts from Maven Central? Maybe that would
+help clean these things up long-term, though it would create problems for
+users who for some reason decide to rely on these previews.
+In any case, if people are *really* concerned about this, we should just
+put it there. My thought was that it's better for users to do something
+special to link to this release (e.g. add a reference to the staging repo)
+so that they are more likely to know that it's a special, unstable thing.
+Same thing they do to use snapshots.
+Matei
+BTW, same goes with docs -- Sean, if you want to add a /docs/2.0-preview on
+the website and link to it, go for it!
+Matei
+Hi all, FYI, we've recently updated the Spark logo at https://spark.apache.org/ to say "Apache Spark" instead of just "Spark". Many ASF projects have been doing this recently to make it clearer that they are associated with the ASF, and indeed the ASF's branding guidelines generally require that projects be referred to as "Apache X" in various settings, especially in related commercial or open source products (https://www.apache.org/foundation/marks/). If you have any kind of site or product that uses Spark logo, it would be great to update to this full one.
+There are EPS versions of the logo available at https://spark.apache.org/images/spark-logo.eps and https://spark.apache.org/images/spark-logo-reverse.eps; before using these also check https://www.apache.org/foundation/marks/.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
+Hi Jacek,
+This applies to all schedulers actually -- it just tells Spark to re-check the available nodes and possibly launch tasks on them, because a new stage was submitted. Then when any node is available, the scheduler will call the TaskSetManager with an "offer" for the node.
+Matei
+---------------------------------------------------------------------
+To unsubscribe, e-mail: dev-unsubscribe@spark.apache.org
+For additional commands, e-mail: dev-help@spark.apache.org
++1
+Tested on Mac.
+Matei
+Hi all,
+The PMC recently voted to add Felix Cheung as a committer. Felix has been a major contributor to SparkR and we're excited to have him join officially. Congrats and welcome, Felix!
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+I think you should ask legal about how to have some Maven artifacts for these. Both Ganglia and Kinesis are very widely used, so it's weird to ask users to build them from source. Maybe the Maven artifacts can be marked as being under a different license?
+In the initial discussion for LEGAL-198, we were told the following:
+"If the component that uses this dependency is not required for the rest of Spark to function then you can have a subproject to build the component. See http://www.apache.org/legal/resolved.html#optional. This means you will have to provide instructions for users to enable the optional component (which IMO should provide pointers to the licensing)."
+It's not clear whether "enable the optional component" means "every user must build it from source", or whether we could tell users "here's a Maven coordinate you can add to your project if you're okay with the licensing".
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+The question is just whether the metadata and instructions involving these Maven packages counts as sufficient to tell the user that they have different licensing terms. For example, our Ganglia package was called spark-ganglia-lgpl (so you'd notice it's a different license even from its name), and our Kinesis one was called spark-streaming-kinesis-asl, and our docs both mentioned these were under different licensing terms. But is that enough? That's the question.
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+This source is meant to be used for a shared file system such as HDFS or NFS, where both the driver and the workers can see the same folders. There's no support in Spark for just working with local files on different workers.
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
++1
+Matei
+Hey Cody,
+Thanks for bringing these things up. You're talking about quite a few different things here, but let me get to them each in turn.
+1) About technical / design discussion -- I fully agree that everything big should go through a lot of review, and I like the idea of a more formal way to propose and comment on larger features. So far, all of this has been done through JIRA, but as a start, maybe marking JIRAs as large (we often use Umbrella for this) and also opening a thread on the list about each such JIRA would help. For Structured Streaming in particular, FWIW, there was a pretty complete doc on the proposed semantics at https://issues.apache.org/jira/browse/SPARK-8360 since March. But it's true that other things such as the Kafka source for it didn't have as much design on JIRA. Nonetheless, this component is still early on and there's still a lot of time to change it, which is happening.
+2) About what people say at Reactive Summit -- there will always be trolls, but just ignore them and build a great project. Those of us involved in the project for a while have long seen similar stuff, e.g. a prominent company saying Spark doesn't scale past 100 nodes when there were many documented instances to the contrary, and the best answer is to just make the project better. This same company, if you read their website now, recommends Apache Spark for most anything. For streaming in particular, there is a lot of confusion because many of the concepts aren't well-defined (e.g. what is "at least once", etc), and it's also a crowded space. But Spark Streaming prioritizes a few things that it does very well: correctness (you can easily tell what the app will do, and it does the same thing despite failures), ease of programming (which also requires correctness), and scalability. We should of course both explain what it does in more places and work on improving it where needed (e.g. adding a higher level API with Structured Streaming and built-in primitives for external timestamps).
+3) About number and diversity of committers -- the PMC is always working to expand these, and you should email people on the PMC (or even the whole list) if you have people you'd like to propose. In general I think nearly all committers added in the past year were from organizations that haven't long been involved in Spark, and the number of committers continues to grow pretty fast.
+4) Finally, about better organizing JIRA, marking dead issues, etc, this would be great and I think we just need a concrete proposal for how to do it. It would be best to point to an existing process that someone else has used here BTW so that we can see it in action.
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+For the improvement proposals, I think one major point was to make them really visible to users who are not contributors, so we should do more than sending stuff to dev@. One very lightweight idea is to have a new type of JIRA called a SIP and have a link to a filter that shows all such JIRAs from http://spark.apache.org. I also like the idea of SIP and design doc templates (in fact many projects have them).
+Matei
+This makes a lot of sense; just to comment on a few things:
+This is something the PMC is actively discussing. Historically, we've added committers when people contributed a new module or feature, basically to the point where other developers are asking them to review changes in that area (https://cwiki.apache.org/confluence/display/SPARK/Committers#Committers-BecomingaCommitter). For example, we added the original authors of GraphX when we merged in GraphX, the authors of new ML algorithms, etc. However, there's a good argument that some areas are simply not covered well now and we should add people there. Also, as the project has grown, there are also more people who focus on smaller fixes and are nonetheless contributing a lot.
+Just as a note here -- it's true that some areas are not super well covered, but I also hope to avoid a situation where people have to yell to be listened to. I can't say anything about *all* technical discussions we've ever had, but historically, people have been able to comment on the design of many things without yelling. This is actually important because a culture of having to yell can drive away contributors. So it's awesome that you yelled about the Kafka source stuff, but at the same time, hopefully we make these types of things work without yelling. This would be a problem even if there were committers with more expertise in each area -- what if someone disagrees with the committers?
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Sounds good. Just to comment on the compatibility part:
+Experimental APIs and alpha components are indeed supposed to be changeable (https://cwiki.apache.org/confluence/display/SPARK/Spark+Versioning+Policy). Maybe people are being too conservative in some cases, but I do want to note that regardless of what precise policy we try to write down, this type of issue will ultimately be a judgment call. Is it worth making a small cosmetic change in an API that's marked experimental, but has been used widely for a year? Perhaps not. Is it worth making it in something one month old, or even in an older API as we move to 2.0? Maybe yes. I think we should just discuss each one (start an email thread if resolving it on JIRA is too complex) and perhaps be more religious about making things non-experimental when we think they're done.
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Yup, this is the stuff that I found unclear. Thanks for clarifying here, but we should also clarify it in the writeup. In particular:
+- Goals needs to be about user-facing behavior ("people" is broad)
+- I'd rename Rejected Goals to Non-Goals. Otherwise someone will dig up one of these and say "Spark's developers have officially rejected X, which our awesome system has".
+- For user-facing stuff, I think you need a section on API. Virtually all other *IPs I've seen have that.
+- I'm still not sure why the strategy section is needed if the purpose is to define user-facing behavior -- unless this is the strategy for setting the goals or for defining the API. That sounds squarely like a design doc issue. In some sense, who cares whether the proposal is technically feasible right now? If it's infeasible, that will be discovered later during design and implementation. Same thing with rejected strategies -- listing some of those is definitely useful sometimes, but if you make this a *required* section, people are just going to fill it in with bogus stuff (I've seen this happen before).
+Matei
+---------------------------------------------------------------------
+To unsubscribe e-mail: dev-unsubscribe@spark.apache.org
+Well, I think there are a few things here that don't make sense. First, why should only committers submit SIPs? Development in the project should be open to all contributors, whether they're committers or not. Second, I think unrealistic goals can be found just by inspecting the goals, and I'm not super worried that we'll accept a lot of SIPs that are then infeasible -- we can then submit new ones. But this depends on whether you want this process to be a "design doc lite", where people also agree on implementation strategy, or just a way to agree on goals. This is what I asked earlier about PRDs vs design docs (and I'm open to either one but I'd just like clarity). Finally, both as a user and designer of software, I always want to give feedback on APIs, so I'd really like a culture of having those early. People don't argue about prettiness when they discuss APIs, they argue about the core concepts to expose in order to meet various goals, and then they're stuck maintaining those for a long time.
+Matei
+What are the main use cases you've seen for this? Maybe we can add a page to the docs about how to launch Spark as an embedded library.
+Matei
+Is there any way to tie wiki accounts with JIRA accounts? I found it weird that they're not tied at the ASF.
+Otherwise, moving this into the docs might make sense.
+Matei
+I'm also curious whether there are concerns other than latency with the way stuff executes in Structured Streaming (now that the time steps don't have to act as triggers), as well as what latency people want for various apps.
+The stateful operator designs for streaming systems aren't inherently "better" than micro-batching -- they lose a lot of stuff that is possible in Spark, such as load balancing work dynamically across nodes, speculative execution for stragglers, scaling clusters up and down elastically, etc. Moreover, Spark itself could execute the current model with much lower latency. The question is just what combinations of latency, throughput, fault recovery, etc to target.
+Matei
+Yeah, as Shivaram pointed out, there have been research projects that looked at it. Also, Structured Streaming was explicitly designed to not make microbatching part of the API or part of the output behavior (tying triggers to it). However, when people begin working on that is a function of demand relative to other features. I don't think we can commit to one plan before exploring more options, but basically there is Shivaram's project, which adds a few new concepts to the scheduler, and there's the option to reduce control plane latency in the current system, which hasn't been heavily optimized yet but should be doable (lots of systems can handle 10,000s of RPCs per second).
+Matei
+Both Spark Streaming and Structured Streaming preserve locality for operator state actually. They only reshuffle state if a cluster node fails or if the load becomes heavily imbalanced and it's better to launch a task on another node and load the state remotely.
+Matei
+Just to comment on this, I'm generally against removing these types of things unless they create a substantial burden on project contributors. It doesn't sound like Python 2.6 and Java 7 do that yet -- Scala 2.10 might, but then of course we need to wait for 2.12 to be out and stable.
+In general, this type of stuff only hurts users, and doesn't have a huge impact on Spark contributors' productivity (sure, it's a bit unpleasant, but that's life). If we break compatibility this way too quickly, we fragment the user community, and then either people have a crappy experience with Spark because their corporate IT doesn't yet have an environment that can run the latest version, or worse, they create more maintenance burden for us because they ask for more patches to be backported to old Spark versions (1.6.x, 2.0.x, etc). Python in particular is pretty fundamental to many Linux distros.
+In the future, rather than just looking at when some software came out, it may be good to have some criteria for when to drop support for something. For example, if there are really nice libraries in Python 2.7 or Java 8 that we're missing out on, that may be a good reason. The maintenance burden for multiple Scala versions is definitely painful but I also think we should always support the latest two Scala releases.
+Matei
+Deprecating them is fine (and I know they're already deprecated), the question is just whether to remove them. For example, what exactly is the downside of having Python 2.6 or Java 7 right now? If it's high, then we can remove them, but I just haven't seen a ton of details. It also sounded like fairly recent versions of CDH, HDP, RHEL, etc still have old versions of these.
+Just talking with users, I've seen many of people who say "we have a Hadoop cluster from $VENDOR, but we just download Spark from Apache and run newer versions of that". That's great for Spark IMO, and we need to stay compatible even with somewhat older Hadoop installs because they are time-consuming to update. Having the whole community on a small set of versions leads to a better experience for everyone and also to more of a "network effect": more people can battle-test new versions, answer questions about them online, write libraries that easily reach the majority of Spark users, etc.
+Matei
+BTW maybe one key point that isn't obvious is that with YARN and Mesos, the version of Spark used can be solely up to the developer who writes an app, not to the cluster administrator. So even in very conservative orgs, developers can download a new version of Spark, run it, and demonstrate value, which is good both for them and for the project. On the other hand, if they were stuck with, say, Spark 1.3, they'd have a much worse experience and perhaps get a worse impression of the project.
+Matei
+It might be useful to ask Apache Infra whether they have any information on these (e.g. what do their own spam metrics say, do they get any feedback from Google, etc). Unfortunately mailing lists seem to be less and less well supported by most email providers.
+Matei
+The Kafka source will only appear in 2.0.2 -- see this thread for the current release candidate: https://lists.apache.org/thread.html/597d630135e9eb3ede54bb0cc0b61a2b57b189588f269a64b58c9243@%3Cdev.spark.apache.org%3E . You can try that right now if you want from the staging Maven repo shown there. The vote looks likely to pass so an actual release should hopefully also be out soon.
+Matei
