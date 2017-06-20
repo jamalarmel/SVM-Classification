@@ -10,10 +10,6 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.svm import LinearSVC
 from sklearn.metrics import confusion_matrix
 
-#file_list = glob.glob('corpus/corpus/*.txt')
-#arrays = [np.genfromtxt(f, delimiter=',', dtype=None) for f in file_list]
-#final_array = np.concatenate([arrays])
-
 class News_Classifier:
     X_train=[]
     X_test=[]
@@ -22,6 +18,9 @@ class News_Classifier:
     Y1=[]
     size=0
     train_ex=0
+    #lines = []
+
+
     def __init__(self):
         #List to store input text
         data_input=[]
@@ -53,13 +52,16 @@ class News_Classifier:
             train_text.append(data_input[p])
             self.Y_train.append(data_output[p])
         
-       
-        
-        
         self.X_train = np.array(train_text[:self.train_ex])
-        self.X_test  = np.array(train_text[self.train_ex:self.size])
-    	#self.X_test  = final_array
-        
+        #self.X_test  = np.array(train_text[self.train_ex:self.size])
+        files = glob.glob("corpus/*.txt")
+        lines = []
+        for fle in files:
+            with open(fle) as f:
+                lines += f.readlines()        
+        self.X_test = np.array(lines)
+    	
+
         self.lb=LabelBinarizer()
         self.Y1=self.Y_train[:self.train_ex]
         self.y = self.lb.fit_transform(self.Y1)
@@ -84,7 +86,7 @@ class News_Classifier:
                 correct=correct+1
             i = i + 1
         for item, labels in zip(self.X_test, y_pred):
-            print('{0} => {1}'.format(item, labels)) 
+            print('Item: {0} => Label: {1}'.format(item, labels)) 
 
         print 'Number of Examples used for Training',self.train_ex
         print 'Number of Correctly classified',correct

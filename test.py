@@ -1,6 +1,19 @@
 import glob
-import numpy as np
-file_list = glob.glob('corpus/corpus/*.txt')
-arrays = [np.genfromtxt(f, delimiter=',', dtype=None) for f in file_list]
-final_array = np.concatenate([arrays])
-print final_array
+
+lines = []
+files = glob.glob("corpus/*.txt")
+for fle in files:
+    with open(fle) as f:
+        lines += f.readlines()
+print(lines)
+
+
+# lines = []
+# #test = []
+# files = glob.glob("/corpus/*.txt")
+# for fle in files:
+#     with open(fle) as f:
+#         lines += f.readlines()        
+#     	#test = np.array('lines')
+# #print(test)
+# print(lines)
