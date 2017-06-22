@@ -4,13 +4,14 @@ import glob
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.svm import LinearSVC
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import (confusion_matrix, classification_report)
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-class News_Classifier:
+class Doc_Classifier:
     X_train=[]
     X_test=[]
     Y_train=[]
@@ -18,7 +19,6 @@ class News_Classifier:
     Y1=[]
     size=0
     train_ex=0
-    #lines = []
 
 
     def __init__(self):
@@ -53,13 +53,13 @@ class News_Classifier:
             self.Y_train.append(data_output[p])
         
         self.X_train = np.array(train_text[:self.train_ex])
-        #self.X_test  = np.array(train_text[self.train_ex:self.size])
-        files = glob.glob("corpus/*.txt")
-        lines = []
-        for fle in files:
-            with open(fle) as f:
-                lines += f.readlines()        
-        self.X_test = np.array(lines)
+        self.X_test  = np.array(train_text[self.train_ex:self.size])
+        # files = glob.glob("corpus/*.txt")
+        # lines = []
+        # for fle in files:
+        #     with open(fle) as f:
+        #         lines += f.readlines()        
+        # self.X_test = np.array(lines)
     	
 
         self.lb=LabelBinarizer()
@@ -86,7 +86,7 @@ class News_Classifier:
                 correct=correct+1
             i = i + 1
         for item, labels in zip(self.X_test, y_pred):
-            print('Item: {0} => Label: {1}'.format(item, labels)) 
+            print('Item: {0} => Label: {1}'.format(item, labels))
 
         print 'Number of Examples used for Training',self.train_ex
         print 'Number of Correctly classified',correct
@@ -94,14 +94,19 @@ class News_Classifier:
         print 'The resulting accuracy using Linear SVC is ',(float(correct)*100/float(self.size-self.train_ex)),'%\n'
 
         cm=confusion_matrix(self.Y_train[self.train_ex:self.size],y_pred)
-        print 'The confusion matrix is',cm
+        percentage_matrix = 100 * cm / cm.sum(axis=1).astype(float)
+        plt.figure(figsize=(16, 16))
+        sns.heatmap(percentage_matrix, annot=True,  fmt='.2f', xticklabels=['Python', 'Java', 'Scala'], yticklabels=['Python', 'Java', 'Scala']);
+        plt.title('Confusion Matrix (Percentage)');
+        plt.show()
+        print(classification_report(self.Y_train[self.train_ex:self.size], y_pred,target_names=['Scala', 'Java', 'Python']))
      
         return y_pred
     
 
 start=time.time()
 print 'Initializing....'
-n=News_Classifier()
+n=Doc_Classifier()
 start=time.time()
 
 print '\nRunning SVM Classification'
