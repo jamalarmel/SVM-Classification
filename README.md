@@ -1,3 +1,6 @@
+[![DOI](https://zenodo.org/badge/94644625.svg)](https://zenodo.org/badge/latestdoi/94644625)
+
+
 The package includes the following files:
 	
 	data_extraction.py: The data extraction script extracts the relevant data from the corpus and creates a CSV corpus.csv to store the data in a format that can be used by the system
