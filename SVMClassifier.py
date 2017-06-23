@@ -26,10 +26,9 @@ class Doc_Classifier:
         data_input=[]
         #List to store output labels
         data_output=[]
-        
         train_text=[]
         
-        self.train_ex=int(raw_input('Please enter the number of examples that should be used to train the model\n'))
+        self.train_ex=int(raw_input('Enter the number of examples that should be used to train the model\n'))
 
         with open('corpus.csv','r') as f:
             train_csv=csv.reader(f)
