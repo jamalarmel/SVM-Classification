@@ -1,6 +1,8 @@
 import glob
 import numpy
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.feature_extraction.text import (CountVectorizer, TfidfTransformer)
 from sklearn.multiclass import OneVsRestClassifier
@@ -8,8 +10,8 @@ from sklearn.svm import LinearSVC
 from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold
 from sklearn.metrics import (confusion_matrix, classification_report, accuracy_score)
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.calibration import (calibration_curve, CalibratedClassifierCV)
+
 
 df = pd.read_csv("corpus.csv", sep=",", encoding="latin-1")
 
@@ -50,21 +52,27 @@ for train_indices, test_indices in k_fold:
     pipeline.fit(train_text, Z)
     predicted = pipeline.predict(test_text)
     predictions = lb.inverse_transform(predicted)
-    
+
+    #Try to add prediction's probability
+    #clf = CalibratedClassifierCV(pipeline)
+    #clf.fit(train_text, Z)
+    #y_proba = clf.predict_proba(test_text)
+
 
     df2=pd.DataFrame(predictions)
     df2.index+=1
     df2.index.name='Id'
     df2.columns=['Label']
     df2.to_csv('results.csv',header=True)
+
     for item, labels in zip(test_text, predictions):
-        print('Item: {0} => Label: {1}'.format(item, labels))    
-   
+        print('Item: {0} => Label: {1}'.format(item, labels))
 
     cm = confusion_matrix(test_y, predictions)
     accuracy = accuracy_score(test_y, predictions)
 
 print 'The resulting accuracy using Linear SVC is ', (100 * accuracy), '%\n'
+#print y_proba
 
 percentage_matrix = 100 * cm / cm.sum(axis=1).astype(float)
 plt.figure(figsize=(16, 16))
